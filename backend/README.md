@@ -9,16 +9,17 @@ uvicorn app.main:app --reload
 
 ## Environment
 
-1. Copy `backend/.env.example` to `backend/.env`
-2. Keep `backend/.env` local only. The repository now ignores it.
-3. Set `ANALYSIS_ADAPTER=mock` for local contract testing, or `ANALYSIS_ADAPTER=openai_compatible` for a real model API
-4. When using a real model API, fill at least:
+1. Put local secrets and chain addresses in the repository-root `.env.local`
+2. Keep `.env.local` local only. The repository now ignores it.
+3. For another machine, copy `.env.local.example` to `.env.local` and fill the secret values.
+4. Set `ANALYSIS_ADAPTER=mock` for local contract testing, or `ANALYSIS_ADAPTER=openai_compatible` for a real model API
+5. When using a real model API, fill at least:
    - `ANALYSIS_PROVIDER`
    - `ANALYSIS_REGION`
    - `ANALYSIS_API_BASE_URL`
    - `ANALYSIS_API_KEY`
    - `ANALYSIS_MODEL`
-5. HashKey Chain defaults are now configurable through:
+6. HashKey Chain defaults are now configurable through:
    - `HASHKEY_TESTNET_CHAIN_ID`
    - `HASHKEY_TESTNET_RPC_URL`
    - `HASHKEY_TESTNET_EXPLORER_URL`
@@ -27,7 +28,7 @@ uvicorn app.main:app --reload
    - `HASHKEY_MAINNET_EXPLORER_URL`
    - `PLAN_REGISTRY_ADDRESS`
    - `KYC_SBT_ADDRESS`
-6. When using Brave Search, fill at least:
+7. When using Brave Search, fill at least:
    - `SEARCH_ADAPTER=brave`
    - `SEARCH_API_KEY`
 
@@ -39,7 +40,7 @@ ANALYSIS_PROVIDER=openai-compatible
 ANALYSIS_REGION=global
 ANALYSIS_API_BASE_URL=https://api.openai.com/v1
 ANALYSIS_API_KEY=your_api_key
-ANALYSIS_MODEL=gpt-4.1-mini
+ANALYSIS_MODEL=glm-5.1
 SEARCH_ADAPTER=brave
 SEARCH_API_BASE_URL=https://api.search.brave.com/res/v1/web/search
 SEARCH_API_KEY=your_brave_key
@@ -66,7 +67,7 @@ Brave Search notes:
 Debug console notes:
 
 - Protected debug APIs live under `/api/debug/*`
-- Debug credentials come from `DEBUG_USERNAME` and `DEBUG_PASSWORD` in `backend/.env`
+- Debug credentials come from `DEBUG_USERNAME` and `DEBUG_PASSWORD` in the repository-root `.env.local`
 - The regular user UI and the debug UI are intentionally split so audit logs are no longer embedded in the main frontend experience
 
 ## Current scope

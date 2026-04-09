@@ -11,6 +11,49 @@ const repoRoot = path.resolve(path.dirname(new URL(import.meta.url).pathname), '
 const frontendPackageRoot = path.join(repoRoot, 'frontend')
 const contractPath = path.join(repoRoot, 'contracts', 'PlanRegistry.sol')
 
+function stripQuotes(value) {
+  if (
+    value.length >= 2 &&
+    ((value.startsWith('"') && value.endsWith('"')) ||
+      (value.startsWith("'") && value.endsWith("'")))
+  ) {
+    return value.slice(1, -1)
+  }
+  return value
+}
+
+function loadEnvFiles() {
+  const candidates = [
+    path.join(repoRoot, '.env.local'),
+    path.join(frontendPackageRoot, '.env.local'),
+    path.join(repoRoot, '.env'),
+    path.join(frontendPackageRoot, '.env'),
+  ]
+
+  for (const envPath of candidates) {
+    if (!fs.existsSync(envPath)) {
+      continue
+    }
+
+    const content = fs.readFileSync(envPath, 'utf8')
+    for (const rawLine of content.split(/\r?\n/)) {
+      const line = rawLine.trim()
+      if (!line || line.startsWith('#') || !line.includes('=')) {
+        continue
+      }
+
+      const separatorIndex = line.indexOf('=')
+      const key = line.slice(0, separatorIndex).trim()
+      if (!key || process.env[key]) {
+        continue
+      }
+
+      const value = stripQuotes(line.slice(separatorIndex + 1).trim())
+      process.env[key] = value
+    }
+  }
+}
+
 async function importFromFrontend(specifier) {
   const resolved = require.resolve(specifier, { paths: [frontendPackageRoot] })
   return import(pathToFileURL(resolved).href)
@@ -87,9 +130,16 @@ function resolveNetworkConfig() {
 }
 
 async function main() {
-  const privateKey = process.env.PLAN_REGISTRY_DEPLOYER_PRIVATE_KEY
+  loadEnvFiles()
+
+  const privateKey =
+    process.env.PLAN_REGISTRY_DEPLOYER_PRIVATE_KEY ||
+    process.env.PRIVATE_KEY ||
+    process.env.DEPLOYER_PRIVATE_KEY
   if (!privateKey) {
-    console.error('PLAN_REGISTRY_DEPLOYER_PRIVATE_KEY is required.')
+    console.error(
+      'PLAN_REGISTRY_DEPLOYER_PRIVATE_KEY is required. The script also accepts PRIVATE_KEY or DEPLOYER_PRIVATE_KEY from .env.local.',
+    )
     process.exit(1)
   }
 

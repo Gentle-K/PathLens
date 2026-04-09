@@ -56,7 +56,6 @@ In a second terminal:
 ```bash
 cd frontend
 npm install
-copy .env.example .env
 npm run dev
 ```
 
@@ -74,7 +73,7 @@ npm run preview
 
 ## Environment variables
 
-Use `.env.example` as the starting point.
+Use the repository-root `.env.local` as the preferred place for local environment variables. For another machine, start from `.env.local.example`.
 
 - `VITE_API_MODE`: `mock` or `rest`
 - `VITE_API_BASE_URL`: REST backend base URL. Leave empty in local dev to use the Vite proxy.

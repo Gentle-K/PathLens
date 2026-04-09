@@ -83,7 +83,7 @@ This repo is now intentionally aligned with the HashKey Chain DeFi / RWA track:
 
 - protected debug login page and debug-only audit/session pages
 - cookie-based anonymous session isolation for normal product use
-- backend `.env` is ignored by git for local API secret storage
+- repository-root `.env.local` is ignored by git and should hold all local-only backend, frontend, wallet, and chain-specific settings
 - OpenAI-compatible adapter and mock adapter remain switchable
 
 ## Repository layout
@@ -131,7 +131,6 @@ cd backend
 python3.13 -m venv .venv
 . .venv/bin/activate
 pip install -r requirements.txt
-cp .env.example .env
 uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload
 ```
 
@@ -140,7 +139,6 @@ uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload
 ```bash
 cd frontend
 npm install
-cp .env.example .env
 npm run dev
 ```
 
@@ -148,7 +146,8 @@ Then open [http://localhost:5173](http://localhost:5173).
 
 ## Environment notes
 
-Backend secrets and model settings should live in `backend/.env`. Keep that file local only.
+Local secrets and environment-specific settings should live in the repository-root `.env.local`. Keep that file local only.
+For another machine, start from the tracked [`.env.local.example`](/Users/kk./Desktop/Gay/.env.local.example).
 
 Important backend variables:
 
@@ -172,11 +171,20 @@ Important backend variables:
 - `DEBUG_USERNAME`
 - `DEBUG_PASSWORD`
 
-The default OpenAI-compatible example in `backend/.env.example` uses:
+Additional root-only local variables commonly used from the same `.env.local`:
+
+- `VITE_API_MODE`
+- `VITE_API_BASE_URL`
+- `VITE_API_WITH_CREDENTIALS`
+- `VITE_PROXY_TARGET`
+- `VITE_WS_PROXY_TARGET`
+- `PRIVATE_KEY`
+
+The consolidated root example in [`.env.local.example`](/Users/kk./Desktop/Gay/.env.local.example) uses:
 
 - provider: `openai-compatible`
 - base URL: `https://api.openai.com/v1`
-- model: `gpt-4.1-mini`
+- model: `glm-5.1`
 
 ## Onchain demo flow
 
@@ -209,7 +217,9 @@ cd frontend
 PLAN_REGISTRY_DEPLOYER_PRIVATE_KEY=0x... HASHKEY_DEPLOY_NETWORK=testnet npm run deploy:plan-registry
 ```
 
-After deployment, copy the printed contract address into:
+The deploy script also auto-loads `PRIVATE_KEY`, `DEPLOYER_PRIVATE_KEY`, or `PLAN_REGISTRY_DEPLOYER_PRIVATE_KEY` from the repository root `.env.local`.
+
+After deployment, copy the printed contract address into the repository-root `.env.local`:
 
 - `HASHKEY_TESTNET_PLAN_REGISTRY_ADDRESS` for testnet
 - `HASHKEY_MAINNET_PLAN_REGISTRY_ADDRESS` for mainnet

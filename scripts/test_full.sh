@@ -83,16 +83,6 @@ require_cmd npm
 require_cmd curl
 require_cmd jq
 
-if [[ ! -f "$BACKEND_DIR/.env" && -f "$BACKEND_DIR/.env.example" ]]; then
-  log "Creating backend/.env from example"
-  cp "$BACKEND_DIR/.env.example" "$BACKEND_DIR/.env"
-fi
-
-if [[ ! -f "$FRONTEND_DIR/.env" && -f "$FRONTEND_DIR/.env.example" ]]; then
-  log "Creating frontend/.env from example"
-  cp "$FRONTEND_DIR/.env.example" "$FRONTEND_DIR/.env"
-fi
-
 ensure_python_venv "$BACKEND_VENV" "$BACKEND_DIR/requirements.txt" "$BACKEND_PY" "$INSTALL_DEPS"
 ensure_python_venv "$BACKEND_TEST_VENV" "$BACKEND_DIR/requirements.txt" "$BACKEND_TEST_PY" "$INSTALL_DEPS"
 ensure_frontend_deps

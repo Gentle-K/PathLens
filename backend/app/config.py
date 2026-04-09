@@ -6,6 +6,7 @@ from pathlib import Path
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
+REPO_ROOT = PROJECT_ROOT.parent
 DEFAULT_DB_PATH = PROJECT_ROOT / "data" / "genius_actuary.db"
 DEFAULT_CORS_ORIGINS = (
     "http://127.0.0.1:5173",
@@ -34,21 +35,32 @@ def _strip_quotes(value: str) -> str:
 
 
 def load_local_env(env_path: Path | None = None) -> None:
-    path = env_path or PROJECT_ROOT / ".env"
-    if not path.exists():
-        return
+    protected_keys = set(os.environ)
+    candidates = [env_path] if env_path else [
+        REPO_ROOT / ".env",
+        PROJECT_ROOT / ".env",
+        PROJECT_ROOT / ".env.local",
+        REPO_ROOT / ".env.local",
+    ]
 
-    for raw_line in path.read_text(encoding="utf-8").splitlines():
-        line = raw_line.strip()
-        if not line or line.startswith("#") or "=" not in line:
+    for path in candidates:
+        if path is None or not path.exists():
             continue
 
-        key, value = line.split("=", 1)
-        key = key.strip()
-        if not key:
-            continue
+        for raw_line in path.read_text(encoding="utf-8").splitlines():
+            line = raw_line.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
 
-        os.environ.setdefault(key, _strip_quotes(value.strip()))
+            key, value = line.split("=", 1)
+            key = key.strip()
+            if not key:
+                continue
+
+            if key in protected_keys:
+                continue
+
+            os.environ[key] = _strip_quotes(value.strip())
 
 
 def _split_csv(value: str | None, default: tuple[str, ...]) -> list[str]:
