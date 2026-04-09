@@ -21,6 +21,7 @@ from app.domain.rwa import AssetTemplate, HashKeyChainConfig, RwaIntakeContext
 
 class SessionCreateRequest(BaseModel):
     mode: AnalysisMode
+    locale: str = "zh"
     problem_statement: str = Field(min_length=5)
     intake_context: RwaIntakeContext = Field(default_factory=RwaIntakeContext)
 

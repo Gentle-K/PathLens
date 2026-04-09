@@ -28,6 +28,7 @@ from app.prompts import (
     build_planning_prompts,
     build_reporting_prompts,
 )
+from app.i18n import text_for_locale
 from app.rwa.catalog import build_asset_library, build_chain_config
 from app.rwa.engine import build_rwa_report, resolve_selected_assets
 
@@ -265,70 +266,189 @@ def _merged_rwa_context(session: AnalysisSession) -> RwaIntakeContext:
 def _build_rwa_questions(session: AnalysisSession) -> list[ClarificationQuestion]:
     settings = Settings.from_env()
     chain_config = build_chain_config(settings)
-    asset_library = build_asset_library(chain_config)
+    asset_library = build_asset_library(chain_config, locale=session.locale)
     selected_assets = resolve_selected_assets(
         session.mode,
         session.problem_statement,
         session.intake_context,
         asset_library,
     )
-    asset_hint = "、".join(asset.name for asset in selected_assets[:3]) or "USDC、MMF、白银 RWA"
+    asset_hint = ", ".join(asset.name for asset in selected_assets[:3]) or text_for_locale(
+        session.locale,
+        "USDC、MMF、白银 RWA",
+        "USDC, MMF, and silver RWA",
+    )
+    objective_options = (
+        ["保住流动性", "稳健增值", "增强收益", "做资产分散"]
+        if session.locale == "zh"
+        else ["Preserve liquidity", "Steady carry", "Increase upside", "Diversify assets"]
+    )
+    risk_options = (
+        ["保守", "均衡", "进取"]
+        if session.locale == "zh"
+        else ["Conservative", "Balanced", "Aggressive"]
+    )
+    kyc_options = (
+        ["暂无 KYC", "可完成基础 KYC", "已具备更高等级或专业投资者资格"]
+        if session.locale == "zh"
+        else ["No KYC yet", "Can complete basic KYC", "Already meet a higher or professional-investor tier"]
+    )
 
     questions = [
         _make_question(
-            question_text="这笔资金最主要的目标是什么？",
-            purpose="先明确你是要流动性管理、稳健收益、通胀对冲，还是提高整体收益弹性。",
-            options=["保住流动性", "稳健增值", "增强收益", "做资产分散"],
+            question_text=text_for_locale(
+                session.locale,
+                "这笔资金最主要的目标是什么？",
+                "What is the main objective for this capital?",
+            ),
+            purpose=text_for_locale(
+                session.locale,
+                "先明确你是要流动性管理、稳健收益、通胀对冲，还是提高整体收益弹性。",
+                "Clarify whether the goal is liquidity management, steady carry, inflation hedging, or a higher-upside allocation.",
+            ),
+            options=objective_options,
             question_group="objective",
-            input_hint="例如：希望 30 天内随时可退出，同时比纯稳定币更有收益。",
-            example_answer="希望保住高流动性，但愿意拿一小部分做更高收益的 RWA。",
+            input_hint=text_for_locale(
+                session.locale,
+                "例如：希望 30 天内随时可退出，同时比纯稳定币更有收益。",
+                "For example: I want to stay exit-capable within 30 days while earning more than idle stablecoins.",
+            ),
+            example_answer=text_for_locale(
+                session.locale,
+                "希望保住高流动性，但愿意拿一小部分做更高收益的 RWA。",
+                "I want to preserve high liquidity but can allocate a small sleeve to higher-yield RWAs.",
+            ),
             allow_skip=False,
         ),
         _make_question(
-            question_text="你最晚需要在多久内可以退出这笔配置？",
-            purpose="RWA 的核心约束之一就是申赎时间和流动性摩擦，这会直接淘汰一部分资产。",
-            options=["T+0", "T+3", "30 天锁定也可", "180 天也可接受"],
+            question_text=text_for_locale(
+                session.locale,
+                "你最晚需要在多久内可以退出这笔配置？",
+                "What is the latest acceptable exit window for this allocation?",
+            ),
+            purpose=text_for_locale(
+                session.locale,
+                "RWA 的核心约束之一就是申赎时间和流动性摩擦，这会直接淘汰一部分资产。",
+                "Redemption timing and liquidity friction are core RWA constraints and will immediately eliminate some assets.",
+            ),
+            options=(
+                ["T+0", "T+3", "30 天锁定也可", "180 天也可接受"]
+                if session.locale == "zh"
+                else ["T+0", "T+3", "30-day lockup is acceptable", "180-day lockup is acceptable"]
+            ),
             question_group="liquidity",
-            input_hint="如果你有明确时间窗，也可以直接写 T+N 或具体天数。",
-            example_answer="最好 T+3 内可以退出，不能接受长期锁定。",
+            input_hint=text_for_locale(
+                session.locale,
+                "如果你有明确时间窗，也可以直接写 T+N 或具体天数。",
+                "If you already have a hard time window, specify T+N or a concrete number of days.",
+            ),
+            example_answer=text_for_locale(
+                session.locale,
+                "最好 T+3 内可以退出，不能接受长期锁定。",
+                "I need the position to remain exit-capable within T+3 and cannot accept a long lockup.",
+            ),
             allow_skip=False,
         ),
         _make_question(
-            question_text="你的真实风险承受度更接近哪一类？",
-            purpose="系统会用风险承受度决定稳定币、MMF、贵金属和高波动 benchmark 的权重上限。",
-            options=["保守", "均衡", "进取"],
+            question_text=text_for_locale(
+                session.locale,
+                "你的真实风险承受度更接近哪一类？",
+                "Which risk tolerance bucket best matches your real posture?",
+            ),
+            purpose=text_for_locale(
+                session.locale,
+                "系统会用风险承受度决定稳定币、MMF、贵金属和高波动 benchmark 的权重上限。",
+                "The system uses this to bound weights across stablecoins, MMFs, precious metals, and higher-volatility benchmarks.",
+            ),
+            options=risk_options,
             question_group="risk",
-            input_hint="也可以说明你最不能接受的回撤或波动。",
-            example_answer="偏均衡，能接受小波动，但不想承担明显回撤。",
+            input_hint=text_for_locale(
+                session.locale,
+                "也可以说明你最不能接受的回撤或波动。",
+                "You can also state the drawdown or volatility profile you cannot accept.",
+            ),
+            example_answer=text_for_locale(
+                session.locale,
+                "偏均衡，能接受小波动，但不想承担明显回撤。",
+                "I am roughly balanced: small fluctuations are fine, but I do not want obvious drawdowns.",
+            ),
             allow_skip=False,
         ),
         _make_question(
-            question_text=f"当前你更想重点比较哪些资产？系统已识别：{asset_hint}",
-            purpose="让系统确认真正要比较的资产集合，避免把无关资产纳入推荐。",
+            question_text=text_for_locale(
+                session.locale,
+                f"当前你更想重点比较哪些资产？系统已识别：{asset_hint}",
+                f"Which assets do you want to compare most closely? The system currently identified: {asset_hint}",
+            ),
+            purpose=text_for_locale(
+                session.locale,
+                "让系统确认真正要比较的资产集合，避免把无关资产纳入推荐。",
+                "Confirm the real comparison set so irrelevant assets do not leak into the recommendation.",
+            ),
             question_group="assets",
-            input_hint="可以直接写 USDT / USDC / MMF / 白银 RWA / 房地产 RWA 等。",
-            example_answer="重点看 USDC、MMF 和白银 RWA。",
+            input_hint=text_for_locale(
+                session.locale,
+                "可以直接写 USDT / USDC / MMF / 白银 RWA / 房地产 RWA 等。",
+                "You can answer directly with USDT / USDC / MMF / silver RWA / real-estate RWA, etc.",
+            ),
+            example_answer=text_for_locale(
+                session.locale,
+                "重点看 USDC、MMF 和白银 RWA。",
+                "Focus on USDC, MMF, and silver RWA.",
+            ),
             allow_skip=False,
         ),
         _make_question(
-            question_text="你目前具备怎样的 KYC / 专业投资者资格？",
-            purpose="HashKey Chain 上一部分 RWA 资产有明显准入门槛，KYC 会影响可购买范围。",
-            options=["暂无 KYC", "可完成基础 KYC", "已具备更高等级或专业投资者资格"],
+            question_text=text_for_locale(
+                session.locale,
+                "你目前具备怎样的 KYC / 专业投资者资格？",
+                "What KYC or professional-investor status can you realistically satisfy?",
+            ),
+            purpose=text_for_locale(
+                session.locale,
+                "HashKey Chain 上一部分 RWA 资产有明显准入门槛，KYC 会影响可购买范围。",
+                "Some HashKey Chain RWAs have explicit access gating, so KYC level directly changes the investable universe.",
+            ),
+            options=kyc_options,
             question_group="kyc",
-            input_hint="如果不确定，也可以写你预计能完成到什么程度。",
-            example_answer="可以完成基础 KYC，但不确定是否满足专业投资者资格。",
+            input_hint=text_for_locale(
+                session.locale,
+                "如果不确定，也可以写你预计能完成到什么程度。",
+                "If you are unsure, describe the KYC level you expect to be able to complete.",
+            ),
+            example_answer=text_for_locale(
+                session.locale,
+                "可以完成基础 KYC，但不确定是否满足专业投资者资格。",
+                "I can complete basic KYC but I am not sure whether I qualify as a professional investor.",
+            ),
         ),
     ]
 
     if session.mode == AnalysisMode.SINGLE_DECISION:
         questions.append(
             _make_question(
-                question_text="如果最终只保留一个主配置腿，你最想保住什么？",
-                purpose="帮助系统判断该资产应该被当作流动性底仓、收益腿还是对冲腿。",
-                options=["流动性", "低回撤", "收益率", "对冲能力"],
+                question_text=text_for_locale(
+                    session.locale,
+                    "如果最终只保留一个主配置腿，你最想保住什么？",
+                    "If only one main sleeve remains in the final plan, what do you want to preserve most?",
+                ),
+                purpose=text_for_locale(
+                    session.locale,
+                    "帮助系统判断该资产应该被当作流动性底仓、收益腿还是对冲腿。",
+                    "This helps the system decide whether the asset should behave as the liquidity anchor, income sleeve, or hedge sleeve.",
+                ),
+                options=["流动性", "低回撤", "收益率", "对冲能力"] if session.locale == "zh" else ["Liquidity", "Low drawdown", "Yield", "Hedging ability"],
                 question_group="priority",
-                input_hint="也可以直接说你最不能接受的后果。",
-                example_answer="优先保住流动性和低回撤。",
+                input_hint=text_for_locale(
+                    session.locale,
+                    "也可以直接说你最不能接受的后果。",
+                    "You can also describe the outcome you cannot accept.",
+                ),
+                example_answer=text_for_locale(
+                    session.locale,
+                    "优先保住流动性和低回撤。",
+                    "Preserving liquidity and low drawdown matters most.",
+                ),
             )
         )
 
@@ -338,7 +458,7 @@ def _build_rwa_questions(session: AnalysisSession) -> list[ClarificationQuestion
 def _build_rwa_search_tasks(session: AnalysisSession) -> list[SearchTask]:
     settings = Settings.from_env()
     chain_config = build_chain_config(settings)
-    asset_library = build_asset_library(chain_config)
+    asset_library = build_asset_library(chain_config, locale=session.locale)
     selected_assets = resolve_selected_assets(
         session.mode,
         session.problem_statement,
@@ -350,8 +470,16 @@ def _build_rwa_search_tasks(session: AnalysisSession) -> list[SearchTask]:
         tasks.append(
             SearchTask(
                 search_topic=asset.name,
-                search_goal=f"确认 {asset.name} 的申赎、托管、准入和链上可验证信息。",
-                search_scope="优先官方文档、发行方说明和 HashKey Chain 生态资料。",
+                search_goal=text_for_locale(
+                    session.locale,
+                    f"确认 {asset.name} 的申赎、托管、准入和链上可验证信息。",
+                    f"Verify {asset.name}'s redemption, custody, access gating, and onchain-verifiable information.",
+                ),
+                search_scope=text_for_locale(
+                    session.locale,
+                    "优先官方文档、发行方说明和 HashKey Chain 生态资料。",
+                    "Prioritize official documentation, issuer materials, and HashKey Chain ecosystem sources.",
+                ),
                 suggested_queries=[
                     asset.name,
                     f"{asset.name} HashKey Chain",
@@ -360,7 +488,11 @@ def _build_rwa_search_tasks(session: AnalysisSession) -> list[SearchTask]:
                 required_fields=["liquidity", "custody", "kyc", "fees"],
                 freshness_requirement="high",
                 task_group="rwa-evidence",
-                notes="RWA 证据以官方和条款型信息优先，避免只用二手内容。",
+                notes=text_for_locale(
+                    session.locale,
+                    "RWA 证据以官方和条款型信息优先，避免只用二手内容。",
+                    "Prioritize official and term-sheet style evidence for RWAs instead of relying only on secondary summaries.",
+                ),
             )
         )
     return tasks
@@ -369,7 +501,7 @@ def _build_rwa_search_tasks(session: AnalysisSession) -> list[SearchTask]:
 def _build_rwa_calculation_tasks(session: AnalysisSession) -> list[CalculationTask]:
     settings = Settings.from_env()
     chain_config = build_chain_config(settings)
-    asset_library = build_asset_library(chain_config)
+    asset_library = build_asset_library(chain_config, locale=session.locale)
     context = _merged_rwa_context(session)
     selected_assets = resolve_selected_assets(
         session.mode,
@@ -382,7 +514,11 @@ def _build_rwa_calculation_tasks(session: AnalysisSession) -> list[CalculationTa
         total_cost_bps = asset.total_cost_bps(context.holding_period_days)
         tasks.append(
             CalculationTask(
-                objective=f"{asset.name} {context.holding_period_days} 天净值估算",
+                objective=text_for_locale(
+                    session.locale,
+                    f"{asset.name} {context.holding_period_days} 天净值估算",
+                    f"{asset.name} {context.holding_period_days}-day ending value estimate",
+                ),
                 formula_hint="principal * (1 + annual_return * days / 365) * (1 - total_cost_bps / 10000)",
                 input_params={
                     "principal": context.investment_amount,
@@ -391,7 +527,11 @@ def _build_rwa_calculation_tasks(session: AnalysisSession) -> list[CalculationTa
                     "total_cost_bps": total_cost_bps,
                 },
                 unit=context.base_currency,
-                notes="用于在结果页展示统一持有期下的净值比较。",
+                notes=text_for_locale(
+                    session.locale,
+                    "用于在结果页展示统一持有期下的净值比较。",
+                    "Used to show normalized ending-value comparisons under a common holding period.",
+                ),
             )
         )
     return tasks
@@ -400,18 +540,38 @@ def _build_rwa_calculation_tasks(session: AnalysisSession) -> list[CalculationTa
 def _build_rwa_chart_tasks(session: AnalysisSession) -> list[ChartTask]:
     return [
         ChartTask(
-            objective="比较不同 RWA 资产在统一持有期下的净值表现。",
+            objective=text_for_locale(
+                session.locale,
+                "比较不同 RWA 资产在统一持有期下的净值表现。",
+                "Compare ending values across RWA assets under a normalized holding period.",
+            ),
             chart_type="bar",
-            title="Holding Period Value Comparison",
+            title=text_for_locale(
+                session.locale,
+                "持有期净值对比",
+                "Holding Period Value Comparison",
+            ),
             preferred_unit=session.intake_context.base_currency,
-            notes="统一持有期净值对比。",
+            notes=text_for_locale(
+                session.locale,
+                "统一持有期净值对比。",
+                "Normalized holding-period value comparison.",
+            ),
         ),
         ChartTask(
-            objective="比较 RiskVector 的七维风险向量。",
+            objective=text_for_locale(
+                session.locale,
+                "比较 RiskVector 的七维风险向量。",
+                "Compare the seven-dimensional RiskVector profiles.",
+            ),
             chart_type="radar",
             title="Risk Vector Radar",
             preferred_unit="risk score",
-            notes="0-100 分越高越危险。",
+            notes=text_for_locale(
+                session.locale,
+                "0-100 分越高越危险。",
+                "Higher scores are riskier on a 0-100 scale.",
+            ),
         ),
     ]
 
@@ -622,50 +782,91 @@ class MockAnalysisAdapter:
 
         if len(session.answers) < 5 and len(session.clarification_questions) < 7:
             follow_up = _make_question(
-                question_text="如果需要把一部分资金保留为备用流动性，你愿意最多拿出多少比例做 RWA 或高摩擦资产？",
-                purpose="帮助系统决定稳定币缓冲仓和高门槛资产的上限。",
-                options=["最多 20%", "最多 40%", "最多 60%", "可更高"],
+                question_text=text_for_locale(
+                    session.locale,
+                    "如果需要把一部分资金保留为备用流动性，你愿意最多拿出多少比例做 RWA 或高摩擦资产？",
+                    "If part of the capital must stay as reserve liquidity, what maximum share are you willing to place into RWAs or higher-friction assets?",
+                ),
+                purpose=text_for_locale(
+                    session.locale,
+                    "帮助系统决定稳定币缓冲仓和高门槛资产的上限。",
+                    "This helps size the stablecoin reserve sleeve and cap the allocation to higher-friction assets.",
+                ),
+                options=["最多 20%", "最多 40%", "最多 60%", "可更高"] if session.locale == "zh" else ["Up to 20%", "Up to 40%", "Up to 60%", "Higher is acceptable"],
                 question_group="sizing",
                 priority=2,
-                input_hint="也可以直接写你理想的稳定币缓冲比例。",
-                example_answer="希望至少保留 30% 作为稳定币缓冲。",
+                input_hint=text_for_locale(
+                    session.locale,
+                    "也可以直接写你理想的稳定币缓冲比例。",
+                    "You can also state the stablecoin buffer you ideally want to keep.",
+                ),
+                example_answer=text_for_locale(
+                    session.locale,
+                    "希望至少保留 30% 作为稳定币缓冲。",
+                    "I want to keep at least 30% as a stablecoin buffer.",
+                ),
             )
             return AnalysisLoopPlan(
                 clarification_questions=[follow_up],
                 major_conclusions=[
                     MajorConclusionItem(
-                        content="One more sizing answer would materially improve the final allocation guardrails.",
+                        content=text_for_locale(
+                            session.locale,
+                            "再补一个仓位规模答案，可以明显改善最终配置边界。",
+                            "One more sizing answer would materially improve the final allocation guardrails.",
+                        ),
                         conclusion_type="inference",
                         confidence=0.78,
                     )
                 ],
-                reasoning_focus="Resolve the last liquidity-buffer trade-off before writing the report.",
-                stop_reason="A final follow-up answer would sharpen the recommended sizing.",
+                reasoning_focus=text_for_locale(
+                    session.locale,
+                    "在出最终报告前，先解决最后一个流动性缓冲与仓位规模取舍。",
+                    "Resolve the last liquidity-buffer trade-off before writing the report.",
+                ),
+                stop_reason=text_for_locale(
+                    session.locale,
+                    "最后一个追问答案会显著提升建议权重的精度。",
+                    "A final follow-up answer would sharpen the recommended sizing.",
+                ),
             )
 
         return AnalysisLoopPlan(
             major_conclusions=[
                 MajorConclusionItem(
-                    content="The current session now has enough structure for a bounded RWA report with evidence, simulations, and an execution draft.",
+                    content=text_for_locale(
+                        session.locale,
+                        "当前会话已经具备生成有证据、有模拟、有执行草案的 RWA 报告所需的结构化信息。",
+                        "The current session now has enough structure for a bounded RWA report with evidence, simulations, and an execution draft.",
+                    ),
                     conclusion_type="inference",
                     confidence=0.88,
                 )
             ],
             ready_for_report=True,
-            reasoning_focus="Consolidate the RWA evidence, simulations, and allocation suggestions into the final report.",
-            stop_reason="No additional clarification or deterministic task is required for the current snapshot.",
+            reasoning_focus=text_for_locale(
+                session.locale,
+                "把 RWA 证据、持有期模拟和配置建议收束成最终报告。",
+                "Consolidate the RWA evidence, simulations, and allocation suggestions into the final report.",
+            ),
+            stop_reason=text_for_locale(
+                session.locale,
+                "当前信息快照已经不再需要额外追问或新的确定性任务。",
+                "No additional clarification or deterministic task is required for the current snapshot.",
+            ),
         )
 
     def build_report(self, session: AnalysisSession) -> AnalysisReport:
         settings = Settings.from_env()
         chain_config = build_chain_config(settings)
-        asset_library = build_asset_library(chain_config)
+        asset_library = build_asset_library(chain_config, locale=session.locale)
         report, evidence = build_rwa_report(
             mode=session.mode,
             problem_statement=session.problem_statement,
             context=_merged_rwa_context(session),
             chain_config=chain_config,
             asset_library=asset_library,
+            locale=session.locale,
         )
 
         existing_urls = {item.source_url for item in session.evidence_items}

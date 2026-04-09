@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 
 from app.domain.models import AnalysisMode, AnalysisSession
+from app.i18n import is_zh_locale
 
 
 def _trim_text(value: str, limit: int) -> str:
@@ -30,6 +31,10 @@ def _mode_brief(session: AnalysisSession) -> str:
     )
 
 
+def _output_language(session: AnalysisSession) -> str:
+    return "Chinese" if is_zh_locale(session.locale) else "English"
+
+
 def build_clarification_prompts(session: AnalysisSession) -> tuple[str, str]:
     system_prompt = (
         "You are the clarification planner for a structured decision-analysis product. "
@@ -54,6 +59,7 @@ def build_clarification_prompts(session: AnalysisSession) -> tuple[str, str]:
         "Return JSON with a top-level 'questions' array. "
         "Each item must contain question_text, purpose, options, allow_custom_input, allow_skip, "
         "priority, question_group, input_hint, and example_answer.\n"
+        f"output_language={_output_language(session)}\n"
         f"workflow={_mode_name(session)}\n"
         f"workflow_brief={_mode_brief(session)}\n"
         f"task_rules={task_rules}\n"
@@ -158,6 +164,7 @@ def build_planning_prompts(
         "6. If the current information is sufficient for a bounded recommendation, set ready_for_report=true.\n"
         "7. reasoning_focus should name the single most important unresolved dimension.\n"
         "8. stop_reason should explain why the workflow should pause for user input, run tools, or finish.\n"
+        f"output_language={_output_language(session)}\n"
         f"context_profile={'compact' if compact else 'full'}\n"
         f"workflow={_mode_name(session)}\n"
         f"workflow_brief={_mode_brief(session)}\n"
@@ -244,6 +251,7 @@ def build_reporting_prompts(session: AnalysisSession) -> tuple[str, str]:
         "4. Prefer bounded estimates over vague statements whenever numbers are available.\n"
         "5. Tables should use consistent column names and plain JSON row objects.\n"
         "6. Keep open_questions short; do not let them dominate the report.\n"
+        f"output_language={_output_language(session)}\n"
         f"workflow={_mode_name(session)}\n"
         f"workflow_brief={_mode_brief(session)}\n"
         f"problem_statement={session.problem_statement}\n"

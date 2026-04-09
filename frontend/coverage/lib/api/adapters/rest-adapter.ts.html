@@ -23,9 +23,9 @@
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">1.88% </span>
+                <span class="strong">1.81% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>2/106</span>
+                <span class='fraction'>2/110</span>
             </div>
         
             
@@ -44,9 +44,9 @@
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">1.88% </span>
+                <span class="strong">1.81% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>2/106</span>
+                <span class='fraction'>2/110</span>
             </div>
         
             
@@ -543,7 +543,17 @@
 <a name='L478'></a><a href='#L478'>478</a>
 <a name='L479'></a><a href='#L479'>479</a>
 <a name='L480'></a><a href='#L480'>480</a>
-<a name='L481'></a><a href='#L481'>481</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<a name='L481'></a><a href='#L481'>481</a>
+<a name='L482'></a><a href='#L482'>482</a>
+<a name='L483'></a><a href='#L483'>483</a>
+<a name='L484'></a><a href='#L484'>484</a>
+<a name='L485'></a><a href='#L485'>485</a>
+<a name='L486'></a><a href='#L486'>486</a>
+<a name='L487'></a><a href='#L487'>487</a>
+<a name='L488'></a><a href='#L488'>488</a>
+<a name='L489'></a><a href='#L489'>489</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -590,7 +600,12 @@
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
@@ -813,6 +828,7 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -1051,29 +1067,36 @@ import {
 } from '@/lib/api/adapters/genius-backend'
 import { mockApiAdapter } from '@/lib/api/adapters/mock-adapter'
 import { endpoints } from '@/lib/api/endpoints'
+import { useAppStore } from '@/lib/store/app-store'
 import type {
   AnalysisMode,
   AnalysisSession,
   DashboardOverview,
+  LanguageCode,
   PaginatedResponse,
   RequestMeta,
   ResourceRecord,
 } from '@/types'
 &nbsp;
-let bootstrapPromise: Promise&lt;BackendBootstrapResponse&gt; | null = null
+const bootstrapPromises = new Map&lt;LanguageCode, Promise&lt;BackendBootstrapResponse&gt;&gt;()
 &nbsp;
 function <span class="fstat-no" title="function not covered" >toBackendMode(m</span>ode: AnalysisMode) {
 <span class="cstat-no" title="statement not covered" >  return mode === 'multi-option' ? 'multi_option' : 'single_decision'</span>
 }
 &nbsp;
 async function <span class="fstat-no" title="function not covered" >getBootstrap(f</span>orce = <span class="branch-0 cbranch-no" title="branch not covered" >false) {</span>
-<span class="cstat-no" title="statement not covered" >  if (force || !bootstrapPromise) {</span>
-<span class="cstat-no" title="statement not covered" >    bootstrapPromise = apiClient.request&lt;BackendBootstrapResponse&gt;(</span>
+  const locale = <span class="cstat-no" title="statement not covered" >useAppStore.getState().locale</span>
+  const cached = <span class="cstat-no" title="statement not covered" >bootstrapPromises.get(locale)</span>
+&nbsp;
+<span class="cstat-no" title="statement not covered" >  if (force || !cached) {</span>
+    const request = <span class="cstat-no" title="statement not covered" >apiClient.request&lt;BackendBootstrapResponse&gt;(</span>
       endpoints.backend.bootstrap,
     )
+<span class="cstat-no" title="statement not covered" >    bootstrapPromises.set(locale, request)</span>
+<span class="cstat-no" title="statement not covered" >    return request</span>
   }
 &nbsp;
-<span class="cstat-no" title="statement not covered" >  return bootstrapPromise</span>
+<span class="cstat-no" title="statement not covered" >  return cached</span>
 }
 &nbsp;
 async function <span class="fstat-no" title="function not covered" >fetchBackendSession(s</span>essionId: string) {
@@ -1238,7 +1261,7 @@ export const restApiAdapter: ApiAdapter = {
       }
     },
     async <span class="fstat-no" title="function not covered" >logout() {</span>
-<span class="cstat-no" title="statement not covered" >      bootstrapPromise = null</span>
+<span class="cstat-no" title="statement not covered" >      bootstrapPromises.clear()</span>
 <span class="cstat-no" title="statement not covered" >      clearBrowserAccount()</span>
 <span class="cstat-no" title="statement not covered" >      await apiClient.request&lt;void&gt;(endpoints.backend.logout, {</span>
         method: 'POST',
@@ -1249,7 +1272,7 @@ export const restApiAdapter: ApiAdapter = {
 <span class="cstat-no" title="statement not covered" >      return createBackendPseudoUser()</span>
     },
     async <span class="fstat-no" title="function not covered" >deletePersonalData() {</span>
-<span class="cstat-no" title="statement not covered" >      bootstrapPromise = null</span>
+<span class="cstat-no" title="statement not covered" >      bootstrapPromises.clear()</span>
 <span class="cstat-no" title="statement not covered" >      clearBrowserAccount()</span>
       const payload =
 <span class="cstat-no" title="statement not covered" >        await apiClient.request&lt;BackendPersonalDataDeletionResponse&gt;(</span>
@@ -1298,6 +1321,7 @@ export const restApiAdapter: ApiAdapter = {
           method: 'POST',
           body: JSON.stringify({
             mode: toBackendMode(payload.mode),
+            locale: payload.locale,
             problem_statement: payload.problemStatement,
             intake_context: toBackendIntakeContext(payload.intakeContext),
           }),
@@ -1510,7 +1534,7 @@ export const restApiAdapter: ApiAdapter = {
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-04-09T14:52:45.487Z
+                at 2026-04-09T16:11:38.808Z
             </div>
         <script src="../../../prettify.js"></script>
         <script>

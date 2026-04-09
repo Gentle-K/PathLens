@@ -401,6 +401,7 @@ export interface BackendSession {
   session_id: string
   owner_client_id: string
   mode: 'single_decision' | 'multi_option'
+  locale?: 'zh' | 'en'
   problem_statement: string
   intake_context: BackendRwaIntakeContext
   status:
@@ -1258,6 +1259,7 @@ export function mapBackendSession(session: BackendSession): AnalysisSession {
   return {
     id: session.session_id,
     mode: mapBackendMode(session.mode),
+    locale: session.locale,
     problemStatement: session.problem_statement,
     status: session.status,
     createdAt: session.created_at,

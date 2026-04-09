@@ -549,6 +549,7 @@ export interface AnalysisProgress {
 export interface AnalysisSessionSummary {
   id: string
   mode: AnalysisMode
+  locale?: LanguageCode
   problemStatement: string
   status: SessionStatus
   createdAt: string
@@ -671,6 +672,7 @@ export interface ResourceRecord {
 
 export interface CreateSessionPayload {
   mode: AnalysisMode
+  locale: LanguageCode
   problemStatement: string
   intakeContext: RwaIntakeContext
 }

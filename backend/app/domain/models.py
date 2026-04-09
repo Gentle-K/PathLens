@@ -236,6 +236,7 @@ class AnalysisSession(BaseModel):
     session_id: str = Field(default_factory=lambda: str(uuid4()))
     owner_client_id: str
     mode: AnalysisMode
+    locale: str = "zh"
     problem_statement: str
     intake_context: RwaIntakeContext = Field(default_factory=RwaIntakeContext)
     status: SessionStatus = SessionStatus.INIT

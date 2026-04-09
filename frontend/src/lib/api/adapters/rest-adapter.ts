@@ -26,29 +26,36 @@ import {
 } from '@/lib/api/adapters/genius-backend'
 import { mockApiAdapter } from '@/lib/api/adapters/mock-adapter'
 import { endpoints } from '@/lib/api/endpoints'
+import { useAppStore } from '@/lib/store/app-store'
 import type {
   AnalysisMode,
   AnalysisSession,
   DashboardOverview,
+  LanguageCode,
   PaginatedResponse,
   RequestMeta,
   ResourceRecord,
 } from '@/types'
 
-let bootstrapPromise: Promise<BackendBootstrapResponse> | null = null
+const bootstrapPromises = new Map<LanguageCode, Promise<BackendBootstrapResponse>>()
 
 function toBackendMode(mode: AnalysisMode) {
   return mode === 'multi-option' ? 'multi_option' : 'single_decision'
 }
 
 async function getBootstrap(force = false) {
-  if (force || !bootstrapPromise) {
-    bootstrapPromise = apiClient.request<BackendBootstrapResponse>(
+  const locale = useAppStore.getState().locale
+  const cached = bootstrapPromises.get(locale)
+
+  if (force || !cached) {
+    const request = apiClient.request<BackendBootstrapResponse>(
       endpoints.backend.bootstrap,
     )
+    bootstrapPromises.set(locale, request)
+    return request
   }
 
-  return bootstrapPromise
+  return cached
 }
 
 async function fetchBackendSession(sessionId: string) {
@@ -213,7 +220,7 @@ export const restApiAdapter: ApiAdapter = {
       }
     },
     async logout() {
-      bootstrapPromise = null
+      bootstrapPromises.clear()
       clearBrowserAccount()
       await apiClient.request<void>(endpoints.backend.logout, {
         method: 'POST',
@@ -224,7 +231,7 @@ export const restApiAdapter: ApiAdapter = {
       return createBackendPseudoUser()
     },
     async deletePersonalData() {
-      bootstrapPromise = null
+      bootstrapPromises.clear()
       clearBrowserAccount()
       const payload =
         await apiClient.request<BackendPersonalDataDeletionResponse>(
@@ -273,6 +280,7 @@ export const restApiAdapter: ApiAdapter = {
           method: 'POST',
           body: JSON.stringify({
             mode: toBackendMode(payload.mode),
+            locale: payload.locale,
             problem_statement: payload.problemStatement,
             intake_context: toBackendIntakeContext(payload.intakeContext),
           }),

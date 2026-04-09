@@ -114,6 +114,7 @@ export function ProblemInputPage() {
               setSessionFailure(null)
               await createMutation.mutateAsync({
                 mode,
+                locale: isChinese ? 'zh' : 'en',
                 problemStatement: values.problemStatement,
                 intakeContext: {
                   investmentAmount: 10000,

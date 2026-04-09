@@ -19,9 +19,12 @@ from app.domain.models import (
 from app.main import create_app
 from app.orchestrator.engine import AnalysisOrchestrator
 from app.persistence.memory import InMemorySessionRepository
+from app.rwa.catalog import build_asset_library, build_chain_config
 from app.services.audit import AuditLogService
 from app.services.sessions import SessionService
 from app.adapters.llm_analysis import OpenAICompatibleAnalysisAdapter
+from app.adapters.llm_analysis import MockAnalysisAdapter
+from app.config import Settings
 from app.prompts.analysis import build_planning_prompts
 
 
@@ -160,6 +163,28 @@ class PriorityParsingTests(unittest.TestCase):
                 for event in session.events
             )
         )
+
+    def test_rwa_locale_switches_mock_questions_and_report_to_english(self):
+        session = AnalysisSession(
+            owner_client_id="client-1",
+            mode=AnalysisMode.MULTI_OPTION,
+            locale="en",
+            problem_statement="I have 10,000 USDT and want a 30-day balanced RWA allocation on HashKey Chain.",
+        )
+        adapter = MockAnalysisAdapter()
+
+        questions = adapter.generate_initial_questions(session)
+        report = adapter.build_report(session)
+        settings = Settings.from_env()
+        asset_library = build_asset_library(
+            build_chain_config(settings),
+            locale="en",
+        )
+
+        self.assertTrue(questions)
+        self.assertIn("main objective", questions[0].question_text.lower())
+        self.assertIn("current setup is best anchored", report.summary.lower())
+        self.assertIn("baseline", asset_library[0].description.lower())
 
     def test_plan_next_round_retries_with_compact_prompt_after_timeout(self):
         adapter = OpenAICompatibleAnalysisAdapter(

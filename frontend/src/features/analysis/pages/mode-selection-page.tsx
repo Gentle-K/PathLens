@@ -5,9 +5,9 @@ import {
   Coins,
   ShieldCheck,
   Sparkles,
-  WalletCards,
 } from 'lucide-react'
 import { useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
 
 import { PageHeader } from '@/components/layout/page-header'
@@ -17,6 +17,7 @@ import { Card } from '@/components/ui/card'
 import { Input, Textarea } from '@/components/ui/field'
 import { AnalysisPendingView } from '@/features/analysis/components/analysis-pending-view'
 import { useApiAdapter } from '@/lib/api/use-api-adapter'
+import { useAppStore } from '@/lib/store/app-store'
 import type { AnalysisMode, LiquidityNeed, RiskTolerance, RwaIntakeContext } from '@/types'
 
 const defaultIntakeContext: RwaIntakeContext = {
@@ -32,7 +33,13 @@ const defaultIntakeContext: RwaIntakeContext = {
   additionalConstraints: '',
 }
 
-const modeCopy: Record<
+function formatPercent(value: number) {
+  return `${(value * 100).toFixed(1)}%`
+}
+
+function buildModeCopy(
+  isZh: boolean,
+): Record<
   AnalysisMode,
   {
     title: string
@@ -40,69 +47,242 @@ const modeCopy: Record<
     examples: string[]
     outputs: string[]
   }
-> = {
-  'single-option': {
-    title: '单资产尽调',
-    subtitle: '适合深挖某个稳定币、MMF 或 RWA 资产的风险、条款和执行路径。',
-    examples: [
-      '我有 10,000 USDT，是否应该把其中一部分放进白银 RWA？',
-      'HashKey Chain 上的 MMF 风格 RWA 是否适合我做 30 天配置？',
-      '我适不适合把稳定币从纯活期切换到更高收益的 RWA 产品？',
-    ],
-    outputs: ['RiskVector', '持有期模拟', '证据面板', '执行草案'],
-  },
-  'multi-option': {
-    title: '多资产配置',
-    subtitle: '适合同时比较稳定币收益、MMF、贵金属和其他 RWA，给出组合建议。',
-    examples: [
-      '我有 10,000 USDT，应该放稳定币收益、MMF、白银 RWA，还是保留更多现金？',
-      '风险偏好中等、要高流动性的情况下，我在 HashKey Chain 上怎么配 RWA？',
-      '如果我只能接受 T+3 退出，USDC、MMF 和白银 RWA 应该怎么组合？',
-    ],
-    outputs: ['对比矩阵', '收益分布', '建议权重', '链上存证草案'],
-  },
+> {
+  return {
+    'single-option': {
+      title: isZh ? '单资产尽调' : 'Single-asset diligence',
+      subtitle: isZh
+        ? '适合深挖某个稳定币、MMF 或 RWA 资产的风险、条款和执行路径。'
+        : 'Best for a deeper review of one stablecoin, MMF, or RWA asset, including risk, terms, and execution path.',
+      examples: isZh
+        ? [
+            '我有 10,000 USDT，是否应该把其中一部分放进白银 RWA？',
+            'HashKey Chain 上的 MMF 风格 RWA 是否适合我做 30 天配置？',
+            '我适不适合把稳定币从纯活期切换到更高收益的 RWA 产品？',
+          ]
+        : [
+            'I have 10,000 USDT. Should I move part of it into a silver-backed RWA?',
+            'Is the MMF-style RWA on HashKey Chain suitable for a 30-day allocation?',
+            'Should I rotate idle stablecoins into a higher-yield RWA product?',
+          ],
+      outputs: isZh
+        ? ['RiskVector', '持有期模拟', '证据面板', '执行草案']
+        : ['RiskVector', 'Holding simulation', 'Evidence panel', 'Execution draft'],
+    },
+    'multi-option': {
+      title: isZh ? '多资产配置' : 'Multi-asset allocation',
+      subtitle: isZh
+        ? '适合同时比较稳定币收益、MMF、贵金属和其他 RWA，给出组合建议。'
+        : 'Best for comparing stablecoin carry, MMFs, precious metals, and other RWAs side by side with a portfolio recommendation.',
+      examples: isZh
+        ? [
+            '我有 10,000 USDT，应该放稳定币收益、MMF、白银 RWA，还是保留更多现金？',
+            '风险偏好中等、要高流动性的情况下，我在 HashKey Chain 上怎么配 RWA？',
+            '如果我只能接受 T+3 退出，USDC、MMF 和白银 RWA 应该怎么组合？',
+          ]
+        : [
+            'I have 10,000 USDT. Should I allocate to stablecoin carry, an MMF, silver RWA, or keep more cash idle?',
+            'How should I build an RWA mix on HashKey Chain if I want medium risk and high liquidity?',
+            'If I can only accept T+3 exits, how should I combine USDC, MMF, and silver RWA?',
+          ],
+      outputs: isZh
+        ? ['对比矩阵', '收益分布', '建议权重', '链上存证草案']
+        : ['Comparison matrix', 'Return distribution', 'Suggested weights', 'Onchain attestation draft'],
+    },
+  }
 }
 
-const riskOptions: Array<{ value: RiskTolerance; label: string; detail: string }> = [
-  { value: 'conservative', label: '保守', detail: '优先保流动性和低回撤' },
-  { value: 'balanced', label: '均衡', detail: '兼顾收益、流动性和分散' },
-  { value: 'aggressive', label: '进取', detail: '接受更高波动以换更高弹性' },
-]
+function buildRiskOptions(
+  isZh: boolean,
+): Array<{ value: RiskTolerance; label: string; detail: string }> {
+  return [
+    {
+      value: 'conservative',
+      label: isZh ? '保守' : 'Conservative',
+      detail: isZh
+        ? '优先保流动性和低回撤'
+        : 'Prioritize liquidity preservation and lower drawdown',
+    },
+    {
+      value: 'balanced',
+      label: isZh ? '均衡' : 'Balanced',
+      detail: isZh
+        ? '兼顾收益、流动性和分散'
+        : 'Balance carry, liquidity, and diversification',
+    },
+    {
+      value: 'aggressive',
+      label: isZh ? '进取' : 'Aggressive',
+      detail: isZh
+        ? '接受更高波动以换更高弹性'
+        : 'Accept more volatility in exchange for higher upside',
+    },
+  ]
+}
 
-const liquidityOptions: Array<{ value: LiquidityNeed; label: string; detail: string }> = [
-  { value: 'instant', label: 'T+0', detail: '几乎随时可以退出' },
-  { value: 't_plus_3', label: 'T+3', detail: '接受少量赎回摩擦' },
-  { value: 'locked', label: '可锁定', detail: '能接受更长持有期' },
-]
+function buildLiquidityOptions(
+  isZh: boolean,
+): Array<{ value: LiquidityNeed; label: string; detail: string }> {
+  return [
+    {
+      value: 'instant',
+      label: 'T+0',
+      detail: isZh ? '几乎随时可以退出' : 'Exit is available almost immediately',
+    },
+    {
+      value: 't_plus_3',
+      label: 'T+3',
+      detail: isZh ? '接受少量赎回摩擦' : 'Small redemption friction is acceptable',
+    },
+    {
+      value: 'locked',
+      label: isZh ? '可锁定' : 'Lockup OK',
+      detail: isZh ? '能接受更长持有期' : 'A longer hold or lockup is acceptable',
+    },
+  ]
+}
 
-const kycOptions = [
-  { value: 0, label: '暂无 KYC', detail: '仅考虑无门槛或低门槛资产' },
-  { value: 1, label: '基础 KYC', detail: '可进入一部分受限产品' },
-  { value: 2, label: '更高等级', detail: '可评估专业投资者类产品' },
-]
-
-function formatPercent(value: number) {
-  return `${(value * 100).toFixed(1)}%`
+function buildKycOptions(
+  isZh: boolean,
+): Array<{ value: number; label: string; detail: string }> {
+  return [
+    {
+      value: 0,
+      label: isZh ? '暂无 KYC' : 'No KYC yet',
+      detail: isZh
+        ? '仅考虑无门槛或低门槛资产'
+        : 'Only consider low-friction or ungated assets',
+    },
+    {
+      value: 1,
+      label: isZh ? '基础 KYC' : 'Basic KYC',
+      detail: isZh
+        ? '可进入一部分受限产品'
+        : 'Can access part of the gated product set',
+    },
+    {
+      value: 2,
+      label: isZh ? '更高等级' : 'Higher tier',
+      detail: isZh
+        ? '可评估专业投资者类产品'
+        : 'Can evaluate professional-investor style products',
+    },
+  ]
 }
 
 export function ModeSelectionPage() {
   const navigate = useNavigate()
   const adapter = useApiAdapter()
+  const { i18n } = useTranslation()
+  const locale = useAppStore((state) => state.locale)
+  const isZh = i18n.language.startsWith('zh')
+
+  const text = useMemo(
+    () => ({
+      eyebrow: 'HashKey Chain / RWA',
+      title: isZh ? 'RWA 配置决策引擎' : 'RWA Allocation Decision Engine',
+      description: isZh
+        ? '把自然语言问题和结构化约束一起交给后端，系统会输出 RiskVector、持有期模拟、证据面板、交易草案和链上存证草案。'
+        : 'Combine a natural-language question with structured constraints and let the backend return RiskVector, holding simulations, an evidence panel, a tx draft, and an onchain attestation draft.',
+      intakeBadge: isZh ? '第 1 页 / Intake' : 'Page 1 / Intake',
+      intakeLead: isZh
+        ? '先锁定资产、持有期、流动性和 KYC。'
+        : 'Lock the asset set, holding period, liquidity, and KYC first.',
+      intakeAnalysis: isZh
+        ? '第 2 页会推进证据、计算和图表。'
+        : 'Page 2 will orchestrate evidence, calculations, and charts.',
+      intakeReport: isZh
+        ? '第 3 页输出配置建议、执行草案和报告哈希。'
+        : 'Page 3 will output allocation guidance, execution steps, and report hashes.',
+      defaultExecutionNetwork: isZh ? '默认执行网络' : 'Default execution network',
+      notConfigured: isZh ? '未配置' : 'Not configured',
+      selectedLabel: isZh ? '当前已选' : 'Selected',
+      selectedAssetCount: (count: number) =>
+        isZh ? `${count} 个资产已选` : `${count} assets selected`,
+      yourQuestion: isZh ? '你的问题' : 'Your question',
+      questionPlaceholder: isZh
+        ? '例如：我有 10,000 USDT，风险偏好中等，希望保持高流动性，应该怎么配？'
+        : 'Example: I have 10,000 USDT, want balanced risk and high liquidity, and need to know how to allocate it.',
+      exampleLabel: isZh ? '问题示例' : 'Question examples',
+      principal: isZh ? '本金' : 'Principal',
+      settlementCurrency: isZh ? '结算币种' : 'Settlement currency',
+      holdingPeriod: isZh ? '持有期' : 'Holding period',
+      daySuffix: isZh ? '天' : 'd',
+      riskTolerance: isZh ? '风险偏好' : 'Risk tolerance',
+      liquidityNeed: isZh ? '流动性约束' : 'Liquidity constraint',
+      kycCapability: isZh ? 'KYC / 准入能力' : 'KYC / access capability',
+      walletAddress: isZh ? '钱包地址（可选）' : 'Wallet address (optional)',
+      attestation: isZh ? '报告存证' : 'Report attestation',
+      attestationEnabled: isZh
+        ? '启用链上存证草案'
+        : 'Generate an onchain attestation draft',
+      attestationDisabled: isZh ? '仅生成离线草案' : 'Generate an offline-only draft',
+      attestationDetail: isZh
+        ? '控制结果页是否生成 Plan Registry attestation 草案。'
+        : 'Controls whether the result page includes a Plan Registry attestation draft.',
+      additionalConstraints: isZh ? '补充约束（可选）' : 'Additional constraints (optional)',
+      additionalConstraintsPlaceholder: isZh
+        ? '例如：最多只拿 40% 做高摩擦资产；必须保留 T+0 备用金；更偏向有官方披露的产品。'
+        : 'Example: no more than 40% in high-friction assets; keep a T+0 reserve; prefer officially disclosed products.',
+      startAnalysis: isZh ? '开始 RWA 分析' : 'Start RWA analysis',
+      createError: isZh
+        ? '创建会话失败，请检查后端是否正常运行。'
+        : 'Failed to create the session. Check whether the backend is running correctly.',
+      assetLibrary: 'Asset Library',
+      assetLibraryDescription: isZh
+        ? '选择希望纳入分析的资产模板。资产越少，单资产尽调越深；资产越多，组合建议越明显。'
+        : 'Choose the asset templates to include. Fewer assets deepen single-asset diligence; more assets make the allocation recommendation clearer.',
+      assetSearchPlaceholder: isZh
+        ? '搜索 USDC / MMF / Silver / Real Estate'
+        : 'Search USDC / MMF / Silver / Real Estate',
+      baseReturn: isZh ? '基准年化' : 'Base annualized',
+      earliestExit: isZh ? '最短退出' : 'Earliest exit',
+      kycShort: 'KYC',
+      createLoaderTitle: isZh ? '正在创建 RWA 分析会话' : 'Creating the RWA analysis session',
+      createLoaderDescription: isZh
+        ? '系统会先固定你的资金约束、资产范围和持有期，再进入统一的分析界面，推进证据、计算和报告。'
+        : 'The system will lock your funding constraints, asset scope, and holding period first, then enter the unified analysis workspace for evidence, calculations, and reporting.',
+      createLoaderLabel: isZh
+        ? '正在初始化 RWA 决策工作台，请稍候。'
+        : 'Initializing the RWA decision workspace.',
+      createLoaderStageLabel: isZh ? '初始化' : 'Initialization',
+      createLoaderStageTitle: isZh ? '准备 RWA 分析上下文' : 'Preparing the RWA analysis context',
+      createLoaderStageDescription: isZh
+        ? '正在整理 HashKey Chain 资产模板、用户偏好和编排状态。'
+        : 'Collecting HashKey Chain asset templates, user preferences, and orchestration state.',
+      createLoaderTips: isZh
+        ? [
+            '先锁定资产集合与持有期，再讨论收益和结论。',
+            'KYC 和流动性会直接影响可配资产范围。',
+          ] as [string, string]
+        : [
+            'Lock the asset set and holding period before debating yield and conclusions.',
+            'KYC and liquidity constraints directly change the investable universe.',
+          ] as [string, string],
+    }),
+    [isZh],
+  )
+
+  const modeCopy = useMemo(() => buildModeCopy(isZh), [isZh])
+  const riskOptions = useMemo(() => buildRiskOptions(isZh), [isZh])
+  const liquidityOptions = useMemo(() => buildLiquidityOptions(isZh), [isZh])
+  const kycOptions = useMemo(() => buildKycOptions(isZh), [isZh])
+
   const [selectedMode, setSelectedMode] = useState<AnalysisMode>('multi-option')
   const [problemStatement, setProblemStatement] = useState(
-    modeCopy['multi-option'].examples[0],
+    buildModeCopy(i18n.language.startsWith('zh'))['multi-option'].examples[0],
   )
   const [intakeContext, setIntakeContext] =
     useState<RwaIntakeContext>(defaultIntakeContext)
   const [assetQuery, setAssetQuery] = useState('')
 
   const modesQuery = useQuery({
-    queryKey: ['analysis', 'modes'],
+    queryKey: ['analysis', 'modes', locale],
     queryFn: adapter.modes.list,
   })
 
   const bootstrapQuery = useQuery({
-    queryKey: ['rwa', 'bootstrap'],
+    queryKey: ['rwa', 'bootstrap', locale],
     queryFn: adapter.rwa.getBootstrap,
   })
 
@@ -149,17 +329,14 @@ export function ModeSelectionPage() {
   if (createMutation.isPending) {
     return (
       <AnalysisPendingView
-        eyebrow="HashKey Chain / RWA"
-        title="正在创建 RWA 分析会话"
-        description="系统会先固定你的资金约束、资产范围和持有期，再进入统一的分析界面，推进证据、计算和报告。"
-        loaderLabel="正在初始化 RWA 决策工作台，请稍候。"
-        stageLabel="初始化"
-        stageTitle="准备 RWA 分析上下文"
-        stageDescription="正在整理 HashKey Chain 资产模板、用户偏好和编排状态。"
-        tips={[
-          '先锁定资产集合与持有期，再讨论收益和结论。',
-          'KYC 和流动性会直接影响可配资产范围。',
-        ]}
+        eyebrow={text.eyebrow}
+        title={text.createLoaderTitle}
+        description={text.createLoaderDescription}
+        loaderLabel={text.createLoaderLabel}
+        stageLabel={text.createLoaderStageLabel}
+        stageTitle={text.createLoaderStageTitle}
+        stageDescription={text.createLoaderStageDescription}
+        tips={text.createLoaderTips}
       />
     )
   }
@@ -167,17 +344,17 @@ export function ModeSelectionPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        eyebrow="HashKey Chain / RWA"
-        title="RWA 配置决策引擎"
-        description="把自然语言问题和结构化约束一起交给后端，系统会输出 RiskVector、持有期模拟、证据面板、交易草案和链上存证草案。"
+        eyebrow={text.eyebrow}
+        title={text.title}
+        description={text.description}
       />
 
       <Card className="p-5">
         <div className="flex flex-wrap items-center gap-3 text-sm text-text-secondary">
-          <Badge tone="gold">第 1 页 / Intake</Badge>
-          <span>先锁定资产、持有期、流动性和 KYC。</span>
-          <span>第 2 页会推进证据、计算和图表。</span>
-          <span>第 3 页输出配置建议、执行草案和报告哈希。</span>
+          <Badge tone="gold">{text.intakeBadge}</Badge>
+          <span>{text.intakeLead}</span>
+          <span>{text.intakeAnalysis}</span>
+          <span>{text.intakeReport}</span>
         </div>
 
         {bootstrapQuery.data ? (
@@ -195,7 +372,7 @@ export function ModeSelectionPage() {
               </p>
             </div>
             <div className="rounded-[18px] border border-border-subtle bg-app-bg-elevated px-4 py-3">
-              <p className="text-xs text-text-muted">默认执行网络</p>
+              <p className="text-xs text-text-muted">{text.defaultExecutionNetwork}</p>
               <p className="mt-2 font-medium text-text-primary">
                 {bootstrapQuery.data.chainConfig.defaultExecutionNetwork}
               </p>
@@ -203,7 +380,7 @@ export function ModeSelectionPage() {
             <div className="rounded-[18px] border border-border-subtle bg-app-bg-elevated px-4 py-3">
               <p className="text-xs text-text-muted">Plan Registry</p>
               <p className="mt-2 break-all text-sm text-text-primary">
-                {bootstrapQuery.data.chainConfig.planRegistryAddress || '未配置'}
+                {bootstrapQuery.data.chainConfig.planRegistryAddress || text.notConfigured}
               </p>
             </div>
           </div>
@@ -262,7 +439,7 @@ export function ModeSelectionPage() {
                 {isSelected ? (
                   <Badge tone="gold" className="gap-1 px-3 py-1.5">
                     <CheckCircle2 className="size-3.5" />
-                    当前已选
+                    {text.selectedLabel}
                   </Badge>
                 ) : null}
               </div>
@@ -290,24 +467,26 @@ export function ModeSelectionPage() {
         <Card className="space-y-5 p-6">
           <div className="flex flex-wrap items-center gap-3">
             <Badge tone="gold">{selectedPreset.title}</Badge>
-            <Badge tone="neutral">{intakeContext.preferredAssetIds.length} 个资产已选</Badge>
+            <Badge tone="neutral">
+              {text.selectedAssetCount(intakeContext.preferredAssetIds.length)}
+            </Badge>
           </div>
 
           <div className="space-y-2">
             <label htmlFor="problemStatement" className="text-sm text-text-secondary">
-              你的问题
+              {text.yourQuestion}
             </label>
             <Textarea
               id="problemStatement"
               value={problemStatement}
               onChange={(event) => setProblemStatement(event.target.value)}
-              placeholder="例如：我有 10,000 USDT，风险偏好中等，希望保持高流动性，应该怎么配？"
+              placeholder={text.questionPlaceholder}
               className="min-h-32 text-base"
             />
           </div>
 
           <div className="space-y-2">
-            <p className="text-xs text-text-muted">问题示例</p>
+            <p className="text-xs text-text-muted">{text.exampleLabel}</p>
             <div className="flex flex-wrap gap-2">
               {selectedPreset.examples.map((example) => {
                 const isActive = problemStatement === example
@@ -331,7 +510,7 @@ export function ModeSelectionPage() {
 
           <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-2">
-              <label className="text-sm text-text-secondary">本金</label>
+              <label className="text-sm text-text-secondary">{text.principal}</label>
               <Input
                 type="number"
                 min={100}
@@ -345,7 +524,9 @@ export function ModeSelectionPage() {
               />
             </div>
             <div className="space-y-2">
-              <label className="text-sm text-text-secondary">结算币种</label>
+              <label className="text-sm text-text-secondary">
+                {text.settlementCurrency}
+              </label>
               <Input
                 value={intakeContext.baseCurrency}
                 onChange={(event) =>
@@ -359,7 +540,7 @@ export function ModeSelectionPage() {
           </div>
 
           <div className="space-y-2">
-            <p className="text-sm text-text-secondary">持有期</p>
+            <p className="text-sm text-text-secondary">{text.holdingPeriod}</p>
             <div className="flex flex-wrap gap-2">
               {(bootstrapQuery.data?.holdingPeriodPresets ?? [7, 30, 90, 180]).map((days) => {
                 const isActive = intakeContext.holdingPeriodDays === days
@@ -379,7 +560,7 @@ export function ModeSelectionPage() {
                         : 'border-border-subtle bg-app-bg-elevated text-text-secondary'
                     }`}
                   >
-                    {days} 天
+                    {days} {text.daySuffix}
                   </button>
                 )
               })}
@@ -387,7 +568,7 @@ export function ModeSelectionPage() {
           </div>
 
           <div className="space-y-2">
-            <p className="text-sm text-text-secondary">风险偏好</p>
+            <p className="text-sm text-text-secondary">{text.riskTolerance}</p>
             <div className="grid gap-2 md:grid-cols-3">
               {riskOptions.map((option) => {
                 const isActive = intakeContext.riskTolerance === option.value
@@ -408,7 +589,9 @@ export function ModeSelectionPage() {
                     }`}
                   >
                     <p className="font-medium">{option.label}</p>
-                    <p className="mt-2 text-xs leading-6 text-text-muted">{option.detail}</p>
+                    <p className="mt-2 text-xs leading-6 text-text-muted">
+                      {option.detail}
+                    </p>
                   </button>
                 )
               })}
@@ -416,7 +599,7 @@ export function ModeSelectionPage() {
           </div>
 
           <div className="space-y-2">
-            <p className="text-sm text-text-secondary">流动性约束</p>
+            <p className="text-sm text-text-secondary">{text.liquidityNeed}</p>
             <div className="grid gap-2 md:grid-cols-3">
               {liquidityOptions.map((option) => {
                 const isActive = intakeContext.liquidityNeed === option.value
@@ -437,7 +620,9 @@ export function ModeSelectionPage() {
                     }`}
                   >
                     <p className="font-medium">{option.label}</p>
-                    <p className="mt-2 text-xs leading-6 text-text-muted">{option.detail}</p>
+                    <p className="mt-2 text-xs leading-6 text-text-muted">
+                      {option.detail}
+                    </p>
                   </button>
                 )
               })}
@@ -445,7 +630,7 @@ export function ModeSelectionPage() {
           </div>
 
           <div className="space-y-2">
-            <p className="text-sm text-text-secondary">KYC / 准入能力</p>
+            <p className="text-sm text-text-secondary">{text.kycCapability}</p>
             <div className="grid gap-2 md:grid-cols-3">
               {kycOptions.map((option) => {
                 const isActive = intakeContext.minimumKycLevel === option.value
@@ -466,7 +651,9 @@ export function ModeSelectionPage() {
                     }`}
                   >
                     <p className="font-medium">{option.label}</p>
-                    <p className="mt-2 text-xs leading-6 text-text-muted">{option.detail}</p>
+                    <p className="mt-2 text-xs leading-6 text-text-muted">
+                      {option.detail}
+                    </p>
                   </button>
                 )
               })}
@@ -475,7 +662,7 @@ export function ModeSelectionPage() {
 
           <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-2">
-              <label className="text-sm text-text-secondary">钱包地址（可选）</label>
+              <label className="text-sm text-text-secondary">{text.walletAddress}</label>
               <Input
                 value={intakeContext.walletAddress ?? ''}
                 onChange={(event) =>
@@ -488,7 +675,7 @@ export function ModeSelectionPage() {
               />
             </div>
             <div className="space-y-2">
-              <label className="text-sm text-text-secondary">报告存证</label>
+              <label className="text-sm text-text-secondary">{text.attestation}</label>
               <button
                 type="button"
                 onClick={() =>
@@ -504,17 +691,21 @@ export function ModeSelectionPage() {
                 }`}
               >
                 <p className="font-medium">
-                  {intakeContext.wantsOnchainAttestation ? '启用链上存证草案' : '仅生成离线草案'}
+                  {intakeContext.wantsOnchainAttestation
+                    ? text.attestationEnabled
+                    : text.attestationDisabled}
                 </p>
                 <p className="mt-2 text-xs leading-6 text-text-muted">
-                  控制结果页是否生成 Plan Registry attestation 草案。
+                  {text.attestationDetail}
                 </p>
               </button>
             </div>
           </div>
 
           <div className="space-y-2">
-            <label className="text-sm text-text-secondary">补充约束（可选）</label>
+            <label className="text-sm text-text-secondary">
+              {text.additionalConstraints}
+            </label>
             <Textarea
               value={intakeContext.additionalConstraints ?? ''}
               onChange={(event) =>
@@ -523,7 +714,7 @@ export function ModeSelectionPage() {
                   additionalConstraints: event.target.value,
                 }))
               }
-              placeholder="例如：最多只拿 40% 做高摩擦资产；必须保留 T+0 备用金；更偏向有官方披露的产品。"
+              placeholder={text.additionalConstraintsPlaceholder}
               className="min-h-24"
             />
           </div>
@@ -532,6 +723,7 @@ export function ModeSelectionPage() {
             onClick={() =>
               void createMutation.mutateAsync({
                 mode: selectedMode,
+                locale,
                 problemStatement,
                 intakeContext,
               })
@@ -543,13 +735,13 @@ export function ModeSelectionPage() {
             }
           >
             <Sparkles className="size-4" />
-            开始 RWA 分析
+            {text.startAnalysis}
             <ArrowRight className="size-4" />
           </Button>
 
           {createMutation.isError ? (
             <div className="rounded-2xl border border-[rgba(197,109,99,0.35)] bg-[rgba(197,109,99,0.12)] px-4 py-3 text-sm text-[#f7d4cf]">
-              创建会话失败，请检查后端是否正常运行。
+              {text.createError}
             </div>
           ) : null}
         </Card>
@@ -558,9 +750,11 @@ export function ModeSelectionPage() {
           <Card className="space-y-4 p-6">
             <div className="flex items-center justify-between gap-3">
               <div>
-                <h2 className="text-lg font-semibold text-text-primary">Asset Library</h2>
+                <h2 className="text-lg font-semibold text-text-primary">
+                  {text.assetLibrary}
+                </h2>
                 <p className="text-sm leading-7 text-text-secondary">
-                  选择希望纳入分析的资产模板。资产越少，单资产尽调越深；资产越多，组合建议越明显。
+                  {text.assetLibraryDescription}
                 </p>
               </div>
               <Badge tone="gold">{filteredAssets.length}</Badge>
@@ -569,7 +763,7 @@ export function ModeSelectionPage() {
             <Input
               value={assetQuery}
               onChange={(event) => setAssetQuery(event.target.value)}
-              placeholder="搜索 USDC / MMF / Silver / Real Estate"
+              placeholder={text.assetSearchPlaceholder}
             />
 
             <div className="space-y-3">
@@ -591,9 +785,13 @@ export function ModeSelectionPage() {
                         <div className="flex flex-wrap items-center gap-2">
                           <p className="font-medium text-text-primary">{asset.name}</p>
                           <Badge tone="neutral">{asset.symbol}</Badge>
-                          <Badge tone={asset.featured ? 'gold' : 'neutral'}>{asset.assetType}</Badge>
+                          <Badge tone={asset.featured ? 'gold' : 'neutral'}>
+                            {asset.assetType}
+                          </Badge>
                         </div>
-                        <p className="mt-2 text-sm leading-7 text-text-secondary">{asset.description}</p>
+                        <p className="mt-2 text-sm leading-7 text-text-secondary">
+                          {asset.description}
+                        </p>
                       </div>
                       {isSelected ? (
                         <CheckCircle2 className="mt-1 size-5 text-gold-primary" />
@@ -602,66 +800,27 @@ export function ModeSelectionPage() {
 
                     <div className="mt-4 grid gap-2 md:grid-cols-3">
                       <div className="rounded-[16px] border border-border-subtle bg-app-bg px-3 py-2">
-                        <p className="text-xs text-text-muted">基准年化</p>
+                        <p className="text-xs text-text-muted">{text.baseReturn}</p>
                         <p className="mt-1 font-medium text-text-primary">
                           {formatPercent(asset.expectedReturnBase)}
                         </p>
                       </div>
                       <div className="rounded-[16px] border border-border-subtle bg-app-bg px-3 py-2">
-                        <p className="text-xs text-text-muted">最短退出</p>
+                        <p className="text-xs text-text-muted">{text.earliestExit}</p>
                         <p className="mt-1 font-medium text-text-primary">
                           {asset.redemptionDays === 0 ? 'T+0' : `T+${asset.redemptionDays}`}
                         </p>
                       </div>
                       <div className="rounded-[16px] border border-border-subtle bg-app-bg px-3 py-2">
-                        <p className="text-xs text-text-muted">KYC</p>
+                        <p className="text-xs text-text-muted">{text.kycShort}</p>
                         <p className="mt-1 font-medium text-text-primary">
                           {asset.requiresKycLevel ?? 0}
                         </p>
                       </div>
                     </div>
-
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      {asset.tags.map((tag) => (
-                        <span
-                          key={`${asset.id}-${tag}`}
-                          className="rounded-full border border-border-subtle px-3 py-1 text-xs text-text-muted"
-                        >
-                          {tag}
-                        </span>
-                      ))}
-                    </div>
                   </button>
                 )
               })}
-            </div>
-          </Card>
-
-          <Card className="space-y-4 p-6">
-            <div className="flex items-center gap-3">
-              <WalletCards className="size-5 text-gold-primary" />
-              <h2 className="text-lg font-semibold text-text-primary">这轮会输出什么</h2>
-            </div>
-
-            <div className="space-y-3">
-              <div className="rounded-[20px] border border-border-subtle bg-app-bg-elevated p-4">
-                <p className="font-medium text-text-primary">RiskVector</p>
-                <p className="mt-2 text-sm leading-7 text-text-secondary">
-                  把 Market、Liquidity、Peg/Redemption、Issuer/Custody、Smart Contract、Oracle、Compliance 统一量化。
-                </p>
-              </div>
-              <div className="rounded-[20px] border border-border-subtle bg-app-bg-elevated p-4">
-                <p className="font-medium text-text-primary">Holding Simulation</p>
-                <p className="mt-2 text-sm leading-7 text-text-secondary">
-                  输出 {intakeContext.holdingPeriodDays} 天持有期下的 P10 / P50 / P90 收益分布、VaR/CVaR 和最大回撤区间。
-                </p>
-              </div>
-              <div className="rounded-[20px] border border-border-subtle bg-app-bg-elevated p-4">
-                <p className="font-medium text-text-primary">Evidence + Tx Draft</p>
-                <p className="mt-2 text-sm leading-7 text-text-secondary">
-                  每个关键判断都挂证据链接，并根据 HashKey Chain 配置生成执行步骤和报告哈希草案。
-                </p>
-              </div>
             </div>
           </Card>
         </div>

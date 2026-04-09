@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from app.config import Settings
 from app.domain.rwa import AssetTemplate, AssetType, HashKeyChainConfig
+from app.i18n import text_for_locale
 
 HASHKEY_DOCS_BASE = "https://docs.hashkeychain.net"
 HASHKEY_NETWORK_INFO_URL = (
@@ -46,7 +47,11 @@ def build_chain_config(settings: Settings) -> HashKeyChainConfig:
     )
 
 
-def build_asset_library(chain_config: HashKeyChainConfig) -> list[AssetTemplate]:
+def build_asset_library(
+    chain_config: HashKeyChainConfig,
+    *,
+    locale: str = "zh",
+) -> list[AssetTemplate]:
     chain_id = chain_config.mainnet_chain_id
     return [
         AssetTemplate(
@@ -54,7 +59,11 @@ def build_asset_library(chain_config: HashKeyChainConfig) -> list[AssetTemplate]
             symbol="USDT",
             name="HashKey USDT",
             asset_type=AssetType.STABLECOIN,
-            description="HashKey Chain 官方列出的主网 USDT 合约，适合作为稳定币收益与流动性基准。",
+            description=text_for_locale(
+                locale,
+                "HashKey Chain 官方列出的主网 USDT 合约，适合作为稳定币收益与流动性基准。",
+                "The mainnet USDT contract listed by HashKey Chain, suitable as the baseline for stablecoin carry and liquidity.",
+            ),
             issuer="Tether / bridge representation",
             custody="Bridge-backed ERC20 on HashKey Chain",
             chain_id=chain_id,
@@ -86,8 +95,16 @@ def build_asset_library(chain_config: HashKeyChainConfig) -> list[AssetTemplate]
             requires_kyc_level=0,
             minimum_ticket_usd=100,
             tags=["stablecoin", "liquidity", "yield-base"],
-            thesis="适合作为流动性底仓和低波动收益腿，但需要显式看待脱锚与赎回信心风险。",
-            fit_summary="更适合保守或均衡型配置，重点承担现金管理和出入金缓冲角色。",
+            thesis=text_for_locale(
+                locale,
+                "适合作为流动性底仓和低波动收益腿，但需要显式看待脱锚与赎回信心风险。",
+                "Works as the liquidity anchor and lower-volatility carry sleeve, but depeg and redemption-confidence risk must stay explicit.",
+            ),
+            fit_summary=text_for_locale(
+                locale,
+                "更适合保守或均衡型配置，重点承担现金管理和出入金缓冲角色。",
+                "Best suited to conservative or balanced allocations as the cash-management and liquidity-buffer sleeve.",
+            ),
             evidence_urls=[HASHKEY_TOKEN_CONTRACTS_URL, HASHKEY_NETWORK_INFO_URL],
             featured=True,
         ),
@@ -96,7 +113,11 @@ def build_asset_library(chain_config: HashKeyChainConfig) -> list[AssetTemplate]
             symbol="USDC",
             name="HashKey USDC",
             asset_type=AssetType.STABLECOIN,
-            description="HashKey Chain 官方列出的主网 Bridged USDC，可作为稳定币与 MMF 的比较基准。",
+            description=text_for_locale(
+                locale,
+                "HashKey Chain 官方列出的主网 Bridged USDC，可作为稳定币与 MMF 的比较基准。",
+                "The bridged mainnet USDC listed by HashKey Chain, useful as the comparison baseline for stablecoins and MMFs.",
+            ),
             issuer="Circle / bridged deployment",
             custody="Bridged USDC on HashKey Chain",
             chain_id=chain_id,
@@ -128,8 +149,16 @@ def build_asset_library(chain_config: HashKeyChainConfig) -> list[AssetTemplate]
             requires_kyc_level=0,
             minimum_ticket_usd=100,
             tags=["stablecoin", "liquidity", "benchmark"],
-            thesis="在披露质量和二级流动性上通常优于一般桥接资产，适合做高流动性配置基线。",
-            fit_summary="适合看重 T+0 可退出和低回撤的人群。",
+            thesis=text_for_locale(
+                locale,
+                "在披露质量和二级流动性上通常优于一般桥接资产，适合做高流动性配置基线。",
+                "Usually offers stronger disclosure quality and secondary liquidity than generic bridged assets, making it a high-liquidity baseline.",
+            ),
+            fit_summary=text_for_locale(
+                locale,
+                "适合看重 T+0 可退出和低回撤的人群。",
+                "Best for users who prioritize T+0 exits and low drawdown.",
+            ),
             evidence_urls=[HASHKEY_TOKEN_CONTRACTS_URL, HASHKEY_NETWORK_INFO_URL],
             featured=True,
         ),
@@ -138,7 +167,11 @@ def build_asset_library(chain_config: HashKeyChainConfig) -> list[AssetTemplate]
             symbol="MMF",
             name="CPIC Estable MMF",
             asset_type=AssetType.MMF,
-            description="HashKey Chain 生态中披露的 tokenized USD MMF 示例，用于短久期高质量货币市场工具配置演示。",
+            description=text_for_locale(
+                locale,
+                "HashKey Chain 生态中披露的 tokenized USD MMF 示例，用于短久期高质量货币市场工具配置演示。",
+                "A tokenized USD MMF example disclosed in the HashKey Chain ecosystem for short-duration, high-quality money-market allocations.",
+            ),
             issuer="CPIC Investment Management / Estable",
             custody="Issuer-managed RWA custody and transfer agent stack",
             chain_id=chain_id,
@@ -168,8 +201,16 @@ def build_asset_library(chain_config: HashKeyChainConfig) -> list[AssetTemplate]
             requires_kyc_level=2,
             minimum_ticket_usd=10_000,
             tags=["rwa", "mmf", "professional-investor"],
-            thesis="适合作为高流动性与收益平衡型配置，但对申赎节奏、KYC 与发行人执行依赖更强。",
-            fit_summary="更适合中低风险偏好、可接受 T+2 资金周转的人群。",
+            thesis=text_for_locale(
+                locale,
+                "适合作为高流动性与收益平衡型配置，但对申赎节奏、KYC 与发行人执行依赖更强。",
+                "Works as a balance between liquidity and carry, but depends more heavily on redemption cadence, KYC gating, and issuer execution.",
+            ),
+            fit_summary=text_for_locale(
+                locale,
+                "更适合中低风险偏好、可接受 T+2 资金周转的人群。",
+                "Better for lower-risk users who can tolerate roughly T+2 capital turnover.",
+            ),
             evidence_urls=[HASHKEY_CPIC_MMF_URL, HASHKEY_KYC_URL],
             featured=True,
         ),
@@ -178,7 +219,11 @@ def build_asset_library(chain_config: HashKeyChainConfig) -> list[AssetTemplate]
             symbol="SILV",
             name="Hong Kong Regulated Silver RWA",
             asset_type=AssetType.PRECIOUS_METAL,
-            description="基于香港受监管白银 RWA 的演示模板，强调 1:1 实物映射、第三方金库托管与专业投资者门槛。",
+            description=text_for_locale(
+                locale,
+                "基于香港受监管白银 RWA 的演示模板，强调 1:1 实物映射、第三方金库托管与专业投资者门槛。",
+                "A demo template for a Hong Kong regulated silver RWA, emphasizing 1:1 metal backing, third-party vault custody, and professional-investor gating.",
+            ),
             issuer="HashKey Chain ecosystem issuer",
             custody="Third-party vault custody for .9999 silver",
             chain_id=chain_id,
@@ -208,8 +253,16 @@ def build_asset_library(chain_config: HashKeyChainConfig) -> list[AssetTemplate]
             requires_kyc_level=2,
             minimum_ticket_usd=5_000,
             tags=["rwa", "precious-metal", "inflation-hedge"],
-            thesis="适合作为通胀对冲和分散化腿，但收益分布更宽、流动性与托管条款必须单独审视。",
-            fit_summary="更适合均衡到进取型配置，用于补充与稳定币/MMF 不同的风险收益来源。",
+            thesis=text_for_locale(
+                locale,
+                "适合作为通胀对冲和分散化腿，但收益分布更宽、流动性与托管条款必须单独审视。",
+                "Useful as an inflation-hedge and diversification sleeve, but its broader return distribution and custody/liquidity terms need separate review.",
+            ),
+            fit_summary=text_for_locale(
+                locale,
+                "更适合均衡到进取型配置，用于补充与稳定币/MMF 不同的风险收益来源。",
+                "Best for balanced-to-aggressive allocations as a return source that differs from stablecoins and MMFs.",
+            ),
             evidence_urls=[HASHKEY_SILVER_RWA_URL, HASHKEY_KYC_URL],
             featured=True,
         ),
@@ -218,7 +271,11 @@ def build_asset_library(chain_config: HashKeyChainConfig) -> list[AssetTemplate]
             symbol="RE-1",
             name="Tokenized Real Estate Demo",
             asset_type=AssetType.REAL_ESTATE,
-            description="用于 Hackathon 演示的房地产类 RWA 模板，突出申赎摩擦、分红收益与低流动性的组合特征。",
+            description=text_for_locale(
+                locale,
+                "用于 Hackathon 演示的房地产类 RWA 模板，突出申赎摩擦、分红收益与低流动性的组合特征。",
+                "A hackathon real-estate RWA template that highlights redemption friction, income distribution, and structurally lower liquidity.",
+            ),
             issuer="Demo SPV",
             custody="Offchain SPV / trustee structure",
             chain_id=chain_id,
@@ -248,8 +305,16 @@ def build_asset_library(chain_config: HashKeyChainConfig) -> list[AssetTemplate]
             requires_kyc_level=2,
             minimum_ticket_usd=25_000,
             tags=["rwa", "real-estate", "yield"],
-            thesis="收益看起来吸引人，但退出时间、法律结构和发行人治理是这类资产的主要风险源。",
-            fit_summary="只适合能接受锁定期和条款尽调的人群。",
+            thesis=text_for_locale(
+                locale,
+                "收益看起来吸引人，但退出时间、法律结构和发行人治理是这类资产的主要风险源。",
+                "The yield profile can look attractive, but exit timing, legal structure, and issuer governance dominate the risk.",
+            ),
+            fit_summary=text_for_locale(
+                locale,
+                "只适合能接受锁定期和条款尽调的人群。",
+                "Only suitable for users who accept lockups and deeper term-sheet diligence.",
+            ),
             evidence_urls=[HASHKEY_ABOUT_URL, HASHKEY_KYC_URL],
             featured=False,
         ),
@@ -258,7 +323,11 @@ def build_asset_library(chain_config: HashKeyChainConfig) -> list[AssetTemplate]
             symbol="WBTC",
             name="HashKey WBTC Benchmark",
             asset_type=AssetType.BENCHMARK,
-            description="HashKey Chain 官方列出的 WBTC 合约，用于给 RWA 方案增加一个高波动链上 benchmark。",
+            description=text_for_locale(
+                locale,
+                "HashKey Chain 官方列出的 WBTC 合约，用于给 RWA 方案增加一个高波动链上 benchmark。",
+                "The WBTC contract listed by HashKey Chain, included as a high-volatility onchain benchmark for RWA comparisons.",
+            ),
             issuer="Wrapped BTC bridge",
             custody="Bridge-backed BTC representation",
             chain_id=chain_id,
@@ -288,8 +357,16 @@ def build_asset_library(chain_config: HashKeyChainConfig) -> list[AssetTemplate]
             requires_kyc_level=0,
             minimum_ticket_usd=100,
             tags=["benchmark", "volatile", "non-rwa-anchor"],
-            thesis="不是 RWA，但适合作为高波动机会成本基准，帮助用户理解为何 RWA 值得承担额外门槛。",
-            fit_summary="仅适合作为比较基准或进取型组合的小比例暴露。",
+            thesis=text_for_locale(
+                locale,
+                "不是 RWA，但适合作为高波动机会成本基准，帮助用户理解为何 RWA 值得承担额外门槛。",
+                "Not an RWA itself, but a useful high-volatility opportunity-cost benchmark for understanding why RWA gating may still be worthwhile.",
+            ),
+            fit_summary=text_for_locale(
+                locale,
+                "仅适合作为比较基准或进取型组合的小比例暴露。",
+                "Primarily useful as a benchmark or as a small exposure inside more aggressive portfolios.",
+            ),
             evidence_urls=[HASHKEY_TOKEN_CONTRACTS_URL, HASHKEY_NETWORK_INFO_URL],
             featured=False,
         ),

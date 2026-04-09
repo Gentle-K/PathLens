@@ -20,6 +20,7 @@ from app.domain.schemas import (
     SessionSummaryResponse,
     SessionStepResponse,
 )
+from app.i18n import normalize_locale
 from app.rwa.catalog import build_asset_library, build_chain_config
 
 router = APIRouter()
@@ -55,6 +56,14 @@ def get_request_ip(request: Request) -> str:
     if forwarded_for:
         return forwarded_for.split(",")[0].strip()
     return request.client.host if request.client else "unknown"
+
+
+def resolve_request_locale(request: Request) -> str:
+    return normalize_locale(
+        request.headers.get("x-app-locale")
+        or request.headers.get("accept-language")
+        or "zh"
+    )
 
 
 def require_debug_auth(
@@ -99,7 +108,10 @@ def frontend_bootstrap(request: Request, response: Response) -> FrontendBootstra
     services = get_app_services()
     settings = Settings.from_env()
     chain_config = build_chain_config(settings)
-    asset_library = build_asset_library(chain_config)
+    asset_library = build_asset_library(
+        chain_config,
+        locale=resolve_request_locale(request),
+    )
     return FrontendBootstrapResponse(
         app_name="Genius Actuary",
         supported_modes=services.orchestrator.supported_modes(),
@@ -133,6 +145,7 @@ def create_session(
     client_id = ensure_client_cookie(request, response)
     session = services.session_service.create_session(
         mode=payload.mode,
+        locale=payload.locale,
         problem_statement=payload.problem_statement,
         owner_client_id=client_id,
         intake_context=payload.intake_context,

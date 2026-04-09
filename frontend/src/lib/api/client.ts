@@ -56,7 +56,7 @@ export class ApiClient {
   }
 
   async request<T>(path: string, init: RequestInit = {}, retry = true): Promise<T> {
-    const { accessToken, refreshToken, clearSession } = useAppStore.getState()
+    const { accessToken, refreshToken, clearSession, locale } = useAppStore.getState()
     const headers = new Headers(init.headers)
     const controller = new AbortController()
     const externalSignal = init.signal
@@ -74,6 +74,10 @@ export class ApiClient {
 
     if (!headers.has('Content-Type') && !(init.body instanceof FormData)) {
       headers.set('Content-Type', 'application/json')
+    }
+
+    if (!headers.has('X-App-Locale')) {
+      headers.set('X-App-Locale', locale)
     }
 
     if (this.apiKey && !headers.has(this.apiKeyHeader)) {
