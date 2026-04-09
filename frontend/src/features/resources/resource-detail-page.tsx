@@ -41,6 +41,18 @@ export function ResourceDetailPage() {
     editRecord: isZh ? '编辑记录' : 'Edit record',
   }
 
+  const record = recordQuery.data
+
+  useEffect(() => {
+    if (!definition || !isHistoryPage || !record) {
+      return
+    }
+
+    void navigate(getAnalysisSessionPath(record.id, String(record.status ?? '')), {
+      replace: true,
+    })
+  }, [definition, isHistoryPage, navigate, record])
+
   if (!definition) {
     return (
       <EmptyState
@@ -49,18 +61,6 @@ export function ResourceDetailPage() {
       />
     )
   }
-
-  const record = recordQuery.data
-
-  useEffect(() => {
-    if (!isHistoryPage || !record) {
-      return
-    }
-
-    void navigate(getAnalysisSessionPath(record.id, String(record.status ?? '')), {
-      replace: true,
-    })
-  }, [isHistoryPage, navigate, record])
 
   return (
     <div className="space-y-6">

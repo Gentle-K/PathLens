@@ -118,7 +118,10 @@ export function ModeSelectionPage() {
     () => (modesQuery.data?.length ? modesQuery.data : undefined),
     [modesQuery.data],
   )
-  const assetLibrary = bootstrapQuery.data?.assetLibrary ?? []
+  const assetLibrary = useMemo(
+    () => bootstrapQuery.data?.assetLibrary ?? [],
+    [bootstrapQuery.data?.assetLibrary],
+  )
   const filteredAssets = useMemo(() => {
     const normalized = assetQuery.trim().toLowerCase()
     if (!normalized) {

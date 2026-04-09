@@ -114,7 +114,7 @@ export function AnalysisSessionPage() {
   const queryClient = useQueryClient()
   const { sessionId = '' } = useParams()
   const adapter = useApiAdapter()
-  const [drafts, setDrafts] = useState<Record<string, DraftAnswer>>({})
+  const [draftOverrides, setDraftOverrides] = useState<Record<string, DraftAnswer>>({})
 
   const sessionQuery = useQuery({
     queryKey: ['analysis', sessionId],
@@ -150,6 +150,16 @@ export function AnalysisSessionPage() {
 
   const session = sessionQuery.data
   const progress = progressQuery.data
+  const drafts = useMemo(
+    () =>
+      session
+        ? {
+            ...buildDraftAnswers(session),
+            ...draftOverrides,
+          }
+        : draftOverrides,
+    [draftOverrides, session],
+  )
   const pendingQuestions = useMemo(
     () => session?.questions.filter((question) => !question.answered) ?? [],
     [session?.questions],
@@ -160,17 +170,6 @@ export function AnalysisSessionPage() {
 
     return assetLibrary.filter((asset) => selectedIds.includes(asset.id))
   }, [rwaBootstrapQuery.data?.assetLibrary, session?.intakeContext?.preferredAssetIds])
-
-  useEffect(() => {
-    if (!session) {
-      return
-    }
-
-    setDrafts((current) => ({
-      ...buildDraftAnswers(session),
-      ...current,
-    }))
-  }, [session])
 
   useEffect(() => {
     if (progress?.status === 'COMPLETED' || session?.status === 'COMPLETED') {
@@ -318,7 +317,7 @@ export function AnalysisSessionPage() {
                                 key={option.value}
                                 type="button"
                                 onClick={() =>
-                                  setDrafts((current) => ({
+                                  setDraftOverrides((current) => ({
                                     ...current,
                                     [question.id]: {
                                       ...draft,
@@ -350,7 +349,7 @@ export function AnalysisSessionPage() {
                           <Input
                             value={draft.customInput}
                             onChange={(event) =>
-                              setDrafts((current) => ({
+                              setDraftOverrides((current) => ({
                                 ...current,
                                 [question.id]: {
                                   ...draft,
@@ -365,7 +364,7 @@ export function AnalysisSessionPage() {
                           <Textarea
                             value={draft.customInput}
                             onChange={(event) =>
-                              setDrafts((current) => ({
+                              setDraftOverrides((current) => ({
                                 ...current,
                                 [question.id]: {
                                   ...draft,
@@ -388,7 +387,7 @@ export function AnalysisSessionPage() {
                           }
                           size="sm"
                           onClick={() =>
-                            setDrafts((current) => ({
+                            setDraftOverrides((current) => ({
                               ...current,
                               [question.id]: {
                                 ...draft,
@@ -407,7 +406,7 @@ export function AnalysisSessionPage() {
                           }
                           size="sm"
                           onClick={() =>
-                            setDrafts((current) => ({
+                            setDraftOverrides((current) => ({
                               ...current,
                               [question.id]: {
                                 ...draft,
@@ -427,7 +426,7 @@ export function AnalysisSessionPage() {
                             }
                             size="sm"
                             onClick={() =>
-                              setDrafts((current) => ({
+                              setDraftOverrides((current) => ({
                                 ...current,
                                 [question.id]: {
                                   ...draft,
