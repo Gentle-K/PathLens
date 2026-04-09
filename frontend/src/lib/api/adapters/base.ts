@@ -14,6 +14,7 @@ import type {
   ModeDefinition,
   NotificationItem,
   PaginatedResponse,
+  RecordAttestationPayload,
   RequestMeta,
   ResourceRecord,
   Role,
@@ -45,6 +46,7 @@ export interface ApiAdapter {
     create(payload: CreateSessionPayload): Promise<AnalysisSession>
     getById(sessionId: string): Promise<AnalysisSession>
     submitAnswers(sessionId: string, payload: SubmitAnswersPayload): Promise<AnalysisSession>
+    recordAttestation(sessionId: string, payload: RecordAttestationPayload): Promise<AnalysisSession>
     requestMoreFollowUp(sessionId: string): Promise<AnalysisSession>
     getProgress(sessionId: string): Promise<AnalysisProgress>
     getReport(sessionId: string): Promise<AnalysisReport>

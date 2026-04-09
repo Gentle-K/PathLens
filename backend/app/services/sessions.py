@@ -1,7 +1,9 @@
-from app.domain.models import AnalysisMode, AnalysisSession, SessionEvent, SessionStatus, UserAnswer
+from app.domain.models import AnalysisMode, AnalysisSession, SessionEvent, SessionStatus, UserAnswer, utcnow
 from app.domain.rwa import RwaIntakeContext
 from app.i18n import normalize_locale
 from app.persistence.base import SessionRepository
+from app.rwa.catalog import build_chain_config
+from app.config import Settings
 from app.services.audit import AuditLogService
 
 
@@ -183,5 +185,74 @@ class SessionService:
             ip_address="cookie-session",
             summary=f"Recorded {len(answer_summaries)} new clarification answer(s).",
             metadata={"answer_count": str(len(answer_summaries))},
+        )
+        return saved
+
+    def record_attestation(
+        self,
+        session_id: str,
+        *,
+        network: str,
+        transaction_hash: str,
+        submitted_by: str = "",
+        block_number: int | None = None,
+    ) -> AnalysisSession | None:
+        session = self.repository.get(session_id)
+        if session is None or session.report is None or session.report.attestation_draft is None:
+            return None
+
+        draft = session.report.attestation_draft
+        chain_config = session.report.chain_config or build_chain_config(Settings.from_env())
+        normalized_network = network.strip().lower() or draft.network or "testnet"
+
+        if normalized_network == "testnet":
+            explorer_base = chain_config.testnet_explorer_url
+            contract_address = (
+                chain_config.testnet_plan_registry_address
+                or draft.contract_address
+            )
+            chain_id = chain_config.testnet_chain_id
+        else:
+            explorer_base = chain_config.mainnet_explorer_url
+            contract_address = (
+                chain_config.mainnet_plan_registry_address
+                or draft.contract_address
+            )
+            chain_id = chain_config.mainnet_chain_id
+
+        draft.network = normalized_network
+        draft.chain_id = chain_id
+        draft.contract_address = contract_address
+        draft.explorer_url = explorer_base
+        draft.transaction_hash = transaction_hash
+        draft.transaction_url = f"{explorer_base}/tx/{transaction_hash}"
+        draft.submitted_by = submitted_by.strip()
+        draft.submitted_at = utcnow()
+        draft.block_number = block_number
+        draft.ready = bool(contract_address)
+
+        session.events.append(
+            SessionEvent(
+                kind="attestation_recorded",
+                payload={
+                    "network": normalized_network,
+                    "transaction_hash": transaction_hash,
+                    "submitted_by": submitted_by.strip(),
+                    "block_number": block_number,
+                },
+            )
+        )
+        saved = self.repository.save(session)
+        self.audit_log_service.write(
+            action="ATTESTATION_RECORDED",
+            actor=submitted_by.strip() or saved.owner_client_id,
+            target=session_id,
+            ip_address="wallet-client",
+            summary=f"Recorded onchain attestation tx {transaction_hash[:18]}...",
+            metadata={
+                "network": normalized_network,
+                "transaction_hash": transaction_hash,
+                "block_number": str(block_number or ""),
+            },
         )
         return saved

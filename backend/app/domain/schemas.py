@@ -30,6 +30,13 @@ class ContinueSessionRequest(BaseModel):
     answers: list[UserAnswer] = Field(default_factory=list)
 
 
+class RecordAttestationRequest(BaseModel):
+    network: str = Field(min_length=1)
+    transaction_hash: str = Field(min_length=10)
+    submitted_by: str = ""
+    block_number: int | None = None
+
+
 class SessionResponse(AnalysisSession):
     model_config = ConfigDict(from_attributes=True)
 

@@ -11,11 +11,13 @@ from app.domain.models import (
     AnalysisReport,
     AnalysisSession,
     ClarificationQuestion,
+    SessionStatus,
     MajorConclusionItem,
     EvidenceItem,
     SearchTask,
     UserAnswer,
 )
+from app.domain.rwa import AttestationDraft
 from app.main import create_app
 from app.orchestrator.engine import AnalysisOrchestrator
 from app.persistence.memory import InMemorySessionRepository
@@ -386,6 +388,78 @@ class SessionStepHttpTests(unittest.TestCase):
                 any(
                     event.kind == "orchestrator_unexpected_exception"
                     for event in saved_session.events
+                )
+            )
+
+    def test_attestation_route_records_transaction_metadata(self):
+        services = build_services()
+        app = create_app()
+
+        with patch("app.api.routes.get_app_services", return_value=services):
+            client = TestClient(app)
+            create_response = client.post(
+                "/api/sessions",
+                json={
+                    "mode": AnalysisMode.MULTI_OPTION.value,
+                    "problem_statement": "Build a 30-day HashKey Chain RWA allocation for 10,000 USDT.",
+                },
+            )
+            self.assertEqual(200, create_response.status_code)
+            session_id = create_response.json()["session_id"]
+
+            saved_session = services.session_service.get_session(session_id)
+            self.assertIsNotNone(saved_session)
+            saved_session.status = SessionStatus.COMPLETED
+            saved_session.report = AnalysisReport(
+                summary="Ready for attestation.",
+                assumptions=[],
+                recommendations=[],
+                open_questions=[],
+                chart_refs=[],
+                markdown="# HashKey Report",
+                chain_config=build_chain_config(Settings.from_env()),
+                attestation_draft=AttestationDraft(
+                    chain_id=133,
+                    network="testnet",
+                    report_hash="0x" + ("1" * 64),
+                    portfolio_hash="0x" + ("2" * 64),
+                    attestation_hash="0x" + ("3" * 64),
+                    contract_address="0x0000000000000000000000000000000000000133",
+                    explorer_url="https://testnet-explorer.hsk.xyz",
+                    ready=True,
+                ),
+            )
+            services.session_service.repository.save(saved_session)
+
+            attestation_response = client.post(
+                f"/api/sessions/{session_id}/attestation",
+                json={
+                    "network": "testnet",
+                    "transaction_hash": "0x" + ("a" * 64),
+                    "submitted_by": "0x0000000000000000000000000000000000000abc",
+                    "block_number": 456789,
+                },
+            )
+
+            self.assertEqual(200, attestation_response.status_code)
+            payload = attestation_response.json()
+            self.assertEqual("0x" + ("a" * 64), payload["report"]["attestation_draft"]["transaction_hash"])
+            self.assertEqual(456789, payload["report"]["attestation_draft"]["block_number"])
+            self.assertTrue(
+                payload["report"]["attestation_draft"]["transaction_url"].endswith(
+                    "/tx/" + ("0x" + ("a" * 64))
+                )
+            )
+
+            refreshed_session = services.session_service.get_session(session_id)
+            self.assertIsNotNone(refreshed_session)
+            self.assertTrue(
+                any(event.kind == "attestation_recorded" for event in refreshed_session.events)
+            )
+            self.assertTrue(
+                any(
+                    entry.action == "ATTESTATION_RECORDED"
+                    for entry in services.audit_log_service.list_logs()
                 )
             )
 

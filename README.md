@@ -18,8 +18,11 @@ The backend keeps the final report deterministic and evidence-linked. The OpenAI
 
 - Built-in HashKey Chain bootstrap payload exposed to the frontend
 - Mainnet / testnet chain metadata, RPC URLs, and explorer URLs
-- Optional `PLAN_REGISTRY_ADDRESS` and `KYC_SBT_ADDRESS` wiring
+- Wallet connection, network switching, explorer deep links, and onchain KYC reads via `viem`
+- Per-network `HASHKEY_*_PLAN_REGISTRY_ADDRESS` and `HASHKEY_*_KYC_SBT_ADDRESS` wiring
 - Seeded HashKey asset library based on official network and token references
+- Live APRO oracle reads for configured `BTC/USD`, `USDT/USD`, and `USDC/USD` feeds
+- Plan Registry attestation flow that can write a real transaction and persist the tx hash back into the session report
 
 ### RWA asset library
 
@@ -55,14 +58,26 @@ The backend now computes:
 The React frontend now renders:
 
 - RWA intake and asset selection
+- wallet connection, HashKey network switching, and onchain KYC/SBT status
 - chain configuration summary
+- live oracle snapshots with source URL, update timestamp, and explorer link
 - asset analysis cards
 - holding-period simulation summaries
 - comparison tables and chart artifacts
 - evidence panel with linked sources
 - recommended weights and suggested ticket sizes
 - tx draft and on-chain attestation draft
+- attestation execution console with onchain receipt, tx hash, and explorer jump
 - assumptions, disclaimers, and calculation summaries
+
+### Hackathon fit
+
+This repo is now intentionally aligned with the HashKey Chain DeFi / RWA track:
+
+- it is built around HashKey Chain rather than a chain-agnostic UI shell
+- it focuses on stablecoins, MMF-style RWAs, precious metals, and other compliant RWA workflows
+- it uses official-recommended HashKey infrastructure patterns where possible: explorer links, KYC/SBT reads, oracle feeds, and real testnet transaction flows
+- it preserves the product's differentiator: deterministic RiskVector, holding-period simulation, evidence panel, and allocation logic, instead of turning the demo into a generic wallet-only swap screen
 
 ### Debug and operations
 
@@ -96,6 +111,7 @@ Key routes:
 - `POST /api/sessions`
 - `GET /api/sessions/{session_id}`
 - `POST /api/sessions/{session_id}/step`
+- `POST /api/sessions/{session_id}/attestation`
 
 ## Frontend highlights
 
@@ -144,9 +160,13 @@ Important backend variables:
 - `HASHKEY_TESTNET_CHAIN_ID`
 - `HASHKEY_TESTNET_RPC_URL`
 - `HASHKEY_TESTNET_EXPLORER_URL`
+- `HASHKEY_TESTNET_PLAN_REGISTRY_ADDRESS`
+- `HASHKEY_TESTNET_KYC_SBT_ADDRESS`
 - `HASHKEY_MAINNET_CHAIN_ID`
 - `HASHKEY_MAINNET_RPC_URL`
 - `HASHKEY_MAINNET_EXPLORER_URL`
+- `HASHKEY_MAINNET_PLAN_REGISTRY_ADDRESS`
+- `HASHKEY_MAINNET_KYC_SBT_ADDRESS`
 - `PLAN_REGISTRY_ADDRESS`
 - `KYC_SBT_ADDRESS`
 - `DEBUG_USERNAME`
@@ -158,10 +178,73 @@ The default OpenAI-compatible example in `backend/.env.example` uses:
 - base URL: `https://api.openai.com/v1`
 - model: `gpt-4.1-mini`
 
+## Onchain demo flow
+
+### 1. Start the product
+
+```bash
+cd backend
+. .venv/bin/activate
+uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload
+
+cd ../frontend
+npm run dev
+```
+
+Open `http://localhost:5173`.
+
+### 2. Connect a wallet and read KYC
+
+- connect MetaMask or another injected wallet from the intake page or report page
+- switch to HashKey testnet or mainnet
+- let the frontend read the configured KYC SBT contract
+- note that onchain KYC overrides the manual intake-only KYC selector
+
+### 3. Deploy the demo Plan Registry contract
+
+The repo includes a minimal contract at `contracts/PlanRegistry.sol` and a deploy script at `scripts/deploy_plan_registry.mjs`.
+
+```bash
+cd frontend
+PLAN_REGISTRY_DEPLOYER_PRIVATE_KEY=0x... HASHKEY_DEPLOY_NETWORK=testnet npm run deploy:plan-registry
+```
+
+After deployment, copy the printed contract address into:
+
+- `HASHKEY_TESTNET_PLAN_REGISTRY_ADDRESS` for testnet
+- `HASHKEY_MAINNET_PLAN_REGISTRY_ADDRESS` for mainnet
+
+### 4. Write a real attestation transaction
+
+- complete an analysis session until the report page is available
+- connect the same wallet on the target network
+- click `Write onchain attestation`
+- the app stores the resulting tx hash, block number, and explorer URL back into the report payload through `/api/sessions/{session_id}/attestation`
+
+If no Plan Registry address is configured yet, the UI still generates the deterministic attestation draft but disables live onchain submission.
+
+## Test scripts
+
+Repository root now includes scripted regression entry points:
+
+- `./scripts/test_smoke.sh`
+- `./scripts/test_full.sh`
+
+Examples:
+
+```bash
+./scripts/test_smoke.sh
+MODE=live ./scripts/test_smoke.sh
+./scripts/test_full.sh
+MODE=live ./scripts/test_full.sh
+```
+
 ## Verification
 
 Latest local verification completed in this repository:
 
+- `./scripts/test_smoke.sh`
+- `./scripts/test_full.sh`
 - `cd frontend && npm run test:run`
 - `cd frontend && npm run build`
 - `cd backend && python3.13 -m venv .venv-test && . .venv-test/bin/activate && pip install -r requirements.txt && python -m unittest discover -s tests`

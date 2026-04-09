@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from app.config import Settings
-from app.domain.rwa import AssetTemplate, AssetType, HashKeyChainConfig
+from app.domain.rwa import AssetTemplate, AssetType, HashKeyChainConfig, OracleFeedConfig
 from app.i18n import text_for_locale
 
 HASHKEY_DOCS_BASE = "https://docs.hashkeychain.net"
@@ -12,6 +12,7 @@ HASHKEY_TOKEN_CONTRACTS_URL = (
     f"{HASHKEY_DOCS_BASE}/docs/Build-on-HashKey-Chain/Token-Contracts"
 )
 HASHKEY_KYC_URL = f"{HASHKEY_DOCS_BASE}/docs/Build-on-HashKey-Chain/Tools/KYC"
+HASHKEY_ORACLE_URL = f"{HASHKEY_DOCS_BASE}/docs/Build-on-HashKey-Chain/Tools/Oracle"
 HASHKEY_SUBGRAPH_URL = (
     f"{HASHKEY_DOCS_BASE}/docs/Build-on-HashKey-Chain/Tools/Subgraph"
 )
@@ -25,8 +26,36 @@ HASHKEY_SILVER_RWA_URL = (
     "hashkey-chain-supports-the-onchain-issuance-of-hk-s-first-regulated-silverbacked-rwa-token"
 )
 
+HASHKEY_ORACLE_FEEDS = [
+    OracleFeedConfig(
+        feed_id="btc-usd",
+        pair="BTC/USD",
+        docs_url=HASHKEY_ORACLE_URL,
+        testnet_address="0x646970afb65c1fc88d7dff5d17bebf7ca7639290",
+        mainnet_address="0x2042d24ed0a86e12b8a3d38db530d7dc3c85ea00",
+    ),
+    OracleFeedConfig(
+        feed_id="usdt-usd",
+        pair="USDT/USD",
+        docs_url=HASHKEY_ORACLE_URL,
+        testnet_address="0x450d4d4b55284b9e7a0f2d88ca00f95e29e44e9f",
+    ),
+    OracleFeedConfig(
+        feed_id="usdc-usd",
+        pair="USDC/USD",
+        docs_url=HASHKEY_ORACLE_URL,
+        testnet_address="0x6655445f8a6ca6f03f8c4f31da95174cef63f8f6",
+        mainnet_address="0xe4a755800df1f47179d35b30fd90f80b1f4f2ea6",
+    ),
+]
+
 
 def build_chain_config(settings: Settings) -> HashKeyChainConfig:
+    testnet_plan_registry_address = settings.hashkey_testnet_plan_registry_address or ""
+    mainnet_plan_registry_address = settings.hashkey_mainnet_plan_registry_address or ""
+    testnet_kyc_sbt_address = settings.hashkey_testnet_kyc_sbt_address or ""
+    mainnet_kyc_sbt_address = settings.hashkey_mainnet_kyc_sbt_address or ""
+
     return HashKeyChainConfig(
         default_execution_network="mainnet",
         testnet_chain_id=settings.hashkey_testnet_chain_id,
@@ -35,15 +64,21 @@ def build_chain_config(settings: Settings) -> HashKeyChainConfig:
         mainnet_chain_id=settings.hashkey_mainnet_chain_id,
         mainnet_rpc_url=settings.hashkey_mainnet_rpc_url,
         mainnet_explorer_url=settings.hashkey_mainnet_explorer_url,
-        plan_registry_address=settings.plan_registry_address or "",
-        kyc_sbt_address=settings.kyc_sbt_address or "",
+        plan_registry_address=testnet_plan_registry_address or mainnet_plan_registry_address,
+        kyc_sbt_address=testnet_kyc_sbt_address or mainnet_kyc_sbt_address,
+        testnet_plan_registry_address=testnet_plan_registry_address,
+        mainnet_plan_registry_address=mainnet_plan_registry_address,
+        testnet_kyc_sbt_address=testnet_kyc_sbt_address,
+        mainnet_kyc_sbt_address=mainnet_kyc_sbt_address,
         docs_urls=[
             HASHKEY_ABOUT_URL,
             HASHKEY_NETWORK_INFO_URL,
             HASHKEY_TOKEN_CONTRACTS_URL,
             HASHKEY_KYC_URL,
+            HASHKEY_ORACLE_URL,
             HASHKEY_SUBGRAPH_URL,
         ],
+        oracle_feeds=HASHKEY_ORACLE_FEEDS,
     )
 
 
@@ -106,6 +141,9 @@ def build_asset_library(
                 "Best suited to conservative or balanced allocations as the cash-management and liquidity-buffer sleeve.",
             ),
             evidence_urls=[HASHKEY_TOKEN_CONTRACTS_URL, HASHKEY_NETWORK_INFO_URL],
+            primary_source_url=HASHKEY_TOKEN_CONTRACTS_URL,
+            onchain_verified=True,
+            issuer_disclosed=True,
             featured=True,
         ),
         AssetTemplate(
@@ -160,6 +198,9 @@ def build_asset_library(
                 "Best for users who prioritize T+0 exits and low drawdown.",
             ),
             evidence_urls=[HASHKEY_TOKEN_CONTRACTS_URL, HASHKEY_NETWORK_INFO_URL],
+            primary_source_url=HASHKEY_TOKEN_CONTRACTS_URL,
+            onchain_verified=True,
+            issuer_disclosed=True,
             featured=True,
         ),
         AssetTemplate(
@@ -212,6 +253,9 @@ def build_asset_library(
                 "Better for lower-risk users who can tolerate roughly T+2 capital turnover.",
             ),
             evidence_urls=[HASHKEY_CPIC_MMF_URL, HASHKEY_KYC_URL],
+            primary_source_url=HASHKEY_CPIC_MMF_URL,
+            onchain_verified=False,
+            issuer_disclosed=True,
             featured=True,
         ),
         AssetTemplate(
@@ -264,6 +308,9 @@ def build_asset_library(
                 "Best for balanced-to-aggressive allocations as a return source that differs from stablecoins and MMFs.",
             ),
             evidence_urls=[HASHKEY_SILVER_RWA_URL, HASHKEY_KYC_URL],
+            primary_source_url=HASHKEY_SILVER_RWA_URL,
+            onchain_verified=False,
+            issuer_disclosed=True,
             featured=True,
         ),
         AssetTemplate(
@@ -316,6 +363,9 @@ def build_asset_library(
                 "Only suitable for users who accept lockups and deeper term-sheet diligence.",
             ),
             evidence_urls=[HASHKEY_ABOUT_URL, HASHKEY_KYC_URL],
+            primary_source_url=HASHKEY_ABOUT_URL,
+            onchain_verified=False,
+            issuer_disclosed=False,
             featured=False,
         ),
         AssetTemplate(
@@ -368,6 +418,9 @@ def build_asset_library(
                 "Primarily useful as a benchmark or as a small exposure inside more aggressive portfolios.",
             ),
             evidence_urls=[HASHKEY_TOKEN_CONTRACTS_URL, HASHKEY_NETWORK_INFO_URL],
+            primary_source_url=HASHKEY_TOKEN_CONTRACTS_URL,
+            onchain_verified=True,
+            issuer_disclosed=True,
             featured=False,
         ),
     ]

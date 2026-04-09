@@ -44,7 +44,39 @@ class HashKeyChainConfig(BaseModel):
     mainnet_explorer_url: str = "https://hashkey.blockscout.com"
     plan_registry_address: str = ""
     kyc_sbt_address: str = ""
+    testnet_plan_registry_address: str = ""
+    mainnet_plan_registry_address: str = ""
+    testnet_kyc_sbt_address: str = ""
+    mainnet_kyc_sbt_address: str = ""
     docs_urls: list[str] = Field(default_factory=list)
+    oracle_feeds: list["OracleFeedConfig"] = Field(default_factory=list)
+
+
+class OracleFeedConfig(BaseModel):
+    feed_id: str
+    pair: str
+    source_name: str = "APRO Oracle"
+    docs_url: str = ""
+    testnet_address: str = ""
+    mainnet_address: str = ""
+    decimals: int = 8
+
+
+class MarketDataSnapshot(BaseModel):
+    feed_id: str
+    pair: str
+    network: str
+    source_name: str
+    source_url: str
+    feed_address: str
+    explorer_url: str = ""
+    price: float | None = None
+    decimals: int = 8
+    fetched_at: datetime = Field(default_factory=utcnow)
+    updated_at: datetime | None = None
+    round_id: int | None = None
+    note: str = ""
+    status: str = "unavailable"
 
 
 class RwaIntakeContext(BaseModel):
@@ -56,6 +88,9 @@ class RwaIntakeContext(BaseModel):
     liquidity_need: LiquidityNeed = LiquidityNeed.T_PLUS_3
     minimum_kyc_level: int = 0
     wallet_address: str = ""
+    wallet_network: str = ""
+    wallet_kyc_level_onchain: int | None = None
+    wallet_kyc_verified: bool | None = None
     wants_onchain_attestation: bool = True
     additional_constraints: str = ""
 
@@ -100,6 +135,9 @@ class AssetTemplate(BaseModel):
     thesis: str = ""
     fit_summary: str = ""
     evidence_urls: list[str] = Field(default_factory=list)
+    primary_source_url: str = ""
+    onchain_verified: bool = False
+    issuer_disclosed: bool = False
     featured: bool = False
 
     def total_cost_bps(self, holding_period_days: int) -> int:
@@ -190,10 +228,16 @@ class AttestationDraft(BaseModel):
     portfolio_hash: str
     attestation_hash: str
     created_at: datetime = Field(default_factory=utcnow)
+    network: str = ""
     contract_address: str = ""
     explorer_url: str = ""
     event_name: str = "PlanRegistered"
     ready: bool = False
+    transaction_hash: str = ""
+    transaction_url: str = ""
+    submitted_by: str = ""
+    submitted_at: datetime | None = None
+    block_number: int | None = None
 
 
 class AssetAnalysisCard(BaseModel):
@@ -214,6 +258,9 @@ class AssetAnalysisCard(BaseModel):
     thesis: str = ""
     fit_summary: str = ""
     tags: list[str] = Field(default_factory=list)
+    primary_source_url: str = ""
+    onchain_verified: bool = False
+    issuer_disclosed: bool = False
     risk_vector: RiskVector
     metadata: dict[str, Any] = Field(default_factory=dict)
     evidence_refs: list[str] = Field(default_factory=list)

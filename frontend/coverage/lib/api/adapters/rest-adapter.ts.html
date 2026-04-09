@@ -23,30 +23,30 @@
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">1.81% </span>
+                <span class="strong">1.78% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>2/110</span>
+                <span class='fraction'>2/112</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
                 <span class="strong">0% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>0/48</span>
+                <span class='fraction'>0/50</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
                 <span class="strong">0% </span>
                 <span class="quiet">Functions</span>
-                <span class='fraction'>0/39</span>
+                <span class='fraction'>0/40</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">1.81% </span>
+                <span class="strong">1.78% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>2/110</span>
+                <span class='fraction'>2/112</span>
             </div>
         
             
@@ -551,7 +551,23 @@
 <a name='L486'></a><a href='#L486'>486</a>
 <a name='L487'></a><a href='#L487'>487</a>
 <a name='L488'></a><a href='#L488'>488</a>
-<a name='L489'></a><a href='#L489'>489</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<a name='L489'></a><a href='#L489'>489</a>
+<a name='L490'></a><a href='#L490'>490</a>
+<a name='L491'></a><a href='#L491'>491</a>
+<a name='L492'></a><a href='#L492'>492</a>
+<a name='L493'></a><a href='#L493'>493</a>
+<a name='L494'></a><a href='#L494'>494</a>
+<a name='L495'></a><a href='#L495'>495</a>
+<a name='L496'></a><a href='#L496'>496</a>
+<a name='L497'></a><a href='#L497'>497</a>
+<a name='L498'></a><a href='#L498'>498</a>
+<a name='L499'></a><a href='#L499'>499</a>
+<a name='L500'></a><a href='#L500'>500</a>
+<a name='L501'></a><a href='#L501'>501</a>
+<a name='L502'></a><a href='#L502'>502</a>
+<a name='L503'></a><a href='#L503'>503</a>
+<a name='L504'></a><a href='#L504'>504</a>
+<a name='L505'></a><a href='#L505'>505</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -847,6 +863,22 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -1346,6 +1378,22 @@ export const restApiAdapter: ApiAdapter = {
 &nbsp;
 <span class="cstat-no" title="statement not covered" >      return mapBackendSession(await fetchBackendSession(sessionId))</span>
     },
+    async <span class="fstat-no" title="function not covered" >recordAttestation(s</span>essionId, payload) {
+      const session = <span class="cstat-no" title="statement not covered" >await apiClient.request&lt;BackendSession&gt;(</span>
+        endpoints.backend.sessionAttestation(sessionId),
+        {
+          method: 'POST',
+          body: JSON.stringify({
+            network: payload.network,
+            transaction_hash: payload.transactionHash,
+            submitted_by: payload.submittedBy ?? '',
+            block_number: payload.blockNumber,
+          }),
+        },
+      )
+&nbsp;
+<span class="cstat-no" title="statement not covered" >      return mapBackendSession(session)</span>
+    },
     async <span class="fstat-no" title="function not covered" >requestMoreFollowUp(s</span>essionId) {
       const payload =
 <span class="cstat-no" title="statement not covered" >        await apiClient.request&lt;BackendRequestMoreFollowUpResponse&gt;(</span>
@@ -1534,7 +1582,7 @@ export const restApiAdapter: ApiAdapter = {
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-04-09T16:11:38.808Z
+                at 2026-04-09T17:02:21.666Z
             </div>
         <script src="../../../prettify.js"></script>
         <script>

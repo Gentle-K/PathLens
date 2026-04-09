@@ -33,6 +33,7 @@ export type UploadIntent = 'report' | 'evidence' | 'attachment'
 export type RealtimeTransport = 'mock' | 'websocket' | 'sse'
 export type RiskTolerance = 'conservative' | 'balanced' | 'aggressive'
 export type LiquidityNeed = 'instant' | 't_plus_3' | 'locked'
+export type WalletNetworkKey = 'testnet' | 'mainnet'
 
 export interface PaginatedResponse<T> {
   items: T[]
@@ -119,7 +120,51 @@ export interface HashKeyChainConfig {
   mainnetExplorerUrl: string
   planRegistryAddress?: string
   kycSbtAddress?: string
+  testnetPlanRegistryAddress?: string
+  mainnetPlanRegistryAddress?: string
+  testnetKycSbtAddress?: string
+  mainnetKycSbtAddress?: string
   docsUrls: string[]
+  oracleFeeds: OracleFeedConfig[]
+}
+
+export interface OracleFeedConfig {
+  id: string
+  pair: string
+  sourceName: string
+  docsUrl?: string
+  testnetAddress?: string
+  mainnetAddress?: string
+  decimals: number
+}
+
+export interface MarketDataSnapshot {
+  feedId: string
+  pair: string
+  network: WalletNetworkKey
+  sourceName: string
+  sourceUrl: string
+  feedAddress: string
+  explorerUrl?: string
+  price?: number
+  decimals: number
+  fetchedAt: string
+  updatedAt?: string
+  roundId?: number
+  note?: string
+  status: 'live' | 'unavailable'
+}
+
+export interface WalletKycSnapshot {
+  walletAddress: string
+  network: WalletNetworkKey
+  contractAddress?: string
+  isHuman: boolean
+  level: number
+  sourceUrl?: string
+  explorerUrl?: string
+  fetchedAt: string
+  note?: string
 }
 
 export interface RwaIntakeContext {
@@ -131,6 +176,9 @@ export interface RwaIntakeContext {
   liquidityNeed: LiquidityNeed
   minimumKycLevel: number
   walletAddress?: string
+  walletNetwork?: WalletNetworkKey | ''
+  walletKycLevelOnchain?: number
+  walletKycVerified?: boolean
   wantsOnchainAttestation: boolean
   additionalConstraints?: string
 }
@@ -175,6 +223,9 @@ export interface RwaAssetTemplate {
   thesis: string
   fitSummary: string
   evidenceUrls: string[]
+  primarySourceUrl?: string
+  onchainVerified?: boolean
+  issuerDisclosed?: boolean
   featured: boolean
 }
 
@@ -450,10 +501,16 @@ export interface AttestationDraft {
   portfolioHash: string
   attestationHash: string
   createdAt: string
+  network?: WalletNetworkKey | string
   contractAddress?: string
   explorerUrl?: string
   eventName: string
   ready: boolean
+  transactionHash?: string
+  transactionUrl?: string
+  submittedBy?: string
+  submittedAt?: string
+  blockNumber?: number
 }
 
 export interface AssetAnalysisCard {
@@ -474,6 +531,9 @@ export interface AssetAnalysisCard {
   thesis: string
   fitSummary: string
   tags: string[]
+  primarySourceUrl?: string
+  onchainVerified?: boolean
+  issuerDisclosed?: boolean
   riskVector: RiskVector
   metadata: Record<string, unknown>
   evidenceRefs: string[]
@@ -513,6 +573,7 @@ export interface AnalysisReport {
   optionProfiles?: OptionProfile[]
   tables?: ReportTable[]
   chainConfig?: HashKeyChainConfig
+  marketSnapshots?: MarketDataSnapshot[]
   assetCards: AssetAnalysisCard[]
   simulations: HoldingPeriodSimulation[]
   recommendedAllocations: PortfolioAllocation[]
@@ -679,6 +740,13 @@ export interface CreateSessionPayload {
 
 export interface SubmitAnswersPayload {
   answers: UserAnswer[]
+}
+
+export interface RecordAttestationPayload {
+  network: WalletNetworkKey
+  transactionHash: string
+  submittedBy?: string
+  blockNumber?: number
 }
 
 export interface FileUploadPayload {

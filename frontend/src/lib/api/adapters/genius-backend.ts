@@ -14,8 +14,10 @@ import type {
   ClarificationQuestion,
   HashKeyChainConfig,
   HoldingPeriodSimulation,
+  MarketDataSnapshot,
   ModeDefinition,
   OptionProfile,
+  OracleFeedConfig,
   PortfolioAllocation,
   ReportTable,
   RiskVector,
@@ -57,7 +59,22 @@ export interface BackendHashKeyChainConfig {
   mainnet_explorer_url: string
   plan_registry_address?: string
   kyc_sbt_address?: string
+  testnet_plan_registry_address?: string
+  mainnet_plan_registry_address?: string
+  testnet_kyc_sbt_address?: string
+  mainnet_kyc_sbt_address?: string
   docs_urls: string[]
+  oracle_feeds?: BackendOracleFeedConfig[]
+}
+
+export interface BackendOracleFeedConfig {
+  feed_id: string
+  pair: string
+  source_name: string
+  docs_url?: string
+  testnet_address?: string
+  mainnet_address?: string
+  decimals: number
 }
 
 export interface BackendRwaIntakeContext {
@@ -69,6 +86,9 @@ export interface BackendRwaIntakeContext {
   liquidity_need: 'instant' | 't_plus_3' | 'locked'
   minimum_kyc_level: number
   wallet_address?: string
+  wallet_network?: 'testnet' | 'mainnet' | ''
+  wallet_kyc_level_onchain?: number
+  wallet_kyc_verified?: boolean
   wants_onchain_attestation: boolean
   additional_constraints?: string
 }
@@ -113,6 +133,9 @@ export interface BackendAssetTemplate {
   thesis: string
   fit_summary: string
   evidence_urls: string[]
+  primary_source_url?: string
+  onchain_verified: boolean
+  issuer_disclosed: boolean
   featured: boolean
 }
 
@@ -184,6 +207,23 @@ export interface BackendEvidenceItem {
   summary: string
   extracted_facts: string[]
   confidence: number
+}
+
+export interface BackendMarketDataSnapshot {
+  feed_id: string
+  pair: string
+  network: 'testnet' | 'mainnet'
+  source_name: string
+  source_url: string
+  feed_address: string
+  explorer_url?: string
+  price?: number | null
+  decimals: number
+  fetched_at: string
+  updated_at?: string | null
+  round_id?: number | null
+  note?: string
+  status: 'live' | 'unavailable'
 }
 
 export interface BackendChartArtifact {
@@ -343,10 +383,16 @@ export interface BackendAttestationDraft {
   portfolio_hash: string
   attestation_hash: string
   created_at: string
+  network: 'testnet' | 'mainnet' | string
   contract_address?: string
   explorer_url?: string
   event_name: string
   ready: boolean
+  transaction_hash?: string
+  transaction_url?: string
+  submitted_by?: string
+  submitted_at?: string | null
+  block_number?: number | null
 }
 
 export interface BackendAssetAnalysisCard {
@@ -367,6 +413,9 @@ export interface BackendAssetAnalysisCard {
   thesis: string
   fit_summary: string
   tags: string[]
+  primary_source_url?: string
+  onchain_verified: boolean
+  issuer_disclosed: boolean
   risk_vector: BackendRiskVector
   metadata: Record<string, unknown>
   evidence_refs: string[]
@@ -384,6 +433,7 @@ export interface BackendReport {
   option_profiles?: BackendOptionProfile[]
   tables?: BackendReportTable[]
   chain_config?: BackendHashKeyChainConfig | null
+  market_snapshots?: BackendMarketDataSnapshot[]
   asset_cards?: BackendAssetAnalysisCard[]
   simulations?: BackendHoldingPeriodSimulation[]
   recommended_allocations?: BackendPortfolioAllocation[]
@@ -549,6 +599,18 @@ function buildFallbackLabels(values: number[]) {
   return values.map((_, index) => `#${index + 1}`)
 }
 
+function mapOracleFeed(feed: BackendOracleFeedConfig): OracleFeedConfig {
+  return {
+    id: feed.feed_id,
+    pair: feed.pair,
+    sourceName: feed.source_name,
+    docsUrl: feed.docs_url || undefined,
+    testnetAddress: feed.testnet_address || undefined,
+    mainnetAddress: feed.mainnet_address || undefined,
+    decimals: feed.decimals,
+  }
+}
+
 function mapChainConfig(config: BackendHashKeyChainConfig): HashKeyChainConfig {
   return {
     ecosystemName: config.ecosystem_name,
@@ -562,7 +624,12 @@ function mapChainConfig(config: BackendHashKeyChainConfig): HashKeyChainConfig {
     mainnetExplorerUrl: config.mainnet_explorer_url,
     planRegistryAddress: config.plan_registry_address || undefined,
     kycSbtAddress: config.kyc_sbt_address || undefined,
+    testnetPlanRegistryAddress: config.testnet_plan_registry_address || undefined,
+    mainnetPlanRegistryAddress: config.mainnet_plan_registry_address || undefined,
+    testnetKycSbtAddress: config.testnet_kyc_sbt_address || undefined,
+    mainnetKycSbtAddress: config.mainnet_kyc_sbt_address || undefined,
     docsUrls: config.docs_urls ?? [],
+    oracleFeeds: (config.oracle_feeds ?? []).map(mapOracleFeed),
   }
 }
 
@@ -592,6 +659,9 @@ export function mapRwaIntakeContext(
     liquidityNeed: context?.liquidity_need ?? 't_plus_3',
     minimumKycLevel: context?.minimum_kyc_level ?? 0,
     walletAddress: context?.wallet_address ?? '',
+    walletNetwork: context?.wallet_network ?? '',
+    walletKycLevelOnchain: context?.wallet_kyc_level_onchain,
+    walletKycVerified: context?.wallet_kyc_verified,
     wantsOnchainAttestation: context?.wants_onchain_attestation ?? true,
     additionalConstraints: context?.additional_constraints ?? '',
   }
@@ -609,6 +679,9 @@ export function toBackendIntakeContext(
     liquidity_need: context.liquidityNeed,
     minimum_kyc_level: context.minimumKycLevel,
     wallet_address: context.walletAddress || '',
+    wallet_network: context.walletNetwork || '',
+    wallet_kyc_level_onchain: context.walletKycLevelOnchain,
+    wallet_kyc_verified: context.walletKycVerified,
     wants_onchain_attestation: context.wantsOnchainAttestation,
     additional_constraints: context.additionalConstraints || '',
   }
@@ -655,6 +728,9 @@ function mapAssetTemplate(asset: BackendAssetTemplate): RwaAssetTemplate {
     thesis: asset.thesis ?? '',
     fitSummary: asset.fit_summary ?? '',
     evidenceUrls: asset.evidence_urls ?? [],
+    primarySourceUrl: asset.primary_source_url ?? '',
+    onchainVerified: Boolean(asset.onchain_verified),
+    issuerDisclosed: Boolean(asset.issuer_disclosed),
     featured: Boolean(asset.featured),
   }
 }
@@ -754,10 +830,16 @@ function mapAttestationDraft(
     portfolioHash: draft.portfolio_hash,
     attestationHash: draft.attestation_hash,
     createdAt: draft.created_at,
+    network: draft.network,
     contractAddress: draft.contract_address ?? '',
     explorerUrl: draft.explorer_url ?? '',
     eventName: draft.event_name,
     ready: Boolean(draft.ready),
+    transactionHash: draft.transaction_hash ?? '',
+    transactionUrl: draft.transaction_url ?? '',
+    submittedBy: draft.submitted_by ?? '',
+    submittedAt: draft.submitted_at ?? undefined,
+    blockNumber: draft.block_number ?? undefined,
   }
 }
 
@@ -782,9 +864,35 @@ function mapAssetAnalysisCard(
     thesis: card.thesis ?? '',
     fitSummary: card.fit_summary ?? '',
     tags: card.tags ?? [],
+    primarySourceUrl: card.primary_source_url ?? '',
+    onchainVerified: Boolean(card.onchain_verified),
+    issuerDisclosed: Boolean(card.issuer_disclosed),
     riskVector: mapRiskVector(card.risk_vector),
     metadata: card.metadata ?? {},
     evidenceRefs: card.evidence_refs ?? [],
+  }
+}
+
+function mapMarketSnapshot(
+  snapshot: BackendMarketDataSnapshot,
+): MarketDataSnapshot {
+  return {
+    feedId: snapshot.feed_id,
+    pair: snapshot.pair,
+    network: snapshot.network,
+    sourceName: snapshot.source_name,
+    sourceUrl: snapshot.source_url,
+    feedAddress: snapshot.feed_address,
+    explorerUrl: snapshot.explorer_url ?? '',
+    price:
+      typeof snapshot.price === 'number' ? snapshot.price : undefined,
+    decimals: snapshot.decimals,
+    fetchedAt: snapshot.fetched_at,
+    updatedAt: snapshot.updated_at ?? undefined,
+    roundId:
+      typeof snapshot.round_id === 'number' ? snapshot.round_id : undefined,
+    note: snapshot.note ?? '',
+    status: snapshot.status,
   }
 }
 
@@ -1482,6 +1590,7 @@ export function mapBackendReport(session: BackendSession): AnalysisReport {
     optionProfiles: mapOptionProfiles(report?.option_profiles),
     tables: mapReportTables(report?.tables),
     chainConfig: report?.chain_config ? mapChainConfig(report.chain_config) : undefined,
+    marketSnapshots: (report?.market_snapshots ?? []).map(mapMarketSnapshot),
     assetCards: (report?.asset_cards ?? []).map(mapAssetAnalysisCard),
     simulations: (report?.simulations ?? []).map(mapSimulation),
     recommendedAllocations: (report?.recommended_allocations ?? []).map(mapAllocation),

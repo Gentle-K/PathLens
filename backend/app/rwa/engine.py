@@ -64,6 +64,46 @@ def _asset_type_label(asset_type: AssetType, locale: str) -> str:
     return text_for_locale(locale, zh, en)
 
 
+def _effective_kyc_level(context: RwaIntakeContext) -> int:
+    if context.wallet_address and context.wallet_kyc_level_onchain is not None:
+        if context.wallet_kyc_verified is False:
+            return 0
+        return max(0, context.wallet_kyc_level_onchain)
+    return max(0, context.minimum_kyc_level)
+
+
+def _resolve_attestation_network(
+    chain_config: HashKeyChainConfig,
+) -> tuple[str, int, str, str]:
+    if chain_config.testnet_plan_registry_address:
+        return (
+            "testnet",
+            chain_config.testnet_chain_id,
+            chain_config.testnet_plan_registry_address,
+            chain_config.testnet_explorer_url,
+        )
+    if chain_config.mainnet_plan_registry_address:
+        return (
+            "mainnet",
+            chain_config.mainnet_chain_id,
+            chain_config.mainnet_plan_registry_address,
+            chain_config.mainnet_explorer_url,
+        )
+    if chain_config.default_execution_network.strip().lower() == "testnet":
+        return (
+            "testnet",
+            chain_config.testnet_chain_id,
+            chain_config.testnet_plan_registry_address or chain_config.plan_registry_address,
+            chain_config.testnet_explorer_url,
+        )
+    return (
+        "mainnet",
+        chain_config.mainnet_chain_id,
+        chain_config.mainnet_plan_registry_address or chain_config.plan_registry_address,
+        chain_config.mainnet_explorer_url,
+    )
+
+
 def score_risk(asset: AssetTemplate) -> RiskVector:
     market = 30.0
     market += 50.0 * sigmoid01((asset.price_volatility - 0.25) / 0.15)
@@ -329,6 +369,7 @@ def recommend_allocations(
 ) -> list[PortfolioAllocation]:
     by_type = TYPE_TARGET_WEIGHTS[context.risk_tolerance]
     scored_cards: list[tuple[AssetAnalysisCard, float, str]] = []
+    effective_kyc_level = _effective_kyc_level(context)
 
     for card in asset_cards:
         penalty = _liquidity_gate_penalty(
@@ -351,7 +392,7 @@ def recommend_allocations(
             context.liquidity_need,
         )
         blocked_reason = ""
-        if card.kyc_required_level and context.minimum_kyc_level < card.kyc_required_level:
+        if card.kyc_required_level and effective_kyc_level < card.kyc_required_level:
             blocked_reason = text_for_locale(
                 locale,
                 f"需要至少 KYC 等级 {card.kyc_required_level}",
@@ -454,6 +495,16 @@ def build_catalog_evidence(
                 f"KYC 门槛: {asset.requires_kyc_level or 0}",
                 f"KYC requirement: {asset.requires_kyc_level or 0}",
             ),
+            text_for_locale(
+                locale,
+                f"链上验证: {'是' if asset.onchain_verified else '否'}",
+                f"Onchain verified: {'yes' if asset.onchain_verified else 'no'}",
+            ),
+            text_for_locale(
+                locale,
+                f"发行方披露: {'是' if asset.issuer_disclosed else '否'}",
+                f"Issuer disclosed: {'yes' if asset.issuer_disclosed else 'no'}",
+            ),
         ]
         evidence_items.append(
             EvidenceItem(
@@ -502,11 +553,17 @@ def build_asset_cards(
                 thesis=asset.thesis,
                 fit_summary=asset.fit_summary,
                 tags=asset.tags,
+                primary_source_url=asset.primary_source_url or (asset.evidence_urls[0] if asset.evidence_urls else ""),
+                onchain_verified=asset.onchain_verified,
+                issuer_disclosed=asset.issuer_disclosed,
                 risk_vector=risk_vector,
                 metadata={
                     "minimum_ticket_usd": asset.minimum_ticket_usd,
                     "oracle_count": asset.oracle_count,
                     "lockup_days": asset.lockup_days,
+                    "oracle_sources": asset.oracle_sources,
+                    "pricing_source_label": "APRO Oracle" if asset.oracle_count else "Issuer / disclosure",
+                    "source_url": asset.primary_source_url or (asset.evidence_urls[0] if asset.evidence_urls else ""),
                 },
                 evidence_refs=list(asset.evidence_urls),
             )
@@ -661,6 +718,9 @@ def build_tx_draft(
     *,
     locale: str = "zh",
 ) -> TxDraft:
+    attestation_network, _, attestation_contract, attestation_explorer = _resolve_attestation_network(
+        chain_config
+    )
     steps: list[TxDraftStep] = [
         TxDraftStep(
             step=1,
@@ -742,17 +802,17 @@ def build_tx_draft(
                 title=text_for_locale(locale, "记录报告存证", "Record the report attestation"),
                 description=text_for_locale(
                     locale,
-                    "在确认方案前，将报告哈希和组合哈希写入 Plan Registry，保留可审计决策痕迹。",
-                    "Before executing, write the report hash and portfolio hash into the Plan Registry to preserve an auditable decision trail.",
+                    f"在确认方案前，将报告哈希和组合哈希写入 HashKey Chain {attestation_network.title()} Plan Registry，保留可审计决策痕迹。",
+                    f"Before executing, write the report hash and portfolio hash into the HashKey Chain {attestation_network.title()} Plan Registry to preserve an auditable decision trail.",
                 ),
                 action_type="attest_plan",
-                target_contract=chain_config.plan_registry_address or "",
+                target_contract=attestation_contract,
                 explorer_url=(
-                    f"{chain_config.mainnet_explorer_url}/address/{chain_config.plan_registry_address}"
-                    if chain_config.plan_registry_address
-                    else chain_config.mainnet_explorer_url
+                    f"{attestation_explorer}/address/{attestation_contract}"
+                    if attestation_contract
+                    else attestation_explorer
                 ),
-                estimated_fee_usd=0.28 if chain_config.plan_registry_address else 0.0,
+                estimated_fee_usd=0.28 if attestation_contract else 0.0,
                 caution=text_for_locale(
                     locale,
                     "存证记录的是哈希摘要，不应包含原始敏感信息。",
@@ -760,7 +820,7 @@ def build_tx_draft(
                 ),
             )
         )
-        total_fee += 0.28 if chain_config.plan_registry_address else 0.0
+        total_fee += 0.28 if attestation_contract else 0.0
 
     return TxDraft(
         title=text_for_locale(locale, "HashKey Chain 执行草案", "HashKey Chain execution draft"),
@@ -799,6 +859,7 @@ def build_attestation_draft(
     allocations: list[PortfolioAllocation],
     chain_config: HashKeyChainConfig,
 ) -> AttestationDraft:
+    network, chain_id, contract_address, explorer_url = _resolve_attestation_network(chain_config)
     report_hash = hashlib.sha256(report_markdown.encode("utf-8")).hexdigest()
     portfolio_payload = json.dumps(
         [allocation.model_dump(mode="json") for allocation in allocations],
@@ -807,16 +868,17 @@ def build_attestation_draft(
     )
     portfolio_hash = hashlib.sha256(portfolio_payload.encode("utf-8")).hexdigest()
     attestation_hash = hashlib.sha256(
-        f"{report_hash}:{portfolio_hash}:{chain_config.mainnet_chain_id}".encode("utf-8")
+        f"{report_hash}:{portfolio_hash}:{chain_id}".encode("utf-8")
     ).hexdigest()
     return AttestationDraft(
-        chain_id=chain_config.mainnet_chain_id,
+        chain_id=chain_id,
         report_hash=report_hash,
         portfolio_hash=portfolio_hash,
         attestation_hash=attestation_hash,
-        contract_address=chain_config.plan_registry_address or "",
-        explorer_url=chain_config.mainnet_explorer_url,
-        ready=bool(chain_config.plan_registry_address),
+        network=network,
+        contract_address=contract_address,
+        explorer_url=explorer_url,
+        ready=bool(contract_address),
     )
 
 
@@ -872,8 +934,8 @@ def _open_questions(
         questions.append(
             text_for_locale(
                 locale,
-                "部分资产因 KYC 等级不足被降权或剔除，需确认真实合规资格。",
-                "Some assets were down-weighted or removed because KYC level appears insufficient; confirm the real eligibility status.",
+                "部分资产因 KYC 等级不足被降权或剔除，需确认链上 KYC/SBT 的真实资格状态。",
+                "Some assets were down-weighted or removed because KYC level appears insufficient; confirm the real onchain KYC/SBT status.",
             )
         )
     if context.liquidity_need == LiquidityNeed.INSTANT:
@@ -925,6 +987,7 @@ def build_rwa_report(
 ) -> tuple[AnalysisReport, list[EvidenceItem]]:
     selected_assets = resolve_selected_assets(mode, problem_statement, context, asset_library)
     asset_cards = build_asset_cards(selected_assets, context)
+    effective_kyc_level = _effective_kyc_level(context)
     simulations = [
         simulate_holding(
             asset,
@@ -970,6 +1033,7 @@ def build_rwa_report(
             else "The safer posture is to confirm access gating and redemption terms before entering an RWA allocation."
         ),
     )
+    attestation_draft = build_attestation_draft(summary, allocations, chain_config)
 
     markdown = "\n".join(
         [
@@ -1007,8 +1071,13 @@ def build_rwa_report(
             ),
             text_for_locale(
                 locale,
-                f"- Plan Registry 地址: {chain_config.plan_registry_address or '未配置，当前仅生成离线存证草案'}",
-                f"- Plan Registry address: {chain_config.plan_registry_address or 'Not configured; only an offline attestation draft can be generated'}",
+                f"- 存证网络: HashKey Chain {attestation_draft.network.title()} ({attestation_draft.chain_id})",
+                f"- Attestation network: HashKey Chain {attestation_draft.network.title()} ({attestation_draft.chain_id})",
+            ),
+            text_for_locale(
+                locale,
+                f"- Plan Registry 地址: {attestation_draft.contract_address or '未配置，当前仅生成离线存证草案'}",
+                f"- Plan Registry address: {attestation_draft.contract_address or 'Not configured; only an offline attestation draft can be generated'}",
             ),
         ]
     )
@@ -1031,6 +1100,19 @@ def build_rwa_report(
                 "RWA 资产的准入、申赎和托管条款以发行人实际文件为准。",
                 "Issuer documents remain the source of truth for RWA eligibility, redemption, and custody terms.",
             ),
+            text_for_locale(
+                locale,
+                (
+                    f"当前采用的有效 KYC 等级为 L{effective_kyc_level}，该值在已连接钱包时优先采用链上 KYC/SBT 快照。"
+                    if context.wallet_address
+                    else f"当前按用户声明的 KYC 约束 L{effective_kyc_level} 进行筛选。"
+                ),
+                (
+                    f"The effective KYC level used in this report is L{effective_kyc_level}; when a wallet is connected, the onchain KYC/SBT snapshot takes precedence."
+                    if context.wallet_address
+                    else f"The current screening uses the user-declared KYC constraint of L{effective_kyc_level}."
+                ),
+            ),
         ],
         recommendations=recommendations,
         open_questions=open_questions,
@@ -1038,6 +1120,7 @@ def build_rwa_report(
         tables=tables,
         option_profiles=option_profiles,
         chain_config=chain_config,
+        market_snapshots=[],
         asset_cards=asset_cards,
         simulations=simulations,
         recommended_allocations=allocations,

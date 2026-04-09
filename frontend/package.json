@@ -10,6 +10,7 @@
     "format": "prettier --check .",
     "format:write": "prettier --write .",
     "preview": "vite preview",
+    "deploy:plan-registry": "node ../scripts/deploy_plan_registry.mjs",
     "test": "vitest",
     "test:run": "vitest run --coverage"
   },
@@ -37,8 +38,10 @@
     "react-markdown": "^10.1.0",
     "react-router-dom": "^7.13.2",
     "remark-gfm": "^4.0.1",
+    "solc": "^0.8.34",
     "sonner": "^2.0.7",
     "tailwind-merge": "^3.5.0",
+    "viem": "^2.47.11",
     "yup": "^1.7.1",
     "zustand": "^5.0.12"
   },

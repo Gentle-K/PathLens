@@ -1,6 +1,7 @@
-import { useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   Blocks,
+  Cable,
   CheckCircle2,
   Coins,
   FileCode2,
@@ -24,6 +25,11 @@ import { Card } from '@/components/ui/card'
 import { ReportTableCard } from '@/features/analysis/components/report-table-card'
 import { useApiAdapter } from '@/lib/api/use-api-adapter'
 import { useAppStore } from '@/lib/store/app-store'
+import {
+  useAttestationWriter,
+  useHashKeyWallet,
+  useLiveMarketSnapshots,
+} from '@/lib/web3/use-hashkey-wallet'
 
 function formatMoney(
   value?: number,
@@ -65,6 +71,7 @@ function assetTypeLabel(
 
 export function ReportPage() {
   const navigate = useNavigate()
+  const queryClient = useQueryClient()
   const { sessionId = '' } = useParams()
   const adapter = useApiAdapter()
   const { i18n } = useTranslation()
@@ -85,6 +92,42 @@ export function ReportPage() {
         : 'The backend failed while producing the result. Go back to the analysis workspace to inspect the state or restart the run.',
       chainConfig: isZh ? 'HashKey Chain 配置' : 'HashKey Chain Configuration',
       notConfigured: isZh ? '未配置' : 'Not configured',
+      mainnet: 'Mainnet',
+      testnet: 'Testnet',
+      explorer: 'Explorer',
+      kycSbt: 'KYC SBT',
+      planRegistry: 'Plan Registry',
+      judgeNarrative: isZh
+        ? '这不是泛 DeFi 收益聚合器，而是面向 HashKey Chain 合规 RWA 的决策与执行中间层。重点不在“多资产”，而在“证据、KYC、托管、赎回、链上存证”是否连成闭环。'
+        : 'This is not a generic DeFi yield aggregator. It is a decision-and-execution layer for compliant RWA flows on HashKey Chain, where evidence, KYC, custody, redemption, and onchain attestation form one loop.',
+      walletExecution: isZh ? '钱包与执行台' : 'Wallet and Execution Console',
+      walletExecutionDescription: isZh
+        ? '在结果页直接连接钱包、切换网络、查看链上 KYC，并把 attestation 写到 Plan Registry。'
+        : 'Connect a wallet, switch networks, inspect onchain KYC, and write the attestation to Plan Registry directly from this report.',
+      connectWallet: isZh ? '连接钱包' : 'Connect wallet',
+      clearWallet: isZh ? '清除本地连接' : 'Clear local connection',
+      switchTestnet: isZh ? '切到 Testnet' : 'Switch to Testnet',
+      switchMainnet: isZh ? '切到 Mainnet' : 'Switch to Mainnet',
+      connectedAddress: isZh ? '当前地址' : 'Connected address',
+      connectedNetwork: isZh ? '当前网络' : 'Connected network',
+      onchainKyc: isZh ? '链上 KYC' : 'Onchain KYC',
+      liveOracle: isZh ? '实时 Oracle 快照' : 'Live Oracle Snapshots',
+      liveOracleDescription: isZh
+        ? '以下价格直接从 HashKey 支持的 APRO oracle feed 读取，附带来源地址、时间戳和 Explorer。'
+        : 'These prices are read directly from configured HashKey-supported APRO oracle feeds, with source addresses, timestamps, and explorer links.',
+      fetchedAt: isZh ? '抓取时间' : 'Fetched at',
+      updatedAt: isZh ? '喂价更新时间' : 'Oracle updated at',
+      executeAttestation: isZh ? '写入链上 attestation' : 'Write onchain attestation',
+      executingAttestation: isZh ? '正在写链...' : 'Writing onchain...',
+      attestationSubmitted: isZh ? '已写入链上' : 'Recorded onchain',
+      requiresWallet: isZh ? '需要先连接钱包' : 'Connect a wallet first',
+      sourceUrl: isZh ? '来源 URL' : 'Source URL',
+      sourceProof: isZh ? '证明层' : 'Proof layer',
+      issuerDisclosed: isZh ? '发行方披露' : 'Issuer disclosed',
+      onchainVerified: isZh ? '链上可验证' : 'Onchain verified',
+      percentileRange: 'P10 / P50 / P90',
+      varCvar: 'VaR / CVaR',
+      endingValueP50: 'Ending Value P50',
       assetCards: isZh ? '资产卡片' : 'Asset Cards',
       baseAnnualized: isZh ? '基准年化' : 'Base annualized',
       overallRisk: isZh ? '综合风险' : 'Overall risk',
@@ -114,6 +157,12 @@ export function ReportPage() {
       offlineDraft: isZh ? '仅离线草案' : 'Offline draft only',
       missingContract: isZh ? '当前未配置链上合约地址' : 'No onchain contract address is configured yet',
       viewExplorerShort: isZh ? '查看 Explorer' : 'View Explorer',
+      stepLabel: isZh ? '步骤' : 'Step',
+      reportHash: isZh ? '报告哈希' : 'Report Hash',
+      portfolioHash: isZh ? '组合哈希' : 'Portfolio Hash',
+      attestationHash: isZh ? '存证哈希' : 'Attestation Hash',
+      network: isZh ? '网络' : 'Network',
+      transactionHash: isZh ? '交易哈希' : 'Tx',
       riskWarnings: isZh ? '风险提醒' : 'Risk Warnings',
       extraRiskNote: isZh
         ? '稳定币、MMF 与各类 RWA 的风险结构不同，不应只按收益率排序。先看退出约束和权利边界，再看收益数字。'
@@ -136,6 +185,61 @@ export function ReportPage() {
 
   const session = sessionQuery.data
   const report = reportQuery.data
+  const wallet = useHashKeyWallet(report?.chainConfig)
+  const marketQuery = useLiveMarketSnapshots(
+    report?.chainConfig,
+    wallet.walletNetwork ??
+      (report?.attestationDraft?.network === 'mainnet' ? 'mainnet' : 'testnet'),
+  )
+  const attestationWriter = useAttestationWriter(report?.chainConfig)
+  const recordAttestationMutation = useMutation({
+    mutationFn: (payload: {
+      network: 'testnet' | 'mainnet'
+      transactionHash: string
+      submittedBy?: string
+      blockNumber?: number
+    }) => adapter.analysis.recordAttestation(sessionId, payload),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['analysis', sessionId] })
+      await queryClient.invalidateQueries({
+        queryKey: ['analysis', sessionId, 'report'],
+      })
+    },
+  })
+
+  const handleWriteAttestation = async () => {
+    if (!report?.attestationDraft) {
+      return
+    }
+
+    const targetNetwork =
+      report.attestationDraft.network === 'mainnet' ? 'mainnet' : 'testnet'
+
+    if (!wallet.isConnected) {
+      await wallet.connectWallet()
+    }
+
+    if (wallet.walletNetwork !== targetNetwork) {
+      await wallet.switchNetwork(targetNetwork)
+    }
+
+    const receipt = await attestationWriter.mutateAsync({
+      network: targetNetwork,
+      reportHash: report.attestationDraft.reportHash,
+      portfolioHash: report.attestationDraft.portfolioHash,
+      attestationHash: report.attestationDraft.attestationHash,
+      sessionId,
+      summaryUri:
+        typeof window !== 'undefined' ? window.location.href : `session:${sessionId}`,
+    })
+
+    await recordAttestationMutation.mutateAsync({
+      network: targetNetwork,
+      transactionHash: receipt.transactionHash,
+      submittedBy: receipt.account,
+      blockNumber: receipt.blockNumber,
+    })
+  }
 
   useEffect(() => {
     if (!session) {
@@ -187,6 +291,10 @@ export function ReportPage() {
         ))}
       </div>
 
+      <Card className="border-[rgba(249,228,159,0.2)] bg-[linear-gradient(135deg,rgba(212,175,55,0.12),rgba(15,14,10,0.78))] p-5">
+        <p className="text-sm leading-7 text-text-primary">{text.judgeNarrative}</p>
+      </Card>
+
       {report.chainConfig ? (
         <Card className="p-5">
           <div className="mb-4 flex items-center gap-3">
@@ -195,7 +303,7 @@ export function ReportPage() {
           </div>
           <div className="grid gap-4 md:grid-cols-4">
             <div className="rounded-[18px] border border-border-subtle bg-app-bg-elevated p-4">
-              <p className="text-xs text-text-muted">Mainnet</p>
+              <p className="text-xs text-text-muted">{text.mainnet}</p>
               <p className="mt-2 font-medium text-text-primary">{report.chainConfig.mainnetChainId}</p>
               <a
                 href={report.chainConfig.mainnetExplorerUrl}
@@ -203,11 +311,11 @@ export function ReportPage() {
                 rel="noreferrer"
                 className="mt-2 inline-flex text-xs text-gold-ink underline-offset-4 hover:underline"
               >
-                Explorer
+                {text.explorer}
               </a>
             </div>
             <div className="rounded-[18px] border border-border-subtle bg-app-bg-elevated p-4">
-              <p className="text-xs text-text-muted">Testnet</p>
+              <p className="text-xs text-text-muted">{text.testnet}</p>
               <p className="mt-2 font-medium text-text-primary">{report.chainConfig.testnetChainId}</p>
               <a
                 href={report.chainConfig.testnetExplorerUrl}
@@ -215,23 +323,225 @@ export function ReportPage() {
                 rel="noreferrer"
                 className="mt-2 inline-flex text-xs text-gold-ink underline-offset-4 hover:underline"
               >
-                Explorer
+                {text.explorer}
               </a>
             </div>
             <div className="rounded-[18px] border border-border-subtle bg-app-bg-elevated p-4">
-              <p className="text-xs text-text-muted">KYC SBT</p>
+              <p className="text-xs text-text-muted">{text.kycSbt}</p>
               <p className="mt-2 break-all text-sm text-text-primary">
                 {report.chainConfig.kycSbtAddress || text.notConfigured}
               </p>
             </div>
             <div className="rounded-[18px] border border-border-subtle bg-app-bg-elevated p-4">
-              <p className="text-xs text-text-muted">Plan Registry</p>
+              <p className="text-xs text-text-muted">{text.planRegistry}</p>
               <p className="mt-2 break-all text-sm text-text-primary">
                 {report.chainConfig.planRegistryAddress || text.notConfigured}
               </p>
             </div>
           </div>
         </Card>
+      ) : null}
+
+      {report.chainConfig ? (
+        <div className="grid gap-4 xl:grid-cols-[1.02fr_0.98fr]">
+          <Card className="space-y-4 p-5">
+            <div className="flex flex-wrap items-start justify-between gap-4">
+              <div>
+                <div className="flex items-center gap-3">
+                  <WalletCards className="size-5 text-gold-primary" />
+                  <h2 className="text-lg font-semibold text-text-primary">
+                    {text.walletExecution}
+                  </h2>
+                </div>
+                <p className="mt-2 text-sm leading-7 text-text-secondary">
+                  {text.walletExecutionDescription}
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {wallet.isConnected ? (
+                  <Button variant="secondary" onClick={() => wallet.disconnectWallet()}>
+                    {text.clearWallet}
+                  </Button>
+                ) : (
+                  <Button
+                    onClick={() => void wallet.connectWallet()}
+                    disabled={!wallet.hasProvider || wallet.isWalletBusy}
+                  >
+                    <Cable className="size-4" />
+                    {text.connectWallet}
+                  </Button>
+                )}
+                <Button
+                  variant="secondary"
+                  onClick={() => void wallet.switchNetwork('testnet')}
+                  disabled={!wallet.hasProvider || wallet.isWalletBusy}
+                >
+                  {text.switchTestnet}
+                </Button>
+                <Button
+                  variant="secondary"
+                  onClick={() => void wallet.switchNetwork('mainnet')}
+                  disabled={!wallet.hasProvider || wallet.isWalletBusy}
+                >
+                  {text.switchMainnet}
+                </Button>
+              </div>
+            </div>
+
+            <div className="grid gap-3 md:grid-cols-3">
+              <div className="rounded-[18px] border border-border-subtle bg-app-bg-elevated p-4">
+                <p className="text-xs text-text-muted">{text.connectedAddress}</p>
+                <p className="mt-2 break-all text-sm text-text-primary">
+                  {wallet.walletAddress || text.requiresWallet}
+                </p>
+              </div>
+              <div className="rounded-[18px] border border-border-subtle bg-app-bg-elevated p-4">
+                <p className="text-xs text-text-muted">{text.connectedNetwork}</p>
+                <p className="mt-2 font-medium text-text-primary">
+                  {wallet.networkLabel}
+                </p>
+              </div>
+              <div className="rounded-[18px] border border-border-subtle bg-app-bg-elevated p-4">
+                <p className="text-xs text-text-muted">{text.onchainKyc}</p>
+                <p className="mt-2 font-medium text-text-primary">
+                  {wallet.kycLoading
+                    ? '...'
+                    : `L${wallet.kycSnapshot?.isHuman ? wallet.kycSnapshot.level : 0}`}
+                </p>
+                <p className="mt-2 text-xs leading-6 text-text-muted">
+                  {wallet.kycSnapshot?.note || text.requiresWallet}
+                </p>
+              </div>
+            </div>
+
+            {report.attestationDraft ? (
+              <div className="rounded-[20px] border border-border-subtle bg-app-bg-elevated p-4">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <p className="font-medium text-text-primary">
+                      {text.attestationDraft}
+                    </p>
+                    <p className="mt-2 text-sm text-text-secondary">
+                      {report.attestationDraft.contractAddress || text.missingContract}
+                    </p>
+                  </div>
+                  <Badge tone={report.attestationDraft.ready ? 'success' : 'warning'}>
+                    {report.attestationDraft.ready ? text.readyOnchain : text.offlineDraft}
+                  </Badge>
+                </div>
+
+                <div className="mt-4 flex flex-wrap gap-2">
+                  <Button
+                    onClick={() => void handleWriteAttestation()}
+                    disabled={
+                      !report.attestationDraft.ready ||
+                      attestationWriter.isPending ||
+                      recordAttestationMutation.isPending ||
+                      !wallet.hasProvider
+                    }
+                  >
+                    <FileCode2 className="size-4" />
+                    {attestationWriter.isPending || recordAttestationMutation.isPending
+                      ? text.executingAttestation
+                      : text.executeAttestation}
+                  </Button>
+                  {report.attestationDraft.transactionUrl ? (
+                    <Button
+                      variant="secondary"
+                      onClick={() =>
+                        window.open(report.attestationDraft?.transactionUrl, '_blank', 'noreferrer')
+                      }
+                    >
+                      {text.viewExplorerShort}
+                    </Button>
+                  ) : null}
+                </div>
+
+                {report.attestationDraft.transactionHash ? (
+                  <div className="mt-4 rounded-[18px] border border-[rgba(249,228,159,0.16)] bg-[rgba(212,175,55,0.08)] p-4 text-sm leading-7 text-text-secondary">
+                    <p className="font-medium text-text-primary">{text.attestationSubmitted}</p>
+                    <p className="mt-2 break-all">
+                      {report.attestationDraft.transactionHash}
+                    </p>
+                    {report.attestationDraft.transactionUrl ? (
+                      <a
+                        href={report.attestationDraft.transactionUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="mt-2 inline-flex text-xs text-gold-ink underline-offset-4 hover:underline"
+                      >
+                        {text.viewExplorerShort}
+                      </a>
+                    ) : null}
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
+          </Card>
+
+          <Card className="space-y-4 p-5">
+            <div className="flex items-center gap-3">
+              <Radar className="size-5 text-gold-primary" />
+              <h2 className="text-lg font-semibold text-text-primary">
+                {text.liveOracle}
+              </h2>
+            </div>
+            <p className="text-sm leading-7 text-text-secondary">
+              {text.liveOracleDescription}
+            </p>
+            <div className="space-y-3">
+              {(marketQuery.data ?? []).map((snapshot) => (
+                <div
+                  key={`${snapshot.feedId}-${snapshot.network}`}
+                  className="rounded-[20px] border border-border-subtle bg-app-bg-elevated p-4"
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="font-medium text-text-primary">{snapshot.pair}</p>
+                    <Badge tone={snapshot.status === 'live' ? 'success' : 'warning'}>
+                      {snapshot.network}
+                    </Badge>
+                  </div>
+                  <p className="mt-2 text-2xl font-semibold text-text-primary">
+                    {typeof snapshot.price === 'number' ? snapshot.price.toFixed(6) : '—'}
+                  </p>
+                  <p className="mt-2 text-sm leading-7 text-text-secondary">
+                    {snapshot.note}
+                  </p>
+                  <p className="mt-2 text-xs text-text-muted">
+                    {text.fetchedAt}: {snapshot.fetchedAt}
+                  </p>
+                  {snapshot.updatedAt ? (
+                    <p className="mt-1 text-xs text-text-muted">
+                      {text.updatedAt}: {snapshot.updatedAt}
+                    </p>
+                  ) : null}
+                  <div className="mt-3 flex flex-wrap gap-3 text-xs">
+                    {snapshot.sourceUrl ? (
+                      <a
+                        href={snapshot.sourceUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-gold-ink underline-offset-4 hover:underline"
+                      >
+                        {text.sourceUrl}
+                      </a>
+                    ) : null}
+                    {snapshot.explorerUrl ? (
+                      <a
+                        href={snapshot.explorerUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-gold-ink underline-offset-4 hover:underline"
+                      >
+                        {text.viewExplorerShort}
+                      </a>
+                    ) : null}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </Card>
+        </div>
       ) : null}
 
       {report.assetCards.length ? (
@@ -249,6 +559,12 @@ export function ReportPage() {
                     <div className="flex flex-wrap items-center gap-2">
                       <h3 className="text-lg font-semibold text-text-primary">{asset.name}</h3>
                       <Badge tone="neutral">{asset.symbol}</Badge>
+                      {asset.onchainVerified ? (
+                        <Badge tone="neutral">{text.onchainVerified}</Badge>
+                      ) : null}
+                      {asset.issuerDisclosed ? (
+                        <Badge tone="neutral">{text.issuerDisclosed}</Badge>
+                      ) : null}
                     </div>
                     <p className="mt-2 text-sm leading-7 text-text-secondary">{asset.fitSummary}</p>
                   </div>
@@ -288,6 +604,16 @@ export function ReportPage() {
                   <p className="mt-2 text-xs text-text-muted">
                     {text.kycRequirement}: L{asset.kycRequiredLevel ?? 0}
                   </p>
+                  {asset.primarySourceUrl ? (
+                    <a
+                      href={asset.primarySourceUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="mt-2 inline-flex text-xs text-gold-ink underline-offset-4 hover:underline"
+                    >
+                      {text.sourceUrl}
+                    </a>
+                  ) : null}
                 </div>
 
                 <div className="flex flex-wrap gap-2">
@@ -321,19 +647,19 @@ export function ReportPage() {
                 </div>
                 <div className="grid gap-3 md:grid-cols-2">
                   <div className="rounded-[18px] border border-border-subtle bg-app-bg-elevated p-4">
-                    <p className="text-xs text-text-muted">P10 / P50 / P90</p>
+                    <p className="text-xs text-text-muted">{text.percentileRange}</p>
                     <p className="mt-2 text-sm font-medium text-text-primary">
                       {formatPercent(simulation.returnPctLow)} / {formatPercent(simulation.returnPctBase)} / {formatPercent(simulation.returnPctHigh)}
                     </p>
                   </div>
                   <div className="rounded-[18px] border border-border-subtle bg-app-bg-elevated p-4">
-                    <p className="text-xs text-text-muted">VaR / CVaR</p>
+                    <p className="text-xs text-text-muted">{text.varCvar}</p>
                     <p className="mt-2 text-sm font-medium text-text-primary">
                       {formatPercent(simulation.var95Pct)} / {formatPercent(simulation.cvar95Pct)}
                     </p>
                   </div>
                   <div className="rounded-[18px] border border-border-subtle bg-app-bg-elevated p-4">
-                    <p className="text-xs text-text-muted">Ending Value P50</p>
+                    <p className="text-xs text-text-muted">{text.endingValueP50}</p>
                     <p className="mt-2 text-sm font-medium text-text-primary">
                       {formatMoney(
                         simulation.endingValueBase,
@@ -456,6 +782,9 @@ export function ReportPage() {
                       <Badge tone="gold">{Math.round(evidence.confidence * 100)}%</Badge>
                     </div>
                     <p className="mt-2 text-sm leading-7 text-text-secondary">{evidence.summary}</p>
+                    <p className="mt-2 text-xs text-text-muted">
+                      {text.fetchedAt}: {evidence.fetchedAt}
+                    </p>
                     <a
                       href={evidence.sourceUrl}
                       target="_blank"
@@ -492,7 +821,7 @@ export function ReportPage() {
                   >
                     <div className="flex items-center justify-between gap-3">
                       <p className="font-medium text-text-primary">
-                        Step {step.step}. {step.title}
+                        {text.stepLabel} {step.step}. {step.title}
                       </p>
                       <Badge tone="neutral">{step.actionType}</Badge>
                     </div>
@@ -540,14 +869,15 @@ export function ReportPage() {
                 </h2>
               </div>
               <div className="rounded-[18px] border border-border-subtle bg-app-bg-elevated p-4 text-sm leading-7 text-text-secondary">
-                <p>Report Hash: {report.attestationDraft.reportHash.slice(0, 16)}...</p>
-                <p className="mt-2">Portfolio Hash: {report.attestationDraft.portfolioHash.slice(0, 16)}...</p>
-                <p className="mt-2">Attestation Hash: {report.attestationDraft.attestationHash.slice(0, 16)}...</p>
+                <p>{text.reportHash}: {report.attestationDraft.reportHash.slice(0, 16)}...</p>
+                <p className="mt-2">{text.portfolioHash}: {report.attestationDraft.portfolioHash.slice(0, 16)}...</p>
+                <p className="mt-2">{text.attestationHash}: {report.attestationDraft.attestationHash.slice(0, 16)}...</p>
+                <p className="mt-2">{text.network}: {report.attestationDraft.network}</p>
               </div>
 
               <div className="rounded-[18px] border border-border-subtle bg-app-bg-elevated p-4">
                 <div className="flex items-center justify-between gap-3">
-                  <p className="font-medium text-text-primary">Plan Registry</p>
+                  <p className="font-medium text-text-primary">{text.planRegistry}</p>
                   <Badge tone={report.attestationDraft.ready ? 'success' : 'warning'}>
                     {report.attestationDraft.ready ? text.readyOnchain : text.offlineDraft}
                   </Badge>
@@ -564,6 +894,11 @@ export function ReportPage() {
                   >
                     {text.viewExplorerShort}
                   </a>
+                ) : null}
+                {report.attestationDraft.transactionHash ? (
+                  <p className="mt-3 break-all text-xs text-text-muted">
+                    {text.transactionHash}: {report.attestationDraft.transactionHash}
+                  </p>
                 ) : null}
               </div>
             </Card>

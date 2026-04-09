@@ -4,6 +4,7 @@ import {
   mapBackendProgress,
   mapBackendReport,
   mapBackendSession,
+  toBackendIntakeContext,
   toBackendAnswers,
   type BackendSession,
 } from '@/lib/api/adapters/genius-backend'
@@ -187,5 +188,113 @@ describe('genius backend contract mapping', () => {
     expect(progress.overallProgress).toBeGreaterThan(0)
     expect(answers[0]?.question_id).toBe('q-1')
     expect(answers[0]?.value).toBe('skipped')
+  })
+
+  it('serializes wallet-derived KYC intake fields for the backend session create route', () => {
+    const payload = toBackendIntakeContext({
+      investmentAmount: 10000,
+      baseCurrency: 'USDT',
+      preferredAssetIds: ['hsk-usdc', 'cpic-estable-mmf'],
+      holdingPeriodDays: 30,
+      riskTolerance: 'balanced',
+      liquidityNeed: 't_plus_3',
+      minimumKycLevel: 2,
+      walletAddress: '0x1234567890abcdef1234567890abcdef12345678',
+      walletNetwork: 'testnet',
+      walletKycLevelOnchain: 2,
+      walletKycVerified: true,
+      wantsOnchainAttestation: true,
+      additionalConstraints: 'Prefer assets with onchain proof.',
+    })
+
+    expect(payload.wallet_address).toBe('0x1234567890abcdef1234567890abcdef12345678')
+    expect(payload.wallet_network).toBe('testnet')
+    expect(payload.wallet_kyc_level_onchain).toBe(2)
+    expect(payload.wallet_kyc_verified).toBe(true)
+  })
+
+  it('maps chain proof metadata and attestation receipts into the report view model', () => {
+    const backendSession = buildBackendSession()
+    backendSession.report = {
+      summary: 'HashKey report',
+      assumptions: ['Assume live oracle access on testnet.'],
+      recommendations: ['Write attestation after reviewing the tx draft.'],
+      open_questions: [],
+      chart_refs: [],
+      markdown: '# HashKey Report',
+      chain_config: {
+        ecosystem_name: 'HashKey Chain',
+        native_token_symbol: 'HSK',
+        default_execution_network: 'testnet',
+        testnet_chain_id: 133,
+        testnet_rpc_url: 'https://testnet.hsk.xyz',
+        testnet_explorer_url: 'https://testnet-explorer.hsk.xyz',
+        mainnet_chain_id: 177,
+        mainnet_rpc_url: 'https://mainnet.hsk.xyz',
+        mainnet_explorer_url: 'https://hashkey.blockscout.com',
+        plan_registry_address: '0x0000000000000000000000000000000000000133',
+        kyc_sbt_address: '0x0000000000000000000000000000000000000888',
+        testnet_plan_registry_address: '0x0000000000000000000000000000000000000133',
+        mainnet_plan_registry_address: '0x0000000000000000000000000000000000000177',
+        testnet_kyc_sbt_address: '0x0000000000000000000000000000000000000888',
+        mainnet_kyc_sbt_address: '0x0000000000000000000000000000000000000999',
+        docs_urls: ['https://docs.hashkeychain.net/docs/Build-on-HashKey-Chain/Tools/KYC'],
+        oracle_feeds: [
+          {
+            feed_id: 'usdc-usd',
+            pair: 'USDC/USD',
+            source_name: 'APRO Oracle',
+            docs_url: 'https://docs.hashkeychain.net/docs/Build-on-HashKey-Chain/Tools/Oracle',
+            testnet_address: '0xfeed000000000000000000000000000000000133',
+            mainnet_address: '0xfeed000000000000000000000000000000000177',
+            decimals: 8,
+          },
+        ],
+      },
+      market_snapshots: [
+        {
+          feed_id: 'usdc-usd',
+          pair: 'USDC/USD',
+          network: 'testnet',
+          source_name: 'APRO Oracle',
+          feed_address: '0xfeed000000000000000000000000000000000133',
+          price: 1.0001,
+          decimals: 8,
+          round_id: 120,
+          updated_at: '2026-04-10T12:00:00.000Z',
+          fetched_at: '2026-04-10T12:00:05.000Z',
+          status: 'live',
+          source_url: 'https://docs.hashkeychain.net/docs/Build-on-HashKey-Chain/Tools/Oracle',
+          explorer_url: 'https://testnet-explorer.hsk.xyz/address/0xfeed000000000000000000000000000000000133',
+          note: 'Fetched from APRO oracle feed.',
+        },
+      ],
+      attestation_draft: {
+        chain_id: 133,
+        report_hash: '0x1111111111111111111111111111111111111111111111111111111111111111',
+        portfolio_hash: '0x2222222222222222222222222222222222222222222222222222222222222222',
+        attestation_hash: '0x3333333333333333333333333333333333333333333333333333333333333333',
+        created_at: '2026-04-10T12:00:06.000Z',
+        network: 'testnet',
+        contract_address: '0x0000000000000000000000000000000000000133',
+        explorer_url: 'https://testnet-explorer.hsk.xyz/address/0x0000000000000000000000000000000000000133',
+        event_name: 'PlanRegistered',
+        ready: true,
+        transaction_hash: '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+        transaction_url: 'https://testnet-explorer.hsk.xyz/tx/0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+        submitted_by: '0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+        submitted_at: '2026-04-10T12:00:10.000Z',
+        block_number: 456789,
+      },
+    }
+
+    const report = mapBackendReport(backendSession)
+
+    expect(report.chainConfig?.testnetPlanRegistryAddress).toBe(
+      '0x0000000000000000000000000000000000000133',
+    )
+    expect(report.chainConfig?.oracleFeeds[0]?.pair).toBe('USDC/USD')
+    expect(report.marketSnapshots?.[0]?.status).toBe('live')
+    expect(report.attestationDraft?.transactionUrl).toContain('/tx/0xaaaaaaaa')
   })
 })

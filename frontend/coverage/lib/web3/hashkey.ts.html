@@ -3,7 +3,7 @@
 <html lang="en">
 
 <head>
-    <title>Code coverage report for lib/mock/analysis-workflows.ts</title>
+    <title>Code coverage report for lib/web3/hashkey.ts</title>
     <meta charset="utf-8" />
     <link rel="stylesheet" href="../../prettify.css" />
     <link rel="stylesheet" href="../../base.css" />
@@ -19,34 +19,34 @@
 <body>
 <div class='wrapper'>
     <div class='pad1'>
-        <h1><a href="../../index.html">All files</a> / <a href="index.html">lib/mock</a> analysis-workflows.ts</h1>
+        <h1><a href="../../index.html">All files</a> / <a href="index.html">lib/web3</a> hashkey.ts</h1>
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">4.76% </span>
+                <span class="strong">12.9% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>2/42</span>
+                <span class='fraction'>12/93</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">0% </span>
+                <span class="strong">8.65% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>0/37</span>
+                <span class='fraction'>9/104</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">8.69% </span>
+                <span class="strong">17.39% </span>
                 <span class="quiet">Functions</span>
-                <span class='fraction'>2/23</span>
+                <span class='fraction'>4/23</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">5.12% </span>
+                <span class="strong">12.9% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>2/39</span>
+                <span class='fraction'>12/93</span>
             </div>
         
             
@@ -468,7 +468,538 @@
 <a name='L403'></a><a href='#L403'>403</a>
 <a name='L404'></a><a href='#L404'>404</a>
 <a name='L405'></a><a href='#L405'>405</a>
-<a name='L406'></a><a href='#L406'>406</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<a name='L406'></a><a href='#L406'>406</a>
+<a name='L407'></a><a href='#L407'>407</a>
+<a name='L408'></a><a href='#L408'>408</a>
+<a name='L409'></a><a href='#L409'>409</a>
+<a name='L410'></a><a href='#L410'>410</a>
+<a name='L411'></a><a href='#L411'>411</a>
+<a name='L412'></a><a href='#L412'>412</a>
+<a name='L413'></a><a href='#L413'>413</a>
+<a name='L414'></a><a href='#L414'>414</a>
+<a name='L415'></a><a href='#L415'>415</a>
+<a name='L416'></a><a href='#L416'>416</a>
+<a name='L417'></a><a href='#L417'>417</a>
+<a name='L418'></a><a href='#L418'>418</a>
+<a name='L419'></a><a href='#L419'>419</a>
+<a name='L420'></a><a href='#L420'>420</a>
+<a name='L421'></a><a href='#L421'>421</a>
+<a name='L422'></a><a href='#L422'>422</a>
+<a name='L423'></a><a href='#L423'>423</a>
+<a name='L424'></a><a href='#L424'>424</a>
+<a name='L425'></a><a href='#L425'>425</a>
+<a name='L426'></a><a href='#L426'>426</a>
+<a name='L427'></a><a href='#L427'>427</a>
+<a name='L428'></a><a href='#L428'>428</a>
+<a name='L429'></a><a href='#L429'>429</a>
+<a name='L430'></a><a href='#L430'>430</a>
+<a name='L431'></a><a href='#L431'>431</a>
+<a name='L432'></a><a href='#L432'>432</a>
+<a name='L433'></a><a href='#L433'>433</a>
+<a name='L434'></a><a href='#L434'>434</a>
+<a name='L435'></a><a href='#L435'>435</a>
+<a name='L436'></a><a href='#L436'>436</a>
+<a name='L437'></a><a href='#L437'>437</a>
+<a name='L438'></a><a href='#L438'>438</a>
+<a name='L439'></a><a href='#L439'>439</a>
+<a name='L440'></a><a href='#L440'>440</a>
+<a name='L441'></a><a href='#L441'>441</a>
+<a name='L442'></a><a href='#L442'>442</a>
+<a name='L443'></a><a href='#L443'>443</a>
+<a name='L444'></a><a href='#L444'>444</a>
+<a name='L445'></a><a href='#L445'>445</a>
+<a name='L446'></a><a href='#L446'>446</a>
+<a name='L447'></a><a href='#L447'>447</a>
+<a name='L448'></a><a href='#L448'>448</a>
+<a name='L449'></a><a href='#L449'>449</a>
+<a name='L450'></a><a href='#L450'>450</a>
+<a name='L451'></a><a href='#L451'>451</a>
+<a name='L452'></a><a href='#L452'>452</a>
+<a name='L453'></a><a href='#L453'>453</a>
+<a name='L454'></a><a href='#L454'>454</a>
+<a name='L455'></a><a href='#L455'>455</a>
+<a name='L456'></a><a href='#L456'>456</a>
+<a name='L457'></a><a href='#L457'>457</a>
+<a name='L458'></a><a href='#L458'>458</a>
+<a name='L459'></a><a href='#L459'>459</a>
+<a name='L460'></a><a href='#L460'>460</a>
+<a name='L461'></a><a href='#L461'>461</a>
+<a name='L462'></a><a href='#L462'>462</a>
+<a name='L463'></a><a href='#L463'>463</a>
+<a name='L464'></a><a href='#L464'>464</a>
+<a name='L465'></a><a href='#L465'>465</a>
+<a name='L466'></a><a href='#L466'>466</a>
+<a name='L467'></a><a href='#L467'>467</a>
+<a name='L468'></a><a href='#L468'>468</a>
+<a name='L469'></a><a href='#L469'>469</a>
+<a name='L470'></a><a href='#L470'>470</a>
+<a name='L471'></a><a href='#L471'>471</a>
+<a name='L472'></a><a href='#L472'>472</a>
+<a name='L473'></a><a href='#L473'>473</a>
+<a name='L474'></a><a href='#L474'>474</a>
+<a name='L475'></a><a href='#L475'>475</a>
+<a name='L476'></a><a href='#L476'>476</a>
+<a name='L477'></a><a href='#L477'>477</a>
+<a name='L478'></a><a href='#L478'>478</a>
+<a name='L479'></a><a href='#L479'>479</a>
+<a name='L480'></a><a href='#L480'>480</a>
+<a name='L481'></a><a href='#L481'>481</a>
+<a name='L482'></a><a href='#L482'>482</a>
+<a name='L483'></a><a href='#L483'>483</a>
+<a name='L484'></a><a href='#L484'>484</a>
+<a name='L485'></a><a href='#L485'>485</a>
+<a name='L486'></a><a href='#L486'>486</a>
+<a name='L487'></a><a href='#L487'>487</a>
+<a name='L488'></a><a href='#L488'>488</a>
+<a name='L489'></a><a href='#L489'>489</a>
+<a name='L490'></a><a href='#L490'>490</a>
+<a name='L491'></a><a href='#L491'>491</a>
+<a name='L492'></a><a href='#L492'>492</a>
+<a name='L493'></a><a href='#L493'>493</a>
+<a name='L494'></a><a href='#L494'>494</a>
+<a name='L495'></a><a href='#L495'>495</a>
+<a name='L496'></a><a href='#L496'>496</a>
+<a name='L497'></a><a href='#L497'>497</a>
+<a name='L498'></a><a href='#L498'>498</a>
+<a name='L499'></a><a href='#L499'>499</a>
+<a name='L500'></a><a href='#L500'>500</a>
+<a name='L501'></a><a href='#L501'>501</a>
+<a name='L502'></a><a href='#L502'>502</a>
+<a name='L503'></a><a href='#L503'>503</a>
+<a name='L504'></a><a href='#L504'>504</a>
+<a name='L505'></a><a href='#L505'>505</a>
+<a name='L506'></a><a href='#L506'>506</a>
+<a name='L507'></a><a href='#L507'>507</a>
+<a name='L508'></a><a href='#L508'>508</a>
+<a name='L509'></a><a href='#L509'>509</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">8x</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">8x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">6x</span>
+<span class="cline-any cline-yes">6x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">6x</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">6x</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">6x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -502,40 +1033,24 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -550,43 +1065,6 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">3x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -596,687 +1074,518 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">6x</span>
+<span class="cline-any cline-yes">6x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">3x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">import type {
-  AnalysisMode,
-  AnalysisReport,
-  BudgetLineItem,
-  BudgetSummary,
-  CalculationTask,
-  ChartArtifact,
-  ChartTask,
-  ClarificationQuestion,
-  MetricHighlight,
-  ModeDefinition,
-  OptionProfile,
-  ReportTable,
-  SearchTask,
+<span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">import {
+  createPublicClient,
+  createWalletClient,
+  custom,
+  defineChain,
+  formatUnits,
+  http,
+  type Address,
+  type Hex,
+} from 'viem'
+&nbsp;
+import type {
+  HashKeyChainConfig,
+  MarketDataSnapshot,
+  OracleFeedConfig,
+  WalletKycSnapshot,
+  WalletNetworkKey,
 } from '@/types'
 &nbsp;
-interface MockAnalysisBundle {
-  questions: ClarificationQuestion[]
-  searchTasks: SearchTask[]
-  calculations: CalculationTask[]
-  chartTasks: ChartTask[]
-  charts: ChartArtifact[]
-  report: AnalysisReport
+export interface InjectedEthereumProvider {
+  isMetaMask?: boolean
+  request(args: {
+    method: string
+    params?: unknown[] | Record&lt;string, unknown&gt;
+  }): Promise&lt;unknown&gt;
+  on?(event: string, handler: (...args: unknown[]) =&gt; void): void
+  removeListener?(event: string, handler: (...args: unknown[]) =&gt; void): void
 }
 &nbsp;
-function <span class="fstat-no" title="function not covered" >makeQuestion(</span>
-  sessionId: string,
-  id: string,
-  question: string,
-  purpose: string,
-  options?: string[],
-  extra?: Partial&lt;ClarificationQuestion&gt;,
-): ClarificationQuestion {
-<span class="cstat-no" title="statement not covered" >  return {</span>
-    id,
-    sessionId,
-    question,
-    purpose,
-    questionGroup: extra?.questionGroup ?? '',
-    inputHint: extra?.inputHint ?? '',
-    exampleAnswer: extra?.exampleAnswer ?? '',
-    fieldType: options?.length ? 'single-choice' : 'textarea',
-    options: options?.map(<span class="fstat-no" title="function not covered" >(o</span>ption) =&gt; (<span class="cstat-no" title="statement not covered" >{ value: option, label: option }))</span>,
-    allowCustomInput: true,
-    allowSkip: extra?.allowSkip ?? true,
-    priority: extra?.priority ?? 1,
-    recommended: [],
-    answered: false,
+type WalletState = {
+  address: string
+  chainId: number | null
+}
+&nbsp;
+export const kycSbtAbi = [
+  {
+    type: 'function',
+    name: 'isHuman',
+    stateMutability: 'view',
+    inputs: [{ name: 'user', type: 'address' }],
+    outputs: [
+      { name: 'verified', type: 'bool' },
+      { name: 'level', type: 'uint8' },
+    ],
+  },
+] as const
+&nbsp;
+export const aproPriceFeedAbi = [
+  {
+    type: 'function',
+    name: 'latestRoundData',
+    stateMutability: 'view',
+    inputs: [],
+    outputs: [
+      { name: 'roundId', type: 'uint80' },
+      { name: 'answer', type: 'int256' },
+      { name: 'startedAt', type: 'uint256' },
+      { name: 'updatedAt', type: 'uint256' },
+      { name: 'answeredInRound', type: 'uint80' },
+    ],
+  },
+] as const
+&nbsp;
+export const planRegistryAbi = [
+  {
+    type: 'function',
+    name: 'registerPlan',
+    stateMutability: 'nonpayable',
+    inputs: [
+      { name: 'reportHash', type: 'bytes32' },
+      { name: 'portfolioHash', type: 'bytes32' },
+      { name: 'attestationHash', type: 'bytes32' },
+      { name: 'sessionId', type: 'string' },
+      { name: 'summaryUri', type: 'string' },
+    ],
+    outputs: [],
+  },
+  {
+    type: 'event',
+    name: 'PlanRegistered',
+    inputs: [
+      { indexed: true, name: 'attestationHash', type: 'bytes32' },
+      { indexed: true, name: 'submitter', type: 'address' },
+      { indexed: false, name: 'reportHash', type: 'bytes32' },
+      { indexed: false, name: 'portfolioHash', type: 'bytes32' },
+      { indexed: false, name: 'sessionId', type: 'string' },
+      { indexed: false, name: 'summaryUri', type: 'string' },
+      { indexed: false, name: 'recordedAt', type: 'uint256' },
+    ],
+  },
+] as const
+&nbsp;
+declare global {
+  interface Window {
+    ethereum?: InjectedEthereumProvider
   }
 }
 &nbsp;
-function <span class="fstat-no" title="function not covered" >makeCalculation(</span>
-  sessionId: string,
-  id: string,
-  taskType: string,
-  formulaExpression: string,
-  inputParams: Record&lt;string, string | number&gt;,
-  units: string,
-  result: string,
-): CalculationTask {
-<span class="cstat-no" title="statement not covered" >  return {</span>
-    id,
-    sessionId,
-    taskType,
-    formulaExpression,
-    inputParams,
-    units,
-    result,
-    status: 'completed',
-    createdAt: new Date().toISOString(),
+export function getInjectedProvider() {
+  <span class="missing-if-branch" title="if path not taken" >I</span>if (typeof window === 'undefined') {
+<span class="cstat-no" title="statement not covered" >    return undefined</span>
   }
+  return window.ethereum
 }
 &nbsp;
-function <span class="fstat-no" title="function not covered" >makeChartTask(</span>
-  sessionId: string,
-  id: string,
-  title: string,
-  chartType: ChartTask['chartType'],
-  objective: string,
-): ChartTask {
-<span class="cstat-no" title="statement not covered" >  return {</span>
-    id,
-    sessionId,
-    title,
-    chartType,
-    objective,
-    status: 'pending',
+export function resolveWalletNetwork(
+  chainConfig: HashKeyChainConfig | undefined,
+  chainId: number | null,
+): WalletNetworkKey | null {
+  <span class="missing-if-branch" title="else path not taken" >E</span>if (!chainConfig || chainId == null) {
+    return null
   }
-}
-&nbsp;
-function <span class="fstat-no" title="function not covered" >money(v</span>alue: number, currency = <span class="branch-0 cbranch-no" title="branch not covered" >'CNY') {</span>
-<span class="cstat-no" title="statement not covered" >  return `${Math.round(value).toLocaleString('zh-CN')} ${currency}`</span>
-}
-&nbsp;
-function buildModeDefinitions(): ModeDefinition[] {
-  return [
-    {
-      id: 'single-option',
-      title: '成本预估',
-      subtitle: '预算范围、项目拆分、回收与风险',
-      description: '适合评估一个具体计划是否值得推进，输出预算区间、详细成本项和可能回收。',
-      valueLens: ['预算范围', '成本拆分', '收入回收', '执行风险'],
-      icon: 'sparkles',
-    },
-    {
-      id: 'multi-option',
-      title: '多项决策',
-      subtitle: '方案识别、平行优缺点、成本与适配度',
-      description: '适合开放式问题，先识别可能方案，再平行输出每种方案的优缺点、成本和建议。',
-      valueLens: ['方案识别', '平行优缺点', '成本对比', '偏好适配'],
-      icon: 'git-compare',
-    },
-  ]
-}
-&nbsp;
-function <span class="fstat-no" title="function not covered" >buildBudgetCharts(s</span>essionId: string, summary: BudgetSummary, items: BudgetLineItem[]): ChartArtifact[] {
-  const costItems = <span class="cstat-no" title="statement not covered" >items.filter(<span class="fstat-no" title="function not covered" >(i</span>tem) =&gt; <span class="cstat-no" title="statement not covered" >item.itemType !== 'income')</span></span>
-  const incomeItems = <span class="cstat-no" title="statement not covered" >items.filter(<span class="fstat-no" title="function not covered" >(i</span>tem) =&gt; <span class="cstat-no" title="statement not covered" >item.itemType === 'income')</span></span>
-&nbsp;
-<span class="cstat-no" title="statement not covered" >  return [</span>
-    {
-      id: `${sessionId}-budget-range`,
-      sessionId,
-      kind: 'bar',
-      title: '预算区间总览',
-      unit: summary.currency,
-      note: '低位、基准、高位用于表达不确定性边界。',
-      compareSeries: [
-        { label: '低位', value: summary.totalCostLow, group: '总成本', nature: 'estimated' },
-        { label: '基准', value: summary.totalCostBase, group: '总成本', nature: 'estimated' },
-        { label: '高位', value: summary.totalCostHigh, group: '总成本', nature: 'estimated' },
-        { label: '低位', value: summary.netLow, group: '净预算', nature: 'estimated' },
-        { label: '基准', value: summary.netBase, group: '净预算', nature: 'estimated' },
-        { label: '高位', value: summary.netHigh, group: '净预算', nature: 'estimated' },
-      ],
-    },
-    {
-      id: `${sessionId}-budget-mix`,
-      sessionId,
-      kind: 'pie',
-      title: '基准成本构成',
-      unit: summary.currency,
-      note: '只展示成本侧项目。',
-      compareSeries: costItems.map(<span class="fstat-no" title="function not covered" >(i</span>tem) =&gt; (<span class="cstat-no" title="statement not covered" >{</span>
-        label: item.name,
-        value: item.base,
-        group: '成本',
-        nature: 'estimated',
-      })),
-    },
-    {
-      id: `${sessionId}-income-offsets`,
-      sessionId,
-      kind: 'bar',
-      title: '潜在收入与回收',
-      unit: summary.currency,
-      note: '收入和回收项需要单独看，不宜直接当作已到账现金。',
-      compareSeries: incomeItems.map(<span class="fstat-no" title="function not covered" >(i</span>tem) =&gt; (<span class="cstat-no" title="statement not covered" >{</span>
-        label: item.name,
-        value: item.base,
-        group: '收入',
-        nature: 'estimated',
-      })),
-    },
-  ]
-}
-&nbsp;
-function <span class="fstat-no" title="function not covered" >buildOptionCharts(s</span>essionId: string, options: OptionProfile[]): ChartArtifact[] {
-<span class="cstat-no" title="statement not covered" >  return [</span>
-    {
-      id: `${sessionId}-option-score`,
-      sessionId,
-      kind: 'bar',
-      title: '方案综合评分',
-      unit: 'score',
-      note: '评分只用于帮助排序，不代表绝对正确答案。',
-      compareSeries: options.map(<span class="fstat-no" title="function not covered" >(o</span>ption) =&gt; (<span class="cstat-no" title="statement not covered" >{</span>
-        label: option.name,
-        value: option.score ?? 0,
-        group: '评分',
-        nature: 'estimated',
-      })),
-    },
-    {
-      id: `${sessionId}-option-cost`,
-      sessionId,
-      kind: 'bar',
-      title: '方案成本对比',
-      unit: options[0]?.currency ?? 'CNY',
-      note: '成本图显示基准值，具体预算仍要结合明细和边界看。',
-      compareSeries: options.map(<span class="fstat-no" title="function not covered" >(o</span>ption) =&gt; (<span class="cstat-no" title="statement not covered" >{</span>
-        label: option.name,
-        value: option.estimatedCostBase ?? 0,
-        group: '基准成本',
-        nature: 'estimated',
-      })),
-    },
-    {
-      id: `${sessionId}-option-radar`,
-      sessionId,
-      kind: 'radar',
-      title: '方案平衡雷达',
-      unit: 'score',
-      note: '用于帮助理解增长、稳定性、成本压力和灵活性的平衡。',
-      radarSeries: options.slice(0, 3).map(<span class="fstat-no" title="function not covered" >(o</span>ption) =&gt; (<span class="cstat-no" title="statement not covered" >{</span>
-        name: option.name,
-        values: [
-          { dimension: '成长性', value: Math.min(10, (option.score ?? 6) + 1) },
-          { dimension: '稳定性', value: Math.max(3, 8 - option.cautionFlags.length) },
-          { dimension: '成本压力', value: Math.min(10, Math.max(2, (option.estimatedCostBase ?? 0) / 120000)) },
-          { dimension: '灵活性', value: Math.max(3, 8 - option.conditions.length) },
-        ],
-      })),
-    },
-  ]
-}
-&nbsp;
-function <span class="fstat-no" title="function not covered" >buildBudgetTable(t</span>itle: string, items: BudgetLineItem[]): ReportTable {
-<span class="cstat-no" title="statement not covered" >  return {</span>
-    id: `${title}-table`,
-    title,
-    columns: ['项目', '类别', '类型', '低位', '基准', '高位', '币种', '说明'],
-    rows: items.map(<span class="fstat-no" title="function not covered" >(i</span>tem) =&gt; (<span class="cstat-no" title="statement not covered" >{</span>
-      项目: item.name,
-      类别: item.category,
-      类型: item.itemType,
-      低位: item.low,
-      基准: item.base,
-      高位: item.high,
-      币种: item.currency,
-      说明: item.rationale ?? '',
-    })),
-    notes: '建议优先按基准值做决策，再为不确定项单独预留缓冲。',
+<span class="cstat-no" title="statement not covered" >  if (chainId === chainConfig.testnetChainId) {</span>
+<span class="cstat-no" title="statement not covered" >    return 'testnet'</span>
   }
-}
-&nbsp;
-function <span class="fstat-no" title="function not covered" >buildOptionTable(t</span>itle: string, options: OptionProfile[]): ReportTable {
-<span class="cstat-no" title="statement not covered" >  return {</span>
-    id: `${title}-table`,
-    title,
-    columns: ['方案', '优点', '缺点', '基准成本', '适合谁', '风险提示', '评分'],
-    rows: options.map(<span class="fstat-no" title="function not covered" >(o</span>ption) =&gt; (<span class="cstat-no" title="statement not covered" >{</span>
-      方案: option.name,
-      优点: option.pros.join('；'),
-      缺点: option.cons.join('；'),
-      基准成本: option.estimatedCostBase ?? null,
-      适合谁: option.fitFor.join('；'),
-      风险提示: option.cautionFlags.join('；'),
-      评分: option.score ?? null,
-    })),
-    notes: '建议结合你的预算、时间窗口和风险承受能力一起看。',
+<span class="cstat-no" title="statement not covered" >  if (chainId === chainConfig.mainnetChainId) {</span>
+<span class="cstat-no" title="statement not covered" >    return 'mainnet'</span>
   }
+<span class="cstat-no" title="statement not covered" >  return null</span>
 }
 &nbsp;
-function <span class="fstat-no" title="function not covered" >buildHighlights(i</span>tems: Array&lt;[string, string, string, string]&gt;): MetricHighlight[] {
-<span class="cstat-no" title="statement not covered" >  return items.map(<span class="fstat-no" title="function not covered" >([</span>id, label, value, detail]) =&gt; (<span class="cstat-no" title="statement not covered" >{ id, label, value, detail }))</span></span>
+export function getNetworkLabel(network: WalletNetworkKey | null, isZh: boolean) {
+  <span class="missing-if-branch" title="if path not taken" >I</span>if (network === 'testnet') {
+<span class="cstat-no" title="statement not covered" >    return isZh ? 'HashKey Chain 测试网' : 'HashKey Chain Testnet'</span>
+  }
+  <span class="missing-if-branch" title="if path not taken" >I</span>if (network === 'mainnet') {
+<span class="cstat-no" title="statement not covered" >    return isZh ? 'HashKey Chain 主网' : 'HashKey Chain Mainnet'</span>
+  }
+  return isZh ? '未连接到 HashKey 网络' : 'Not on a HashKey network'
 }
 &nbsp;
-export function buildMockModeDefinitions() {
-  return buildModeDefinitions()
+function <span class="fstat-no" title="function not covered" >hexChainId(v</span>alue: number) {
+<span class="cstat-no" title="statement not covered" >  return `0x${value.toString(16)}`</span>
 }
 &nbsp;
-export function <span class="fstat-no" title="function not covered" >buildMockAnalysisBundle(</span>
-  sessionId: string,
-  problemStatement: string,
-  mode: AnalysisMode,
-): MockAnalysisBundle {
-<span class="cstat-no" title="statement not covered" >  if (mode === 'single-option') {</span>
-    const budgetItems: BudgetLineItem[] = <span class="cstat-no" title="statement not covered" >[</span>
-      { id: `${sessionId}-item-1`, name: '工作人员工资', category: '人力成本', itemType: 'cost', low: 60000, base: 90000, high: 130000, currency: 'CNY', rationale: '含执行、裁判和临时支持人员。', basisRefs: [], confidence: 0.72 },
-      { id: `${sessionId}-item-2`, name: '场地租用', category: '执行成本', itemType: 'cost', low: 80000, base: 120000, high: 180000, currency: 'CNY', rationale: '取决于城市、档期和场馆等级。', basisRefs: [], confidence: 0.76 },
-      { id: `${sessionId}-item-3`, name: '设备与物料', category: '执行成本', itemType: 'cost', low: 30000, base: 60000, high: 100000, currency: 'CNY', rationale: '音响、灯光、摄影、赛事物料。', basisRefs: [], confidence: 0.68 },
-      { id: `${sessionId}-item-4`, name: '宣发投放', category: '市场成本', itemType: 'cost', low: 20000, base: 50000, high: 90000, currency: 'CNY', rationale: '决定曝光和到场率。', basisRefs: [], confidence: 0.7 },
-      { id: `${sessionId}-item-5`, name: '组织机会成本', category: '机会成本', itemType: 'opportunity_cost', low: 30000, base: 50000, high: 80000, currency: 'CNY', rationale: '团队时间被占用导致的替代损失。', basisRefs: [], confidence: 0.63 },
-      { id: `${sessionId}-item-6`, name: '赞助收入', category: '收入回收', itemType: 'income', low: 80000, base: 160000, high: 300000, currency: 'CNY', rationale: '取决于招商质量和合同落地率。', basisRefs: [], confidence: 0.65 },
-      { id: `${sessionId}-item-7`, name: '门票与报名费', category: '收入回收', itemType: 'income', low: 30000, base: 70000, high: 140000, currency: 'CNY', rationale: '受转化率和上座率影响。', basisRefs: [], confidence: 0.61 },
-    ]
+export function <span class="fstat-no" title="function not covered" >toViemChain(</span>
+  chainConfig: HashKeyChainConfig,
+  network: WalletNetworkKey,
+) {
+  const isTestnet = <span class="cstat-no" title="statement not covered" >network === 'testnet'</span>
+  const chainId = <span class="cstat-no" title="statement not covered" >isTestnet</span>
+    ? chainConfig.testnetChainId
+    : chainConfig.mainnetChainId
+  const rpcUrl = <span class="cstat-no" title="statement not covered" >isTestnet</span>
+    ? chainConfig.testnetRpcUrl
+    : chainConfig.mainnetRpcUrl
+  const explorerUrl = <span class="cstat-no" title="statement not covered" >isTestnet</span>
+    ? chainConfig.testnetExplorerUrl
+    : chainConfig.mainnetExplorerUrl
 &nbsp;
-    const budgetSummary: BudgetSummary = <span class="cstat-no" title="statement not covered" >{</span>
-      currency: 'CNY',
-      totalCostLow: 220000,
-      totalCostBase: 370000,
-      totalCostHigh: 580000,
-      totalIncomeLow: 110000,
-      totalIncomeBase: 230000,
-      totalIncomeHigh: 440000,
-      netLow: 110000,
-      netBase: 140000,
-      netHigh: 140000,
-      reserveNote: '建议额外预留 15% 到 20% 的现金缓冲。',
-    }
+<span class="cstat-no" title="statement not covered" >  return defineChain({</span>
+    id: chainId,
+    name: `${chainConfig.ecosystemName} ${isTestnet ? 'Testnet' : 'Mainnet'}`,
+    network: `${chainConfig.ecosystemName.toLowerCase().replaceAll(' ', '-')}-${network}`,
+    nativeCurrency: {
+      name: chainConfig.nativeTokenSymbol,
+      symbol: chainConfig.nativeTokenSymbol,
+      decimals: 18,
+    },
+    rpcUrls: {
+      default: { http: [rpcUrl] },
+      public: { http: [rpcUrl] },
+    },
+    blockExplorers: {
+      default: {
+        name: 'Blockscout',
+        url: explorerUrl,
+      },
+    },
+  })
+}
 &nbsp;
-    const questions = <span class="cstat-no" title="statement not covered" >[</span>
-      makeQuestion(sessionId, `${sessionId}-q-1`, '这次计划最终想做到什么规模和结果？', '预算判断必须先知道目标规模和成功标准。'),
-      makeQuestion(sessionId, `${sessionId}-q-2`, '当前最硬的预算或现金流约束是什么？', '预算上限会直接改变可执行范围和风险承受方式。'),
-      makeQuestion(sessionId, `${sessionId}-q-3`, '是否存在赞助、补贴或其他收入来源？', '结果页需要同时输出成本项和回收项。'),
-    ]
+function <span class="fstat-no" title="function not covered" >publicClientFor(</span>
+  chainConfig: HashKeyChainConfig,
+  network: WalletNetworkKey,
+) {
+  const chain = <span class="cstat-no" title="statement not covered" >toViemChain(chainConfig, network)</span>
+<span class="cstat-no" title="statement not covered" >  return createPublicClient({</span>
+    chain,
+    transport: http(chain.rpcUrls.default.http[0]),
+  })
+}
 &nbsp;
-    const calculations = <span class="cstat-no" title="statement not covered" >[</span>
-      makeCalculation(sessionId, `${sessionId}-calc-1`, '预算区间汇总', 'sum(cost_items) - sum(income_items)', { 成本基准: 370000, 收入基准: 230000 }, 'CNY', '140000'),
-      makeCalculation(sessionId, `${sessionId}-calc-2`, '安全缓冲估算', 'net_base * 15%', { 净预算基准: 140000 }, 'CNY', '21000'),
-    ]
+function <span class="fstat-no" title="function not covered" >planRegistryAddress(</span>
+  chainConfig: HashKeyChainConfig,
+  network: WalletNetworkKey,
+) {
+<span class="cstat-no" title="statement not covered" >  return network === 'testnet'</span>
+    ? chainConfig.testnetPlanRegistryAddress || chainConfig.planRegistryAddress
+    : chainConfig.mainnetPlanRegistryAddress || chainConfig.planRegistryAddress
+}
 &nbsp;
-    const tables = <span class="cstat-no" title="statement not covered" >[buildBudgetTable('预算项目拆分表', budgetItems)]</span>
-    const charts = <span class="cstat-no" title="statement not covered" >buildBudgetCharts(sessionId, budgetSummary, budgetItems)</span>
-    const highlights = <span class="cstat-no" title="statement not covered" >buildHighlights([</span>
-      ['budget-range', '预算范围', `${money(budgetSummary.netLow)} - ${money(budgetSummary.netHigh)}`, '已经把收入回收一并计入净预算。'],
-      ['base-budget', '基准净预算', money(budgetSummary.netBase), '适合作为默认决策预算线。'],
-      ['budget-count', '预算项目数', String(budgetItems.length), '覆盖直接成本、机会成本与收入项。'],
-      ['reserve', '建议缓冲', '15% - 20%', budgetSummary.reserveNote ?? ''],
-    ])
+function <span class="fstat-no" title="function not covered" >kycSbtAddress(</span>
+  chainConfig: HashKeyChainConfig,
+  network: WalletNetworkKey,
+) {
+<span class="cstat-no" title="statement not covered" >  return network === 'testnet'</span>
+    ? chainConfig.testnetKycSbtAddress || chainConfig.kycSbtAddress
+    : chainConfig.mainnetKycSbtAddress || chainConfig.kycSbtAddress
+}
 &nbsp;
-    const report: AnalysisReport = <span class="cstat-no" title="statement not covered" >{</span>
-      id: `report-${sessionId}`,
-      sessionId,
-      mode,
-      summaryTitle: problemStatement,
-      markdown: `# 成本预估结果\n\n## 结论\n\n当前更合理的做法是把 **${money(budgetSummary.netBase)}** 视为基准净预算，并准备额外缓冲。这个计划不是不能做，而是非常依赖收入回收是否落地，以及场地、人力和宣发是否超支。\n\n## 成本视角\n\n- 直接成本主要集中在人力、场地和设备。\n- 机会成本不能忽略，它会吞掉团队的时间和后续机会。\n- 如果赞助和门票没有及时落地，现金压力会明显上升。\n\n## 建议动作\n\n1. 先锁定场地和关键人力报价，再决定规模。\n2. 把收入项和已确定成本拆开看，不要提前乐观抵扣。\n3. 在合同未签和赞助未到账前，按基准预算而不是高位收入做决策。`,
-      highlights,
-      calculations,
-      charts,
-      evidence: [],
-      assumptions: ['当前预算按中型线下活动估算。', '收入项按中性转化率和落地率估算。'],
-      disclaimers: ['预算区间是辅助决策的估算，不应代替真实报价和合同条款。'],
-      budgetSummary,
-      budgetItems,
-      tables,
-      assetCards: [],
-      simulations: [],
-      recommendedAllocations: [],
-    }
+function <span class="fstat-no" title="function not covered" >explorerBase(</span>
+  chainConfig: HashKeyChainConfig,
+  network: WalletNetworkKey,
+) {
+<span class="cstat-no" title="statement not covered" >  return network === 'testnet'</span>
+    ? chainConfig.testnetExplorerUrl
+    : chainConfig.mainnetExplorerUrl
+}
 &nbsp;
-<span class="cstat-no" title="statement not covered" >    return {</span>
-      questions,
-      searchTasks: [
-        { id: `${sessionId}-search-1`, sessionId, topic: '场地与执行成本基准', goal: '验证场地、人力和设备的市场区间', scope: '当前城市和相近规模活动', suggestedQueries: ['线下活动 场地租赁 成本', '赛事执行 人力 成本'], requiredFields: ['报价区间', '影响因子'], freshnessRequirement: 'high', status: 'pending' },
-      ],
-      calculations,
-      chartTasks: [
-        makeChartTask(sessionId, `${sessionId}-chart-task-1`, '预算区间总览', 'bar', '绘制低位、基准、高位预算对比'),
-        makeChartTask(sessionId, `${sessionId}-chart-task-2`, '基准成本构成', 'pie', '展示主要成本项占比'),
-      ],
-      charts,
-      report,
-    }
+function <span class="fstat-no" title="function not covered" >rpcUrlFor(</span>
+  chainConfig: HashKeyChainConfig,
+  network: WalletNetworkKey,
+) {
+<span class="cstat-no" title="statement not covered" >  return network === 'testnet'</span>
+    ? chainConfig.testnetRpcUrl
+    : chainConfig.mainnetRpcUrl
+}
+&nbsp;
+function <span class="fstat-no" title="function not covered" >feedAddressFor(f</span>eed: OracleFeedConfig, network: WalletNetworkKey) {
+<span class="cstat-no" title="statement not covered" >  return network === 'testnet'</span>
+    ? feed.testnetAddress
+    : feed.mainnetAddress
+}
+&nbsp;
+function <span class="fstat-no" title="function not covered" >chainIdFor(</span>
+  chainConfig: HashKeyChainConfig,
+  network: WalletNetworkKey,
+) {
+<span class="cstat-no" title="statement not covered" >  return network === 'testnet'</span>
+    ? chainConfig.testnetChainId
+    : chainConfig.mainnetChainId
+}
+&nbsp;
+function <span class="fstat-no" title="function not covered" >normalizeHashToBytes32(v</span>alue: string): Hex {
+  const normalized = <span class="cstat-no" title="statement not covered" >value.trim().toLowerCase().replace(/^0x/, '')</span>
+<span class="cstat-no" title="statement not covered" >  return `0x${normalized.padStart(64, '0').slice(0, 64)}` as Hex</span>
+}
+&nbsp;
+export async function <span class="fstat-no" title="function not covered" >readInjectedWalletState(): Promise&lt;WalletState&gt; {</span>
+  const provider = <span class="cstat-no" title="statement not covered" >getInjectedProvider()</span>
+<span class="cstat-no" title="statement not covered" >  if (!provider) {</span>
+<span class="cstat-no" title="statement not covered" >    return { address: '', chainId: null }</span>
   }
 &nbsp;
-  const options: OptionProfile[] = <span class="cstat-no" title="statement not covered" >[</span>
-    { id: `${sessionId}-option-1`, name: '去美国留学一年', summary: '成长快，但资金和执行压力大。', pros: ['国际视野和资源扩张明显', '对部分职业路径有加速作用'], cons: ['资金投入高', '执行链条长，时间与签证风险大'], conditions: ['需要明确预算来源', '最好有明确项目或学校方向'], fitFor: ['明确想做国际化路径的人', '愿意承担更高不确定性的人'], cautionFlags: ['预算可能接近或超过 100 万', '中途退出成本高'], estimatedCostLow: 700000, estimatedCostBase: 1000000, estimatedCostHigh: 1300000, currency: 'CNY', score: 7.2, confidence: 0.7, basisRefs: [] },
-    { id: `${sessionId}-option-2`, name: '留在国内继续发展', summary: '现金压力低，试错空间更大。', pros: ['成本低很多', '行动快，回撤小'], cons: ['国际化增量较有限', '短期认知扩展没有留学强'], conditions: ['需要主动寻找高质量项目和环境'], fitFor: ['优先保现金流和确定性的人'], cautionFlags: ['成长速度可能更依赖个人主动性'], estimatedCostLow: 60000, estimatedCostBase: 100000, estimatedCostHigh: 180000, currency: 'CNY', score: 7.8, confidence: 0.74, basisRefs: [] },
-    { id: `${sessionId}-option-3`, name: '先工作两年再决定', summary: '把选择权往后留，换取更强的资金和判断基础。', pros: ['先积累资金和经验', '两年后判断会更成熟'], cons: ['推迟潜在的国际化窗口', '需要持续自律地准备'], conditions: ['工作内容需要对长期目标有帮助'], fitFor: ['暂时不想高风险投入的人', '还在摸清长期方向的人'], cautionFlags: ['容易在工作惯性中放弃后续计划'], estimatedCostLow: 80000, estimatedCostBase: 160000, estimatedCostHigh: 260000, currency: 'CNY', score: 8.1, confidence: 0.76, basisRefs: [] },
-  ]
-&nbsp;
-  const questions = <span class="cstat-no" title="statement not covered" >[</span>
-    makeQuestion(sessionId, `${sessionId}-q-1`, '你最在意的是长期成长、现金流稳定，还是尽快开始行动？', '多项决策必须先知道排序标准。'),
-    makeQuestion(sessionId, `${sessionId}-q-2`, '你当前不能突破的预算上限是多少？', '预算上限会直接淘汰一部分看似不错但不现实的方案。'),
-    makeQuestion(sessionId, `${sessionId}-q-3`, '如果没有完美方案，你更愿意保住什么？', '推荐必须体现你的真实取舍。'),
-  ]
-&nbsp;
-  const calculations = <span class="cstat-no" title="statement not covered" >[</span>
-    makeCalculation(sessionId, `${sessionId}-calc-1`, '方案成本对比', 'compare(option_cost_base)', { 留学: 1000000, 国内: 100000, 先工作: 160000 }, 'CNY', 'completed'),
-  ]
-&nbsp;
-  const tables = <span class="cstat-no" title="statement not covered" >[buildOptionTable('方案平行对比表', options)]</span>
-  const charts = <span class="cstat-no" title="statement not covered" >buildOptionCharts(sessionId, options)</span>
-  const highlights = <span class="cstat-no" title="statement not covered" >buildHighlights([</span>
-    ['option-count', '识别方案数', String(options.length), '系统为当前问题整理了三种可执行路径。'],
-    ['lead-option', '当前优先方案', options[2].name, '在兼顾现金流、选择权和长期准备的情况下更稳妥。'],
-    ['score-gap', '最高评分', `${options[2].score}`, '仅用于排序辅助。'],
-    ['cost-gap', '最大成本差', `${money((options[0].estimatedCostBase ?? 0) - (options[1].estimatedCostBase ?? 0))}`, '不同方案之间的成本差距非常大。'],
+  const [accounts, chainIdHex] = <span class="cstat-no" title="statement not covered" >await Promise.all([</span>
+    provider.request({ method: 'eth_accounts' }),
+    provider.request({ method: 'eth_chainId' }),
   ])
 &nbsp;
-  const report: AnalysisReport = <span class="cstat-no" title="statement not covered" >{</span>
-    id: `report-${sessionId}`,
-    sessionId,
-    mode,
-    summaryTitle: problemStatement,
-    markdown: `# 多项决策结果\n\n## 结论\n\n当前更稳妥的默认方案是 **先工作两年再决定**。它不是理论上最耀眼的方案，但在保持现金流、保留选择权、同时继续为留学做准备这三点上更平衡。\n\n## 为什么不是直接去留学\n\n- 去留学的上行空间明显，但资金和执行压力也最大。\n- 如果预算接近上限，任何突发变量都会明显放大风险。\n- 在准备不足时直接推进，容易把高成本方案变成高压力方案。\n\n## 为什么不是直接留在国内不动\n\n- 成本低和行动快是优势。\n- 但如果你的真实目标是国际化发展，只停留在国内会损失部分长期弹性。\n\n## 建议动作\n\n1. 先验证 2 年内最有帮助的工作路径是否存在。\n2. 用工作期积累资金与判断，再决定是否出国。\n3. 如果未来能拿到明确资助，再重新评估直接留学方案。`,
-    highlights,
-    calculations,
-    charts,
-    evidence: [],
-    assumptions: ['方案成本按常见区间和中性情境估算。'],
-    disclaimers: ['方案评分和成本区间只用于帮助比较，不是唯一决策依据。'],
-    optionProfiles: options,
-    tables,
-    assetCards: [],
-    simulations: [],
-    recommendedAllocations: [],
+  const firstAccount = <span class="cstat-no" title="statement not covered" >Array.isArray(accounts) ? String(accounts[0] ?? '') : ''</span>
+<span class="cstat-no" title="statement not covered" >  return {</span>
+    address: firstAccount,
+    chainId:
+      typeof chainIdHex === 'string' ? Number.parseInt(chainIdHex, 16) : null,
+  }
+}
+&nbsp;
+export async function <span class="fstat-no" title="function not covered" >connectInjectedWallet() {</span>
+  const provider = <span class="cstat-no" title="statement not covered" >getInjectedProvider()</span>
+<span class="cstat-no" title="statement not covered" >  if (!provider) {</span>
+<span class="cstat-no" title="statement not covered" >    throw new Error('No injected wallet provider is available.')</span>
   }
 &nbsp;
+  const accounts = <span class="cstat-no" title="statement not covered" >await provider.request({</span>
+    method: 'eth_requestAccounts',
+  })
+  const chainIdHex = <span class="cstat-no" title="statement not covered" >await provider.request({ method: 'eth_chainId' })</span>
+  const firstAccount = <span class="cstat-no" title="statement not covered" >Array.isArray(accounts) ? String(accounts[0] ?? '') : ''</span>
+&nbsp;
 <span class="cstat-no" title="statement not covered" >  return {</span>
-    questions,
-    searchTasks: [
-      { id: `${sessionId}-search-1`, sessionId, topic: '留学与国内路径成本基准', goal: '验证不同路径的一年成本与机会成本差异', scope: '近一年公开信息', suggestedQueries: ['美国 留学 一年 成本', '国内 一年 生活 开销'], requiredFields: ['成本区间', '关键变量'], freshnessRequirement: 'high', status: 'pending' },
-    ],
-    calculations,
-    chartTasks: [
-      makeChartTask(sessionId, `${sessionId}-chart-task-1`, '方案综合评分', 'bar', '绘制方案排序'),
-      makeChartTask(sessionId, `${sessionId}-chart-task-2`, '方案平衡雷达', 'radar', '展示成长、稳定性、成本压力和灵活性'),
-    ],
-    charts,
-    report,
+    address: firstAccount,
+    chainId:
+      typeof chainIdHex === 'string' ? Number.parseInt(chainIdHex, 16) : null,
   }
+}
+&nbsp;
+export async function <span class="fstat-no" title="function not covered" >switchWalletNetwork(</span>
+  chainConfig: HashKeyChainConfig,
+  network: WalletNetworkKey,
+) {
+  const provider = <span class="cstat-no" title="statement not covered" >getInjectedProvider()</span>
+<span class="cstat-no" title="statement not covered" >  if (!provider) {</span>
+<span class="cstat-no" title="statement not covered" >    throw new Error('No injected wallet provider is available.')</span>
+  }
+&nbsp;
+  const chainId = <span class="cstat-no" title="statement not covered" >chainIdFor(chainConfig, network)</span>
+  const chain = <span class="cstat-no" title="statement not covered" >toViemChain(chainConfig, network)</span>
+&nbsp;
+<span class="cstat-no" title="statement not covered" >  try {</span>
+<span class="cstat-no" title="statement not covered" >    await provider.request({</span>
+      method: 'wallet_switchEthereumChain',
+      params: [{ chainId: hexChainId(chainId) }],
+    })
+  } catch (error) {
+    const code =
+<span class="cstat-no" title="statement not covered" >      typeof error === 'object' &amp;&amp; error &amp;&amp; 'code' in error</span>
+        ? Number((error as { code?: number }).code)
+        : undefined
+&nbsp;
+<span class="cstat-no" title="statement not covered" >    if (code !== 4902) {</span>
+<span class="cstat-no" title="statement not covered" >      throw error</span>
+    }
+&nbsp;
+<span class="cstat-no" title="statement not covered" >    await provider.request({</span>
+      method: 'wallet_addEthereumChain',
+      params: [
+        {
+          chainId: hexChainId(chain.id),
+          chainName: chain.name,
+          nativeCurrency: chain.nativeCurrency,
+          rpcUrls: [rpcUrlFor(chainConfig, network)],
+          blockExplorerUrls: [explorerBase(chainConfig, network)],
+        },
+      ],
+    })
+  }
+}
+&nbsp;
+export async function <span class="fstat-no" title="function not covered" >readWalletKyc(</span>
+  chainConfig: HashKeyChainConfig,
+  walletAddress: string,
+  network: WalletNetworkKey,
+): Promise&lt;WalletKycSnapshot&gt; {
+  const contractAddress = <span class="cstat-no" title="statement not covered" >kycSbtAddress(chainConfig, network)</span>
+  const <span class="cstat-no" title="statement not covered" >fetchedAt = new Date().toISOString()</span>
+&nbsp;
+<span class="cstat-no" title="statement not covered" >  if (!walletAddress || !contractAddress) {</span>
+<span class="cstat-no" title="statement not covered" >    return {</span>
+      walletAddress,
+      network,
+      contractAddress,
+      isHuman: false,
+      level: 0,
+      sourceUrl: chainConfig.docsUrls.find(<span class="fstat-no" title="function not covered" >(u</span>rl) =&gt; <span class="cstat-no" title="statement not covered" >url.includes('/Tools/KYC'))</span>,
+      explorerUrl: contractAddress
+        ? `${explorerBase(chainConfig, network)}/address/${contractAddress}`
+        : undefined,
+      fetchedAt,
+      note: contractAddress
+        ? 'Wallet not connected.'
+        : 'KYC SBT contract is not configured for this network.',
+    }
+  }
+&nbsp;
+  const client = <span class="cstat-no" title="statement not covered" >publicClientFor(chainConfig, network)</span>
+  const [isHuman, level] = <span class="cstat-no" title="statement not covered" >await client.readContract({</span>
+    address: contractAddress as Address,
+    abi: kycSbtAbi,
+    functionName: 'isHuman',
+    args: [walletAddress as Address],
+  })
+&nbsp;
+<span class="cstat-no" title="statement not covered" >  return {</span>
+    walletAddress,
+    network,
+    contractAddress,
+    isHuman,
+    level: Number(level),
+    sourceUrl: chainConfig.docsUrls.find(<span class="fstat-no" title="function not covered" >(u</span>rl) =&gt; <span class="cstat-no" title="statement not covered" >url.includes('/Tools/KYC'))</span>,
+    explorerUrl: `${explorerBase(chainConfig, network)}/address/${contractAddress}`,
+    fetchedAt,
+    note: isHuman
+      ? 'Onchain KYC/SBT eligibility detected.'
+      : 'No onchain KYC/SBT eligibility was detected for this wallet.',
+  }
+}
+&nbsp;
+export async function <span class="fstat-no" title="function not covered" >readMarketSnapshots(</span>
+  chainConfig: HashKeyChainConfig,
+  network: WalletNetworkKey,
+) {
+  const client = <span class="cstat-no" title="statement not covered" >publicClientFor(chainConfig, network)</span>
+  const <span class="cstat-no" title="statement not covered" >fetchedAt = new Date().toISOString()</span>
+&nbsp;
+<span class="cstat-no" title="statement not covered" >  return Promise.all(</span>
+    chainConfig.oracleFeeds.map(<span class="fstat-no" title="function not covered" >async (f</span>eed): Promise&lt;MarketDataSnapshot&gt; =&gt; {
+      const feedAddress = <span class="cstat-no" title="statement not covered" >feedAddressFor(feed, network)</span>
+<span class="cstat-no" title="statement not covered" >      if (!feedAddress) {</span>
+<span class="cstat-no" title="statement not covered" >        return {</span>
+          feedId: feed.id,
+          pair: feed.pair,
+          network,
+          sourceName: feed.sourceName,
+          sourceUrl:
+            feed.docsUrl ||
+            chainConfig.docsUrls.find((url) =&gt; url.includes('/Tools/Oracle')) ||
+            '',
+          feedAddress: '',
+          price: undefined,
+          decimals: feed.decimals,
+          fetchedAt,
+          note: 'This oracle feed is not configured on the selected network.',
+          status: 'unavailable',
+        }
+      }
+&nbsp;
+<span class="cstat-no" title="statement not covered" >      try {</span>
+        const [roundId, answer, , updatedAt] = <span class="cstat-no" title="statement not covered" >await client.readContract({</span>
+          address: feedAddress as Address,
+          abi: aproPriceFeedAbi,
+          functionName: 'latestRoundData',
+        })
+&nbsp;
+<span class="cstat-no" title="statement not covered" >        return {</span>
+          feedId: feed.id,
+          pair: feed.pair,
+          network,
+          sourceName: feed.sourceName,
+          sourceUrl:
+            feed.docsUrl ||
+            chainConfig.docsUrls.find((url) =&gt; url.includes('/Tools/Oracle')) ||
+            '',
+          feedAddress,
+          explorerUrl: `${explorerBase(chainConfig, network)}/address/${feedAddress}`,
+          price: Number(formatUnits(answer, feed.decimals)),
+          decimals: feed.decimals,
+          fetchedAt,
+          updatedAt:
+            Number(updatedAt) &gt; 0
+              ? new Date(Number(updatedAt) * 1000).toISOString()
+              : undefined,
+          roundId: Number(roundId),
+          note: 'Live price fetched from the configured HashKey APRO oracle feed.',
+          status: 'live',
+        }
+      } catch (error) {
+<span class="cstat-no" title="statement not covered" >        return {</span>
+          feedId: feed.id,
+          pair: feed.pair,
+          network,
+          sourceName: feed.sourceName,
+          sourceUrl:
+            feed.docsUrl ||
+            chainConfig.docsUrls.find((url) =&gt; url.includes('/Tools/Oracle')) ||
+            '',
+          feedAddress,
+          explorerUrl: `${explorerBase(chainConfig, network)}/address/${feedAddress}`,
+          price: undefined,
+          decimals: feed.decimals,
+          fetchedAt,
+          note:
+            error instanceof Error
+              ? error.message
+              : 'The live price feed request failed.',
+          status: 'unavailable',
+        }
+      }
+    }),
+  )
+}
+&nbsp;
+export async function <span class="fstat-no" title="function not covered" >writePlanAttestation(p</span>arams: {
+  chainConfig: HashKeyChainConfig
+  network: WalletNetworkKey
+  reportHash: string
+  portfolioHash: string
+  attestationHash: string
+  sessionId: string
+  summaryUri: string
+}) {
+  const provider = <span class="cstat-no" title="statement not covered" >getInjectedProvider()</span>
+<span class="cstat-no" title="statement not covered" >  if (!provider) {</span>
+<span class="cstat-no" title="statement not covered" >    throw new Error('No injected wallet provider is available.')</span>
+  }
+&nbsp;
+  const contractAddress = <span class="cstat-no" title="statement not covered" >planRegistryAddress(params.chainConfig, params.network)</span>
+<span class="cstat-no" title="statement not covered" >  if (!contractAddress) {</span>
+<span class="cstat-no" title="statement not covered" >    throw new Error('Plan Registry is not configured for the selected network.')</span>
+  }
+&nbsp;
+  const chain = <span class="cstat-no" title="statement not covered" >toViemChain(params.chainConfig, params.network)</span>
+  const <span class="cstat-no" title="statement not covered" >walletClient = createWalletClient({</span>
+    chain,
+    transport: custom(provider),
+  })
+  const publicClient = <span class="cstat-no" title="statement not covered" >publicClientFor(params.chainConfig, params.network)</span>
+&nbsp;
+  const [account] = <span class="cstat-no" title="statement not covered" >await walletClient.getAddresses()</span>
+  const hash = <span class="cstat-no" title="statement not covered" >await walletClient.writeContract({</span>
+    account,
+    address: contractAddress as Address,
+    abi: planRegistryAbi,
+    functionName: 'registerPlan',
+    args: [
+      normalizeHashToBytes32(params.reportHash),
+      normalizeHashToBytes32(params.portfolioHash),
+      normalizeHashToBytes32(params.attestationHash),
+      params.sessionId,
+      params.summaryUri,
+    ],
+  })
+  const receipt = <span class="cstat-no" title="statement not covered" >await publicClient.waitForTransactionReceipt({ hash })</span>
+&nbsp;
+<span class="cstat-no" title="statement not covered" >  return {</span>
+    account,
+    transactionHash: hash,
+    transactionUrl: `${explorerBase(params.chainConfig, params.network)}/tx/${hash}`,
+    blockNumber: Number(receipt.blockNumber),
+  }
+}
+&nbsp;
+export function shortAddress(value?: string) {
+  <span class="missing-if-branch" title="else path not taken" >E</span>if (!value) {
+    return ''
+  }
+<span class="cstat-no" title="statement not covered" >  return `${value.slice(0, 6)}...${value.slice(-4)}`</span>
 }
 &nbsp;</pre></td></tr></table></pre>
 

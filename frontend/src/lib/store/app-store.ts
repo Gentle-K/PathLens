@@ -50,6 +50,8 @@ interface AppStoreState {
   accessToken: string | null
   refreshToken: string | null
   currentUser: User | null
+  walletAddress: string
+  walletChainId: number | null
   setThemeMode: (themeMode: ThemeMode) => void
   setResolvedTheme: (resolvedTheme: ResolvedTheme) => void
   setLocale: (locale: LanguageCode) => void
@@ -63,6 +65,11 @@ interface AppStoreState {
     currentUser: User
   }) => void
   clearSession: () => void
+  setWalletState: (payload: {
+    walletAddress: string
+    walletChainId: number | null
+  }) => void
+  clearWalletState: () => void
   syncFromSettings: (settings: SettingsPayload) => void
 }
 
@@ -78,6 +85,8 @@ export const useAppStore = create<AppStoreState>()(
       accessToken: null,
       refreshToken: null,
       currentUser: null,
+      walletAddress: '',
+      walletChainId: null,
       setThemeMode: (themeMode) => set({ themeMode }),
       setResolvedTheme: (resolvedTheme) => set({ resolvedTheme }),
       setLocale: (locale) => set({ locale }),
@@ -94,6 +103,13 @@ export const useAppStore = create<AppStoreState>()(
           accessToken: null,
           refreshToken: null,
           currentUser: null,
+        }),
+      setWalletState: ({ walletAddress, walletChainId }) =>
+        set({ walletAddress, walletChainId }),
+      clearWalletState: () =>
+        set({
+          walletAddress: '',
+          walletChainId: null,
         }),
       syncFromSettings: (settings) =>
         set({
@@ -125,6 +141,8 @@ export const useAppStore = create<AppStoreState>()(
         accessToken: state.accessToken,
         refreshToken: state.refreshToken,
         currentUser: state.currentUser,
+        walletAddress: state.walletAddress,
+        walletChainId: state.walletChainId,
       }),
     },
   ),

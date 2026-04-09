@@ -14,6 +14,7 @@ from app.domain.schemas import (
     DebugSessionListResponse,
     FrontendBootstrapResponse,
     PersonalDataDeletionResponse,
+    RecordAttestationRequest,
     RequestMoreFollowUpResponse,
     SessionCreateRequest,
     SessionResponse,
@@ -196,6 +197,32 @@ def continue_session(
         services.session_service.record_answers(session_id, payload.answers)
 
     return services.orchestrator.advance_session(session_id)
+
+
+@router.post("/api/sessions/{session_id}/attestation", response_model=SessionResponse)
+def record_attestation(
+    session_id: str,
+    payload: RecordAttestationRequest,
+    request: Request,
+    response: Response,
+) -> SessionResponse:
+    services = get_app_services()
+    client_id = ensure_client_cookie(request, response)
+    session = services.session_service.get_session(session_id)
+    if session is None:
+        raise HTTPException(status_code=404, detail="Session not found.")
+    assert_session_owner(SessionResponse.model_validate(session), client_id)
+
+    updated = services.session_service.record_attestation(
+        session_id,
+        network=payload.network,
+        transaction_hash=payload.transaction_hash,
+        submitted_by=payload.submitted_by,
+        block_number=payload.block_number,
+    )
+    if updated is None:
+        raise HTTPException(status_code=400, detail="Attestation draft is unavailable for this session.")
+    return SessionResponse.model_validate(updated)
 
 
 @router.post(

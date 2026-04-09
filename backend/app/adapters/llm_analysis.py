@@ -950,13 +950,34 @@ class OpenAICompatibleAnalysisAdapter(MockAnalysisAdapter):
     def build_report(self, session: AnalysisSession) -> AnalysisReport:
         try:
             system_prompt, user_prompt = build_reporting_prompts(session)
-            return self._request_json_with_retry(
+            llm_report = self._request_json_with_retry(
                 session=session,
                 system_prompt=system_prompt,
                 user_prompt=user_prompt,
                 operation="build the final report",
                 validator=lambda payload: self._validate_report_payload(session, payload),
             )
+            deterministic_report = super().build_report(session)
+            deterministic_report.summary = llm_report.summary or deterministic_report.summary
+            deterministic_report.assumptions = (
+                llm_report.assumptions or deterministic_report.assumptions
+            )
+            deterministic_report.recommendations = (
+                llm_report.recommendations or deterministic_report.recommendations
+            )
+            deterministic_report.open_questions = (
+                llm_report.open_questions or deterministic_report.open_questions
+            )
+            deterministic_report.markdown = llm_report.markdown or deterministic_report.markdown
+            if llm_report.tables:
+                deterministic_report.tables = llm_report.tables
+            if llm_report.option_profiles:
+                deterministic_report.option_profiles = llm_report.option_profiles
+            if llm_report.budget_summary is not None:
+                deterministic_report.budget_summary = llm_report.budget_summary
+            if llm_report.budget_items:
+                deterministic_report.budget_items = llm_report.budget_items
+            return deterministic_report
         except Exception as error:
             session.events.append(
                 SessionEvent(

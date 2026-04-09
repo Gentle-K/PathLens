@@ -23,10 +23,10 @@ describe('ModeSelectionPage', () => {
     })
 
     expect(
-      await screen.findByRole('heading', { name: 'Single-asset diligence' }),
-    ).toBeInTheDocument()
+      await screen.findAllByRole('heading', { name: 'Single-asset diligence' }),
+    ).not.toHaveLength(0)
     expect(
-      await screen.findByRole('heading', { name: 'Multi-asset allocation' }),
-    ).toBeInTheDocument()
+      await screen.findAllByRole('heading', { name: 'Multi-asset allocation' }),
+    ).not.toHaveLength(0)
   })
 })

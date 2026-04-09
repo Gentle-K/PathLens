@@ -12,6 +12,7 @@ from app.domain.rwa import (
     AttestationDraft,
     HashKeyChainConfig,
     HoldingPeriodSimulation,
+    MarketDataSnapshot,
     PortfolioAllocation,
     RwaIntakeContext,
     TxDraft,
@@ -207,6 +208,7 @@ class AnalysisReport(BaseModel):
     option_profiles: list[OptionProfile] = Field(default_factory=list)
     tables: list[ReportTable] = Field(default_factory=list)
     chain_config: HashKeyChainConfig | None = None
+    market_snapshots: list[MarketDataSnapshot] = Field(default_factory=list)
     asset_cards: list[AssetAnalysisCard] = Field(default_factory=list)
     simulations: list[HoldingPeriodSimulation] = Field(default_factory=list)
     recommended_allocations: list[PortfolioAllocation] = Field(default_factory=list)

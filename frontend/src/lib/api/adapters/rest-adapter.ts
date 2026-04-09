@@ -305,6 +305,22 @@ export const restApiAdapter: ApiAdapter = {
 
       return mapBackendSession(await fetchBackendSession(sessionId))
     },
+    async recordAttestation(sessionId, payload) {
+      const session = await apiClient.request<BackendSession>(
+        endpoints.backend.sessionAttestation(sessionId),
+        {
+          method: 'POST',
+          body: JSON.stringify({
+            network: payload.network,
+            transaction_hash: payload.transactionHash,
+            submitted_by: payload.submittedBy ?? '',
+            block_number: payload.blockNumber,
+          }),
+        },
+      )
+
+      return mapBackendSession(session)
+    },
     async requestMoreFollowUp(sessionId) {
       const payload =
         await apiClient.request<BackendRequestMoreFollowUpResponse>(

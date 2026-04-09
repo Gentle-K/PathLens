@@ -1,10 +1,12 @@
 import { useMutation, useQuery } from '@tanstack/react-query'
 import {
   ArrowRight,
+  Cable,
   CheckCircle2,
   Coins,
   ShieldCheck,
   Sparkles,
+  WalletCards,
 } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -18,7 +20,13 @@ import { Input, Textarea } from '@/components/ui/field'
 import { AnalysisPendingView } from '@/features/analysis/components/analysis-pending-view'
 import { useApiAdapter } from '@/lib/api/use-api-adapter'
 import { useAppStore } from '@/lib/store/app-store'
-import type { AnalysisMode, LiquidityNeed, RiskTolerance, RwaIntakeContext } from '@/types'
+import { useHashKeyWallet } from '@/lib/web3/use-hashkey-wallet'
+import type {
+  AnalysisMode,
+  LiquidityNeed,
+  RiskTolerance,
+  RwaIntakeContext,
+} from '@/types'
 
 const defaultIntakeContext: RwaIntakeContext = {
   investmentAmount: 10000,
@@ -29,6 +37,9 @@ const defaultIntakeContext: RwaIntakeContext = {
   liquidityNeed: 't_plus_3',
   minimumKycLevel: 0,
   walletAddress: '',
+  walletNetwork: '',
+  walletKycLevelOnchain: undefined,
+  walletKycVerified: undefined,
   wantsOnchainAttestation: true,
   additionalConstraints: '',
 }
@@ -194,6 +205,35 @@ export function ModeSelectionPage() {
       intakeReport: isZh
         ? '第 3 页输出配置建议、执行草案和报告哈希。'
         : 'Page 3 will output allocation guidance, execution steps, and report hashes.',
+      walletPanelTitle: isZh ? 'HashKey 钱包与链上 KYC' : 'HashKey Wallet and Onchain KYC',
+      walletPanelDescription: isZh
+        ? '连接钱包后，系统会读取当前网络和链上 KYC/SBT 状态，并用它决定哪些资产真实可投。'
+        : 'Connect a wallet to read the active network and onchain KYC/SBT state, then use it to decide which assets are truly investable.',
+      connectWallet: isZh ? '连接钱包' : 'Connect wallet',
+      disconnectWallet: isZh ? '清除本地连接' : 'Clear local connection',
+      switchTestnet: isZh ? '切到 Testnet' : 'Switch to Testnet',
+      switchMainnet: isZh ? '切到 Mainnet' : 'Switch to Mainnet',
+      walletUnavailable: isZh
+        ? '未检测到浏览器钱包，请安装 MetaMask 或兼容钱包。'
+        : 'No injected wallet was detected. Install MetaMask or a compatible wallet.',
+      connectedAddress: isZh ? '当前地址' : 'Connected address',
+      connectedNetwork: isZh ? '当前网络' : 'Connected network',
+      onchainKyc: isZh ? '链上 KYC' : 'Onchain KYC',
+      onchainKycHint: isZh
+        ? '连接钱包时，链上 KYC 会覆盖手动选择。未连接时，仍可使用手动约束做离线评估。'
+        : 'When a wallet is connected, the onchain KYC snapshot overrides manual selection. If no wallet is connected, manual constraints still support offline evaluation.',
+      onchainDerived: isZh ? '链上读取' : 'Onchain derived',
+      manualFallback: isZh ? '手动兜底' : 'Manual fallback',
+      eligible: isZh ? '可投' : 'Eligible',
+      gated: isZh ? '受限' : 'Gated',
+      needsKyc: (level: number) =>
+        isZh ? `需要至少 L${level}` : `Requires at least L${level}`,
+      onchainBadge: isZh ? '链上验证' : 'Onchain verified',
+      issuerBadge: isZh ? '发行方披露' : 'Issuer disclosed',
+      sourceLabel: isZh ? '来源' : 'Source',
+      mainnet: 'Mainnet',
+      testnet: 'Testnet',
+      planRegistry: 'Plan Registry',
       defaultExecutionNetwork: isZh ? '默认执行网络' : 'Default execution network',
       notConfigured: isZh ? '未配置' : 'Not configured',
       selectedLabel: isZh ? '当前已选' : 'Selected',
@@ -211,7 +251,7 @@ export function ModeSelectionPage() {
       riskTolerance: isZh ? '风险偏好' : 'Risk tolerance',
       liquidityNeed: isZh ? '流动性约束' : 'Liquidity constraint',
       kycCapability: isZh ? 'KYC / 准入能力' : 'KYC / access capability',
-      walletAddress: isZh ? '钱包地址（可选）' : 'Wallet address (optional)',
+      walletAddress: isZh ? '钱包地址' : 'Wallet address',
       attestation: isZh ? '报告存证' : 'Report attestation',
       attestationEnabled: isZh
         ? '启用链上存证草案'
@@ -285,6 +325,8 @@ export function ModeSelectionPage() {
     queryKey: ['rwa', 'bootstrap', locale],
     queryFn: adapter.rwa.getBootstrap,
   })
+  const wallet = useHashKeyWallet(bootstrapQuery.data?.chainConfig)
+  const walletKycSnapshot = wallet.kycSnapshot
 
   const createMutation = useMutation({
     mutationFn: adapter.analysis.create,
@@ -312,6 +354,34 @@ export function ModeSelectionPage() {
       `${asset.name} ${asset.symbol} ${asset.description} ${asset.tags.join(' ')}`.toLowerCase().includes(normalized),
     )
   }, [assetLibrary, assetQuery])
+  const sessionIntakeContext = useMemo<RwaIntakeContext>(
+    () => ({
+      ...intakeContext,
+      walletAddress: wallet.walletAddress || intakeContext.walletAddress || '',
+      walletNetwork: wallet.walletNetwork ?? '',
+      walletKycLevelOnchain: walletKycSnapshot?.level,
+      walletKycVerified: walletKycSnapshot?.isHuman,
+      minimumKycLevel:
+        wallet.walletAddress && walletKycSnapshot
+          ? walletKycSnapshot.level
+          : intakeContext.minimumKycLevel,
+    }),
+    [
+      intakeContext,
+      wallet.walletAddress,
+      wallet.walletNetwork,
+      walletKycSnapshot,
+    ],
+  )
+  const effectiveKycLevel = useMemo(() => {
+    if (!wallet.walletAddress) {
+      return intakeContext.minimumKycLevel
+    }
+    if (walletKycSnapshot) {
+      return walletKycSnapshot.isHuman ? walletKycSnapshot.level : 0
+    }
+    return intakeContext.minimumKycLevel
+  }, [intakeContext.minimumKycLevel, wallet.walletAddress, walletKycSnapshot])
 
   const toggleAsset = (assetId: string) => {
     setIntakeContext((current) => {
@@ -360,13 +430,13 @@ export function ModeSelectionPage() {
         {bootstrapQuery.data ? (
           <div className="mt-4 grid gap-3 xl:grid-cols-4">
             <div className="rounded-[18px] border border-border-subtle bg-app-bg-elevated px-4 py-3">
-              <p className="text-xs text-text-muted">Mainnet</p>
+              <p className="text-xs text-text-muted">{text.mainnet}</p>
               <p className="mt-2 font-medium text-text-primary">
                 {bootstrapQuery.data.chainConfig.mainnetChainId}
               </p>
             </div>
             <div className="rounded-[18px] border border-border-subtle bg-app-bg-elevated px-4 py-3">
-              <p className="text-xs text-text-muted">Testnet</p>
+              <p className="text-xs text-text-muted">{text.testnet}</p>
               <p className="mt-2 font-medium text-text-primary">
                 {bootstrapQuery.data.chainConfig.testnetChainId}
               </p>
@@ -378,13 +448,103 @@ export function ModeSelectionPage() {
               </p>
             </div>
             <div className="rounded-[18px] border border-border-subtle bg-app-bg-elevated px-4 py-3">
-              <p className="text-xs text-text-muted">Plan Registry</p>
+              <p className="text-xs text-text-muted">{text.planRegistry}</p>
               <p className="mt-2 break-all text-sm text-text-primary">
                 {bootstrapQuery.data.chainConfig.planRegistryAddress || text.notConfigured}
               </p>
             </div>
           </div>
         ) : null}
+      </Card>
+
+      <Card className="space-y-4 p-5">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div className="space-y-2">
+            <div className="flex items-center gap-3">
+              <div className="rounded-full border border-border-subtle bg-app-bg-elevated p-3 text-gold-primary">
+                <WalletCards className="size-5" />
+              </div>
+              <div>
+                <h2 className="text-lg font-semibold text-text-primary">
+                  {text.walletPanelTitle}
+                </h2>
+                <p className="text-sm leading-7 text-text-secondary">
+                  {text.walletPanelDescription}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            {wallet.isConnected ? (
+              <Button
+                variant="secondary"
+                onClick={() => wallet.disconnectWallet()}
+              >
+                {text.disconnectWallet}
+              </Button>
+            ) : (
+              <Button
+                onClick={() => void wallet.connectWallet()}
+                disabled={!wallet.hasProvider || wallet.isWalletBusy}
+              >
+                <Cable className="size-4" />
+                {text.connectWallet}
+              </Button>
+            )}
+            <Button
+              variant="secondary"
+              onClick={() => void wallet.switchNetwork('testnet')}
+              disabled={!wallet.hasProvider || wallet.isWalletBusy}
+            >
+              {text.switchTestnet}
+            </Button>
+            <Button
+              variant="secondary"
+              onClick={() => void wallet.switchNetwork('mainnet')}
+              disabled={!wallet.hasProvider || wallet.isWalletBusy}
+            >
+              {text.switchMainnet}
+            </Button>
+          </div>
+        </div>
+
+        {!wallet.hasProvider ? (
+          <div className="rounded-[18px] border border-[rgba(197,109,99,0.35)] bg-[rgba(197,109,99,0.1)] px-4 py-3 text-sm text-[#f7d4cf]">
+            {text.walletUnavailable}
+          </div>
+        ) : null}
+
+        <div className="grid gap-3 md:grid-cols-3">
+          <div className="rounded-[18px] border border-border-subtle bg-app-bg-elevated px-4 py-3">
+            <p className="text-xs text-text-muted">{text.connectedAddress}</p>
+            <p className="mt-2 break-all text-sm text-text-primary">
+              {wallet.walletAddress || text.notConfigured}
+            </p>
+          </div>
+          <div className="rounded-[18px] border border-border-subtle bg-app-bg-elevated px-4 py-3">
+            <p className="text-xs text-text-muted">{text.connectedNetwork}</p>
+            <p className="mt-2 font-medium text-text-primary">
+              {wallet.networkLabel}
+            </p>
+          </div>
+          <div className="rounded-[18px] border border-border-subtle bg-app-bg-elevated px-4 py-3">
+            <div className="flex items-center gap-2">
+              <p className="text-xs text-text-muted">{text.onchainKyc}</p>
+              <Badge tone={wallet.walletAddress ? 'gold' : 'neutral'}>
+                {wallet.walletAddress ? text.onchainDerived : text.manualFallback}
+              </Badge>
+            </div>
+            <p className="mt-2 font-medium text-text-primary">
+              {wallet.kycLoading
+                ? '...'
+                : `L${wallet.kycSnapshot?.isHuman ? wallet.kycSnapshot.level : effectiveKycLevel}`}
+            </p>
+            <p className="mt-2 text-xs leading-6 text-text-muted">
+              {wallet.kycSnapshot?.note || text.onchainKycHint}
+            </p>
+          </div>
+        </div>
       </Card>
 
       <div className="grid gap-4 xl:grid-cols-2">
@@ -630,14 +790,20 @@ export function ModeSelectionPage() {
           </div>
 
           <div className="space-y-2">
-            <p className="text-sm text-text-secondary">{text.kycCapability}</p>
+            <div className="flex flex-wrap items-center gap-2">
+              <p className="text-sm text-text-secondary">{text.kycCapability}</p>
+              <Badge tone={wallet.walletAddress ? 'gold' : 'neutral'}>
+                {wallet.walletAddress ? text.onchainDerived : text.manualFallback}
+              </Badge>
+            </div>
             <div className="grid gap-2 md:grid-cols-3">
               {kycOptions.map((option) => {
-                const isActive = intakeContext.minimumKycLevel === option.value
+                const isActive = effectiveKycLevel === option.value
                 return (
                   <button
                     key={option.value}
                     type="button"
+                    disabled={Boolean(wallet.walletAddress)}
                     onClick={() =>
                       setIntakeContext((current) => ({
                         ...current,
@@ -648,7 +814,7 @@ export function ModeSelectionPage() {
                       isActive
                         ? 'border-border-strong bg-[rgba(212,175,55,0.14)] text-text-primary'
                         : 'border-border-subtle bg-app-bg-elevated text-text-secondary'
-                    }`}
+                    } ${wallet.walletAddress ? 'cursor-not-allowed opacity-70' : ''}`}
                   >
                     <p className="font-medium">{option.label}</p>
                     <p className="mt-2 text-xs leading-6 text-text-muted">
@@ -664,13 +830,8 @@ export function ModeSelectionPage() {
             <div className="space-y-2">
               <label className="text-sm text-text-secondary">{text.walletAddress}</label>
               <Input
-                value={intakeContext.walletAddress ?? ''}
-                onChange={(event) =>
-                  setIntakeContext((current) => ({
-                    ...current,
-                    walletAddress: event.target.value.trim(),
-                  }))
-                }
+                value={sessionIntakeContext.walletAddress ?? ''}
+                readOnly
                 placeholder="0x..."
               />
             </div>
@@ -725,7 +886,7 @@ export function ModeSelectionPage() {
                 mode: selectedMode,
                 locale,
                 problemStatement,
-                intakeContext,
+                intakeContext: sessionIntakeContext,
               })
             }
             disabled={
@@ -769,6 +930,8 @@ export function ModeSelectionPage() {
             <div className="space-y-3">
               {filteredAssets.map((asset) => {
                 const isSelected = intakeContext.preferredAssetIds.includes(asset.id)
+                const requiredLevel = asset.requiresKycLevel ?? 0
+                const isEligible = requiredLevel <= effectiveKycLevel
                 return (
                   <button
                     key={asset.id}
@@ -788,6 +951,15 @@ export function ModeSelectionPage() {
                           <Badge tone={asset.featured ? 'gold' : 'neutral'}>
                             {asset.assetType}
                           </Badge>
+                          <Badge tone={isEligible ? 'success' : 'warning'}>
+                            {isEligible ? text.eligible : text.needsKyc(requiredLevel)}
+                          </Badge>
+                          {asset.onchainVerified ? (
+                            <Badge tone="neutral">{text.onchainBadge}</Badge>
+                          ) : null}
+                          {asset.issuerDisclosed ? (
+                            <Badge tone="neutral">{text.issuerBadge}</Badge>
+                          ) : null}
                         </div>
                         <p className="mt-2 text-sm leading-7 text-text-secondary">
                           {asset.description}
@@ -818,6 +990,12 @@ export function ModeSelectionPage() {
                         </p>
                       </div>
                     </div>
+
+                    {asset.primarySourceUrl ? (
+                      <p className="mt-3 text-xs text-text-muted">
+                        {text.sourceLabel}: {asset.primarySourceUrl}
+                      </p>
+                    ) : null}
                   </button>
                 )
               })}

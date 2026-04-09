@@ -48,9 +48,45 @@ const mockChainConfig: HashKeyChainConfig = {
   mainnetChainId: 177,
   mainnetRpcUrl: 'https://mainnet.hsk.xyz',
   mainnetExplorerUrl: 'https://hashkey.blockscout.com',
+  planRegistryAddress: '0x0000000000000000000000000000000000000133',
+  kycSbtAddress: '0x0000000000000000000000000000000000000134',
+  testnetPlanRegistryAddress: '0x0000000000000000000000000000000000000133',
+  mainnetPlanRegistryAddress: '0x0000000000000000000000000000000000000177',
+  testnetKycSbtAddress: '0x0000000000000000000000000000000000000134',
+  mainnetKycSbtAddress: '0x0000000000000000000000000000000000000178',
   docsUrls: [
     'https://docs.hashkeychain.net/docs/About-HashKey-Chain',
     'https://docs.hashkeychain.net/docs/Build-on-HashKey-Chain/network-info',
+    'https://docs.hashkeychain.net/docs/Build-on-HashKey-Chain/Tools/Oracle',
+    'https://docs.hashkeychain.net/docs/Build-on-HashKey-Chain/Tools/KYC',
+  ],
+  oracleFeeds: [
+    {
+      id: 'btc-usd',
+      pair: 'BTC/USD',
+      sourceName: 'APRO Oracle',
+      docsUrl: 'https://docs.hashkeychain.net/docs/Build-on-HashKey-Chain/Tools/Oracle',
+      testnetAddress: '0x646970afb65c1fc88d7dff5d17bebf7ca7639290',
+      mainnetAddress: '0x2042d24ed0a86e12b8a3d38db530d7dc3c85ea00',
+      decimals: 8,
+    },
+    {
+      id: 'usdt-usd',
+      pair: 'USDT/USD',
+      sourceName: 'APRO Oracle',
+      docsUrl: 'https://docs.hashkeychain.net/docs/Build-on-HashKey-Chain/Tools/Oracle',
+      testnetAddress: '0x450d4d4b55284b9e7a0f2d88ca00f95e29e44e9f',
+      decimals: 8,
+    },
+    {
+      id: 'usdc-usd',
+      pair: 'USDC/USD',
+      sourceName: 'APRO Oracle',
+      docsUrl: 'https://docs.hashkeychain.net/docs/Build-on-HashKey-Chain/Tools/Oracle',
+      testnetAddress: '0x6655445f8a6ca6f03f8c4f31da95174cef63f8f6',
+      mainnetAddress: '0xe4a755800df1f47179d35b30fd90f80b1f4f2ea6',
+      decimals: 8,
+    },
   ],
 }
 
@@ -93,6 +129,9 @@ const mockAssetLibrary: RwaAssetTemplate[] = [
     thesis: '适合作为流动性底仓。',
     fitSummary: '更适合保守或均衡型配置。',
     evidenceUrls: ['https://docs.hashkeychain.net/docs/Build-on-HashKey-Chain/Token-Contracts'],
+    primarySourceUrl: 'https://docs.hashkeychain.net/docs/Build-on-HashKey-Chain/Token-Contracts',
+    onchainVerified: true,
+    issuerDisclosed: true,
     featured: true,
   },
   {
@@ -132,6 +171,9 @@ const mockAssetLibrary: RwaAssetTemplate[] = [
     thesis: '适合做稳健收益腿。',
     fitSummary: '适合中低风险偏好。',
     evidenceUrls: ['https://www.prnewswire.com/news-releases/cpic-estable-mmf-launches-on-hashkey-chain-with-100m-first-day-subscriptions-302408505.html'],
+    primarySourceUrl: 'https://www.prnewswire.com/news-releases/cpic-estable-mmf-launches-on-hashkey-chain-with-100m-first-day-subscriptions-302408505.html',
+    onchainVerified: false,
+    issuerDisclosed: true,
     featured: true,
   },
   {
@@ -171,6 +213,9 @@ const mockAssetLibrary: RwaAssetTemplate[] = [
     thesis: '适合作为宏观对冲腿。',
     fitSummary: '更适合均衡到进取型配置。',
     evidenceUrls: ['https://group.hashkey.com/en/newsroom/hashkey-chain-supports-the-onchain-issuance-of-hk-s-first-regulated-silverbacked-rwa-token'],
+    primarySourceUrl: 'https://group.hashkey.com/en/newsroom/hashkey-chain-supports-the-onchain-issuance-of-hk-s-first-regulated-silverbacked-rwa-token',
+    onchainVerified: false,
+    issuerDisclosed: true,
     featured: true,
   },
 ]
@@ -193,6 +238,9 @@ export const defaultRwaIntakeContext: RwaIntakeContext = {
   liquidityNeed: 't_plus_3',
   minimumKycLevel: 0,
   walletAddress: '',
+  walletNetwork: '',
+  walletKycLevelOnchain: undefined,
+  walletKycVerified: undefined,
   wantsOnchainAttestation: true,
   additionalConstraints: '',
 }
@@ -662,6 +710,24 @@ export const mockApiAdapter: ApiAdapter = {
         payload: sessionSummary(session),
       })
 
+      return structuredClone(session)
+    },
+    async recordAttestation(sessionId, payload) {
+      await wait(120)
+      const session = findSession(sessionId)
+      const report = db.reports[sessionId]
+      if (report?.attestationDraft) {
+        report.attestationDraft = {
+          ...report.attestationDraft,
+          network: payload.network,
+          transactionHash: payload.transactionHash,
+          transactionUrl: `${report.attestationDraft.explorerUrl ?? ''}/tx/${payload.transactionHash}`,
+          submittedBy: payload.submittedBy ?? '',
+          submittedAt: nowIso(),
+          blockNumber: payload.blockNumber,
+        }
+      }
+      session.updatedAt = nowIso()
       return structuredClone(session)
     },
     async requestMoreFollowUp(sessionId) {

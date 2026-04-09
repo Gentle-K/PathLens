@@ -8,6 +8,7 @@ export const endpoints = {
     deleteMyData: '/api/me/data',
     sessionDetail: (sessionId: string) => `/api/sessions/${sessionId}`,
     sessionStep: (sessionId: string) => `/api/sessions/${sessionId}/step`,
+    sessionAttestation: (sessionId: string) => `/api/sessions/${sessionId}/attestation`,
     sessionRequestMoreFollowUp: (sessionId: string) => `/api/sessions/${sessionId}/request-more-follow-up`,
     debugAuthMe: '/api/debug/auth/me',
     debugLogs: '/api/debug/logs',

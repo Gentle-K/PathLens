@@ -87,6 +87,10 @@ class Settings:
     hashkey_mainnet_chain_id: int
     hashkey_mainnet_rpc_url: str
     hashkey_mainnet_explorer_url: str
+    hashkey_testnet_plan_registry_address: str | None
+    hashkey_mainnet_plan_registry_address: str | None
+    hashkey_testnet_kyc_sbt_address: str | None
+    hashkey_mainnet_kyc_sbt_address: str | None
     plan_registry_address: str | None
     kyc_sbt_address: str | None
     debug_username: str
@@ -110,6 +114,27 @@ class Settings:
             )
         elif not analysis_api_base_url:
             analysis_api_base_url = "https://api.openai.com/v1"
+
+        testnet_plan_registry_address = (
+            os.getenv("HASHKEY_TESTNET_PLAN_REGISTRY_ADDRESS")
+            or os.getenv("PLAN_REGISTRY_ADDRESS")
+            or None
+        )
+        mainnet_plan_registry_address = (
+            os.getenv("HASHKEY_MAINNET_PLAN_REGISTRY_ADDRESS")
+            or os.getenv("PLAN_REGISTRY_ADDRESS")
+            or None
+        )
+        testnet_kyc_sbt_address = (
+            os.getenv("HASHKEY_TESTNET_KYC_SBT_ADDRESS")
+            or os.getenv("KYC_SBT_ADDRESS")
+            or None
+        )
+        mainnet_kyc_sbt_address = (
+            os.getenv("HASHKEY_MAINNET_KYC_SBT_ADDRESS")
+            or os.getenv("KYC_SBT_ADDRESS")
+            or None
+        )
 
         return cls(
             app_env=os.getenv("APP_ENV", "development"),
@@ -170,8 +195,22 @@ class Settings:
                 "HASHKEY_MAINNET_EXPLORER_URL",
                 DEFAULT_HASHKEY_MAINNET_EXPLORER_URL,
             ).strip(),
-            plan_registry_address=os.getenv("PLAN_REGISTRY_ADDRESS") or None,
-            kyc_sbt_address=os.getenv("KYC_SBT_ADDRESS") or None,
+            hashkey_testnet_plan_registry_address=testnet_plan_registry_address,
+            hashkey_mainnet_plan_registry_address=mainnet_plan_registry_address,
+            hashkey_testnet_kyc_sbt_address=testnet_kyc_sbt_address,
+            hashkey_mainnet_kyc_sbt_address=mainnet_kyc_sbt_address,
+            plan_registry_address=(
+                testnet_plan_registry_address
+                or mainnet_plan_registry_address
+                or os.getenv("PLAN_REGISTRY_ADDRESS")
+                or None
+            ),
+            kyc_sbt_address=(
+                testnet_kyc_sbt_address
+                or mainnet_kyc_sbt_address
+                or os.getenv("KYC_SBT_ADDRESS")
+                or None
+            ),
             debug_username=os.getenv("DEBUG_USERNAME", "debug-admin"),
             debug_password=os.getenv("DEBUG_PASSWORD", "change-me-debug-password"),
         )
