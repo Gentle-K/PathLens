@@ -147,6 +147,11 @@ class AssetTemplate(BaseModel):
     onchain_verified: bool = False
     issuer_disclosed: bool = False
     featured: bool = False
+    # ERC-3643 compliance reference fields (informational only)
+    issuer_model: str = ""
+    holder_eligibility_note: str = ""
+    transfer_compliance_note: str = ""
+    redemption_custody_note: str = ""
 
     def total_cost_bps(self, holding_period_days: int) -> int:
         annualized_management_bps = int(

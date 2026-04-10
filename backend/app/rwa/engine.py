@@ -285,6 +285,59 @@ def _simulation_note(asset: AssetTemplate, *, locale: str = "zh") -> str:
     )
 
 
+DEFAULT_HORIZONS = [90, 180, 365]
+
+
+def simulate_multi_horizon(
+    asset: AssetTemplate,
+    investment_amount: float,
+    horizons: list[int] | None = None,
+    *,
+    locale: str = "zh",
+) -> list[HoldingPeriodSimulation]:
+    """Run ``simulate_holding`` for multiple holding horizons.
+
+    Parameters
+    ----------
+    horizons
+        List of holding periods in days.  Defaults to [90, 180, 365].
+
+    Returns
+    -------
+    list[HoldingPeriodSimulation]
+        One simulation result per horizon, in the order given.
+    """
+    if horizons is None:
+        horizons = list(DEFAULT_HORIZONS)
+    return [
+        simulate_holding(asset, investment_amount, days, locale=locale)
+        for days in horizons
+    ]
+
+
+def estimate_net_return_after_fees(
+    asset: AssetTemplate,
+    investment_amount: float,
+    holding_period_days: int,
+) -> dict[str, float]:
+    """Estimate net return after all fees for a given holding period.
+
+    Returns a dict with ``gross_return_pct``, ``total_fee_pct``,
+    ``net_return_pct``, and ``net_value``.
+    """
+    gross_return_pct = asset.expected_return_base * (holding_period_days / 365)
+    total_cost_bps = asset.total_cost_bps(holding_period_days)
+    total_fee_pct = total_cost_bps / 10000
+    net_return_pct = gross_return_pct - total_fee_pct
+    net_value = investment_amount * (1 + net_return_pct)
+    return {
+        "gross_return_pct": round(gross_return_pct * 100, 4),
+        "total_fee_pct": round(total_fee_pct * 100, 4),
+        "net_return_pct": round(net_return_pct * 100, 4),
+        "net_value": round(net_value, 2),
+    }
+
+
 KEYWORD_ASSET_MAP = {
     "usdt": "hsk-usdt",
     "stablecoin": "hsk-usdc",

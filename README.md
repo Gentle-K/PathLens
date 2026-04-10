@@ -103,8 +103,13 @@ This repo is now intentionally aligned with the HashKey Chain DeFi / RWA track:
 - mock or Brave-style search adapter support
 - deterministic chart artifacts derived from report data
 - stable frontend-facing contracts for session creation, progress, and final reports
+- portfolio optimization adapter with rule-based allocation, risk filtering, liquidity penalty, and horizon matching
+- DeFi Llama data adapter for external yield/protocol evidence
+- evidence pipeline with deduplication and confidence normalization
+- multi-horizon simulation (90d/180d/365d) and net-return-after-fees estimation
+- ERC-3643 compliance metadata on asset templates (issuer model, holder eligibility, transfer compliance, redemption/custody notes)
 
-Key routes:
+Key routes (session lifecycle):
 
 - `GET /health`
 - `GET /api/frontend/bootstrap`
@@ -112,6 +117,45 @@ Key routes:
 - `GET /api/sessions/{session_id}`
 - `POST /api/sessions/{session_id}/step`
 - `POST /api/sessions/{session_id}/attestation`
+
+Dedicated RWA routes:
+
+- `GET /api/rwa/catalog` — full asset library and chain config
+- `POST /api/rwa/analyze` — one-shot comparison, scoring, simulation, allocation, and report
+- `POST /api/rwa/clarify` — structured follow-up questions for an RWA query
+
+### Portfolio optimizer design
+
+The optimizer uses Option B: a lightweight rule-based engine behind a thin adapter interface (`adapters/portfolio_opt.py`). It performs:
+
+- composite scoring with configurable risk tolerance
+- risk filtering (conservative users reject high-risk assets)
+- liquidity penalty (T+0 / T+3 mismatch penalisation)
+- horizon matching (lockup vs holding period)
+- volatile-asset cap and per-asset weight bounds
+
+PyPortfolioOpt can be added later by installing `pypfopt` and uncommenting the efficient-frontier backend in `adapters/portfolio_opt.py`. No changes to API routes or report generation are needed.
+
+### Evidence pipeline
+
+Evidence is collected from multiple sources and normalised into `EvidencePanelItem` instances:
+
+1. **Catalog evidence** — static facts from asset templates
+2. **DeFi Llama evidence** — yield pool and protocol metadata from `adapters/llama_data.py`
+
+The pipeline (`rwa/evidence.py`) deduplicates by URL+title, strips empty facts, and clamps confidence to [0, 1]. DeFi Llama data is cached with a 5-minute TTL and degrades gracefully on network errors.
+
+### External repositories
+
+All external repos live in `./external/` (gitignored) and are used as follows:
+
+| Repo | Role | Usage |
+|---|---|---|
+| scaffold-eth-2 | reference | Studied for wallet connect patterns; NOT merged into frontend |
+| PyPortfolioOpt | reference + future dependency | API patterns studied; optional `pypfopt` import with fallback |
+| defillama-sdk | reference | Adapter patterns studied; our own `llama_data.py` adapter instead |
+| ERC-3643 | reference | Compliance metadata fields informed by the standard |
+
 
 ## Frontend highlights
 

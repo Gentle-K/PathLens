@@ -2,6 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.routes import router
+from app.api.rwa_routes import rwa_router
 from app.config import Settings
 
 
@@ -22,6 +23,7 @@ def create_app() -> FastAPI:
     )
 
     app.include_router(router)
+    app.include_router(rwa_router)
     return app
 
 

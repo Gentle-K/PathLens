@@ -294,5 +294,54 @@ class PortfolioOptimizerTests(unittest.TestCase):
         self.assertIn("No assets provided", result.notes[0])
 
 
+class MultiHorizonTests(unittest.TestCase):
+    def test_multi_horizon_returns_three_simulations(self):
+        from app.rwa.engine import simulate_multi_horizon
+        library = _asset_library()
+        asset = library[0]
+        sims = simulate_multi_horizon(asset, 10000.0, locale="en")
+        self.assertEqual(len(sims), 3)
+        expected_days = [90, 180, 365]
+        actual_days = [s.holding_period_days for s in sims]
+        self.assertEqual(actual_days, expected_days)
+
+    def test_multi_horizon_custom_periods(self):
+        from app.rwa.engine import simulate_multi_horizon
+        library = _asset_library()
+        asset = library[0]
+        sims = simulate_multi_horizon(asset, 10000.0, [7, 30], locale="en")
+        self.assertEqual(len(sims), 2)
+        self.assertEqual(sims[0].holding_period_days, 7)
+        self.assertEqual(sims[1].holding_period_days, 30)
+
+    def test_multi_horizon_deterministic(self):
+        from app.rwa.engine import simulate_multi_horizon
+        library = _asset_library()
+        asset = library[0]
+        s1 = simulate_multi_horizon(asset, 10000.0, locale="en")
+        s2 = simulate_multi_horizon(asset, 10000.0, locale="en")
+        for a, b in zip(s1, s2):
+            self.assertEqual(a.ending_value_base, b.ending_value_base)
+
+
+class NetReturnTests(unittest.TestCase):
+    def test_estimate_net_return_structure(self):
+        from app.rwa.engine import estimate_net_return_after_fees
+        library = _asset_library()
+        asset = library[0]
+        result = estimate_net_return_after_fees(asset, 10000.0, 30)
+        self.assertIn("gross_return_pct", result)
+        self.assertIn("total_fee_pct", result)
+        self.assertIn("net_return_pct", result)
+        self.assertIn("net_value", result)
+
+    def test_net_return_less_than_gross(self):
+        from app.rwa.engine import estimate_net_return_after_fees
+        library = _asset_library()
+        asset = library[0]
+        result = estimate_net_return_after_fees(asset, 10000.0, 30)
+        self.assertLessEqual(result["net_return_pct"], result["gross_return_pct"])
+
+
 if __name__ == "__main__":
     unittest.main()

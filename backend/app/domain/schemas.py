@@ -138,3 +138,45 @@ class FrontendBootstrapResponse(BaseModel):
     supported_asset_types: list[str]
     holding_period_presets: list[int]
     oracle_snapshots: list[OracleSnapshot] = Field(default_factory=list)
+
+
+# ---------------------------------------------------------------------------
+# Dedicated RWA schemas
+# ---------------------------------------------------------------------------
+
+class RwaCatalogResponse(BaseModel):
+    assets: list[AssetTemplate]
+    asset_types: list[str]
+    chain_config: HashKeyChainConfig
+
+
+class RwaComparisonRequest(BaseModel):
+    problem_statement: str = Field(min_length=5)
+    preferred_asset_ids: list[str] = Field(default_factory=list)
+    investment_amount: float = 10000.0
+    base_currency: str = "USDT"
+    holding_period_days: int = 30
+    risk_tolerance: str = "balanced"
+    liquidity_need: str = "t_plus_3"
+    minimum_kyc_level: int = 0
+    wallet_address: str = ""
+    wallet_network: str = ""
+    locale: str = "zh"
+    include_multi_horizon: bool = True
+    include_defi_llama_evidence: bool = True
+
+
+class RwaAnalyzeResponse(BaseModel):
+    report: AnalysisReport
+    evidence: list[EvidenceItem] = Field(default_factory=list)
+    multi_horizon_simulations: dict[str, list] = Field(default_factory=dict)
+
+
+class RwaClarifyRequest(BaseModel):
+    problem_statement: str = Field(min_length=5)
+    locale: str = "zh"
+
+
+class RwaClarifyResponse(BaseModel):
+    questions: list[ClarificationQuestion]
+
