@@ -1,0 +1,16 @@
+{
+  "base_model": "Qwen/Qwen2.5-7B-Instruct",
+  "adapter_strategy": "single_multitask_lora",
+  "locale_bias": "zh",
+  "supported_locales": ["zh", "en"],
+  "task_types": ["clarify", "plan", "stress", "score_explain", "report"],
+  "teacher_provider_default": "openai",
+  "teacher_version": "teacher-rwa-v1",
+  "lora": {
+    "rank": 32,
+    "alpha": 64,
+    "dropout": 0.05,
+    "target_modules": ["q_proj", "k_proj", "v_proj", "o_proj", "gate_proj", "up_proj", "down_proj"]
+  }
+}
+

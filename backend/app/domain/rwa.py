@@ -203,6 +203,48 @@ class MethodologyReference(BaseModel):
     summary: str = ""
 
 
+class SourceProvenanceRef(BaseModel):
+    ref_id: str
+    title: str
+    source_name: str
+    source_url: str
+    source_kind: str = "report"
+    source_tier: str = "official"
+    freshness_date: str = ""
+    verified_summary: str = ""
+
+
+class ConfidenceBand(BaseModel):
+    label: str
+    low: float
+    base: float
+    high: float
+    unit: str = "%"
+    confidence_level: float = 0.8
+    note: str = ""
+
+
+class StressScenario(BaseModel):
+    scenario_key: str
+    title: str
+    severity: str = "adverse"
+    narrative: str
+    portfolio_impact_pct: float
+    liquidity_impact_days: float = 0.0
+    affected_asset_ids: list[str] = Field(default_factory=list)
+    source_provenance_refs: list[str] = Field(default_factory=list)
+
+
+class ReserveBackingSummary(BaseModel):
+    title: str
+    summary: str
+    reserve_quality_score: float
+    attestation_status: str
+    liquidity_notice: str = ""
+    asset_symbols: list[str] = Field(default_factory=list)
+    source_provenance_refs: list[str] = Field(default_factory=list)
+
+
 class SimulationPathPoint(BaseModel):
     day: int
     p10_value: float

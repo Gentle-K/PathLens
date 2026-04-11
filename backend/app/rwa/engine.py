@@ -33,6 +33,13 @@ from app.domain.rwa import (
 )
 from app.i18n import text_for_locale
 from app.rwa.explorer_service import address_url, chain_id_for, oracle_docs_url
+from app.rwa.actuary_signals import (
+    build_confidence_band,
+    build_oracle_stress_score,
+    build_reserve_backing_summary,
+    build_stress_scenarios,
+)
+from app.rwa.actuary_source_registry import build_source_provenance_refs
 from app.rwa.risk_model import allocation_reason, build_risk_profiles, methodology_references
 
 logger = logging.getLogger(__name__)
@@ -1430,6 +1437,7 @@ def build_rwa_report(
     tables = build_comparison_tables(asset_cards, simulations, locale=locale)
     recommendations = _recommendation_lines(context, allocations, locale=locale)
     open_questions = _open_questions(context, allocations, locale=locale)
+    source_provenance_refs = build_source_provenance_refs(selected_assets)
     top_choice = next(
         (allocation for allocation in allocations if allocation.target_weight_pct > 0),
         None,
@@ -1448,6 +1456,14 @@ def build_rwa_report(
         ),
     )
     attestation_draft = build_attestation_draft(summary, allocations, chain_config)
+    confidence_band = build_confidence_band(
+        simulations,
+        allocations,
+        note="Weighted from the holding-period simulation bands of the suggested allocation sleeves.",
+    )
+    oracle_stress_score = build_oracle_stress_score(asset_cards, allocations)
+    reserve_backing_summary = build_reserve_backing_summary(selected_assets, source_provenance_refs)
+    stress_scenarios = build_stress_scenarios(asset_cards, allocations, source_provenance_refs)
 
     markdown = "\n".join(
         [
@@ -1536,6 +1552,11 @@ def build_rwa_report(
         recommendations=recommendations,
         open_questions=open_questions,
         markdown=markdown,
+        confidence_band=confidence_band,
+        stress_scenarios=stress_scenarios,
+        reserve_backing_summary=reserve_backing_summary,
+        source_provenance_refs=source_provenance_refs,
+        oracle_stress_score=oracle_stress_score,
         tables=tables,
         option_profiles=option_profiles,
         chain_config=chain_config,

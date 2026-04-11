@@ -1,0 +1,7 @@
+{
+  "model_id": "actuary-rwa-student-v1",
+  "teacher_version": "teacher-rwa-v1",
+  "supported_task_types": ["clarify", "plan", "stress", "score_explain", "report"],
+  "locale_bias": "zh"
+}
+

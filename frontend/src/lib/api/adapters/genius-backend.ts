@@ -12,6 +12,7 @@ import type {
   ChartArtifact,
   ChartTask,
   ClarificationQuestion,
+  ConfidenceBand,
   HashKeyChainConfig,
   HoldingPeriodSimulation,
   MarketDataSnapshot,
@@ -22,6 +23,7 @@ import type {
   OracleFeedConfig,
   PortfolioAllocation,
   ReportTable,
+  ReserveBackingSummary,
   RiskBreakdownItem,
   RiskVector,
   ResourceRecord,
@@ -29,6 +31,8 @@ import type {
   RwaBootstrap,
   RwaIntakeContext,
   SearchTask,
+  SourceProvenanceRef,
+  StressScenario,
   TxDraft,
   User,
   UserAnswer,
@@ -473,6 +477,48 @@ export interface BackendMethodologyReference {
   summary?: string
 }
 
+export interface BackendSourceProvenanceRef {
+  ref_id: string
+  title: string
+  source_name: string
+  source_url: string
+  source_kind: string
+  source_tier: string
+  freshness_date?: string
+  verified_summary?: string
+}
+
+export interface BackendConfidenceBand {
+  label: string
+  low: number
+  base: number
+  high: number
+  unit: string
+  confidence_level: number
+  note?: string
+}
+
+export interface BackendStressScenario {
+  scenario_key: string
+  title: string
+  severity: string
+  narrative: string
+  portfolio_impact_pct: number
+  liquidity_impact_days: number
+  affected_asset_ids?: string[]
+  source_provenance_refs?: string[]
+}
+
+export interface BackendReserveBackingSummary {
+  title: string
+  summary: string
+  reserve_quality_score: number
+  attestation_status: string
+  liquidity_notice?: string
+  asset_symbols?: string[]
+  source_provenance_refs?: string[]
+}
+
 export interface BackendReport {
   summary: string
   assumptions: string[]
@@ -480,6 +526,11 @@ export interface BackendReport {
   open_questions: string[]
   chart_refs: string[]
   markdown?: string
+  confidence_band?: BackendConfidenceBand | null
+  stress_scenarios?: BackendStressScenario[]
+  reserve_backing_summary?: BackendReserveBackingSummary | null
+  source_provenance_refs?: BackendSourceProvenanceRef[]
+  oracle_stress_score?: number | null
   budget_summary?: BackendBudgetSummary | null
   budget_items?: BackendBudgetLineItem[]
   option_profiles?: BackendOptionProfile[]
@@ -919,6 +970,70 @@ function mapMethodologyReference(
     title: item.title,
     url: item.url,
     summary: item.summary ?? '',
+  }
+}
+
+function mapSourceProvenanceRef(
+  item: BackendSourceProvenanceRef,
+): SourceProvenanceRef {
+  return {
+    refId: item.ref_id,
+    title: item.title,
+    sourceName: item.source_name,
+    sourceUrl: item.source_url,
+    sourceKind: item.source_kind,
+    sourceTier: item.source_tier,
+    freshnessDate: item.freshness_date ?? undefined,
+    verifiedSummary: item.verified_summary ?? '',
+  }
+}
+
+function mapConfidenceBand(
+  item?: BackendConfidenceBand | null,
+): ConfidenceBand | undefined {
+  if (!item) {
+    return undefined
+  }
+  return {
+    label: item.label,
+    low: item.low,
+    base: item.base,
+    high: item.high,
+    unit: item.unit,
+    confidenceLevel: item.confidence_level,
+    note: item.note ?? '',
+  }
+}
+
+function mapStressScenario(
+  item: BackendStressScenario,
+): StressScenario {
+  return {
+    scenarioKey: item.scenario_key,
+    title: item.title,
+    severity: item.severity,
+    narrative: item.narrative,
+    portfolioImpactPct: item.portfolio_impact_pct,
+    liquidityImpactDays: item.liquidity_impact_days,
+    affectedAssetIds: item.affected_asset_ids ?? [],
+    sourceProvenanceRefs: item.source_provenance_refs ?? [],
+  }
+}
+
+function mapReserveBackingSummary(
+  item?: BackendReserveBackingSummary | null,
+): ReserveBackingSummary | undefined {
+  if (!item) {
+    return undefined
+  }
+  return {
+    title: item.title,
+    summary: item.summary,
+    reserveQualityScore: item.reserve_quality_score,
+    attestationStatus: item.attestation_status,
+    liquidityNotice: item.liquidity_notice ?? '',
+    assetSymbols: item.asset_symbols ?? [],
+    sourceProvenanceRefs: item.source_provenance_refs ?? [],
   }
 }
 
@@ -1707,6 +1822,14 @@ export function mapBackendReport(session: BackendSession): AnalysisReport {
     budgetItems: mapBudgetItems(report?.budget_items),
     optionProfiles: mapOptionProfiles(report?.option_profiles),
     tables: mapReportTables(report?.tables),
+    confidenceBand: mapConfidenceBand(report?.confidence_band),
+    stressScenarios: (report?.stress_scenarios ?? []).map(mapStressScenario),
+    reserveBackingSummary: mapReserveBackingSummary(report?.reserve_backing_summary),
+    sourceProvenanceRefs: (report?.source_provenance_refs ?? []).map(mapSourceProvenanceRef),
+    oracleStressScore:
+      typeof report?.oracle_stress_score === 'number'
+        ? report.oracle_stress_score
+        : undefined,
     chainConfig: report?.chain_config ? mapChainConfig(report.chain_config) : undefined,
     kycSnapshot: report?.kyc_snapshot ? mapKycSnapshot(report.kyc_snapshot) : undefined,
     marketSnapshots: (report?.market_snapshots ?? []).map(mapMarketSnapshot),

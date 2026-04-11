@@ -611,6 +611,48 @@ export interface MethodologyReference {
   summary: string
 }
 
+export interface SourceProvenanceRef {
+  refId: string
+  title: string
+  sourceName: string
+  sourceUrl: string
+  sourceKind: string
+  sourceTier: string
+  freshnessDate?: string
+  verifiedSummary: string
+}
+
+export interface ConfidenceBand {
+  label: string
+  low: number
+  base: number
+  high: number
+  unit: string
+  confidenceLevel: number
+  note?: string
+}
+
+export interface StressScenario {
+  scenarioKey: string
+  title: string
+  severity: string
+  narrative: string
+  portfolioImpactPct: number
+  liquidityImpactDays: number
+  affectedAssetIds: string[]
+  sourceProvenanceRefs: string[]
+}
+
+export interface ReserveBackingSummary {
+  title: string
+  summary: string
+  reserveQualityScore: number
+  attestationStatus: string
+  liquidityNotice?: string
+  assetSymbols: string[]
+  sourceProvenanceRefs: string[]
+}
+
 export interface RwaBootstrap {
   appName: string
   chainConfig: HashKeyChainConfig
@@ -645,6 +687,11 @@ export interface AnalysisReport {
   budgetItems?: BudgetLineItem[]
   optionProfiles?: OptionProfile[]
   tables?: ReportTable[]
+  confidenceBand?: ConfidenceBand
+  stressScenarios?: StressScenario[]
+  reserveBackingSummary?: ReserveBackingSummary
+  sourceProvenanceRefs?: SourceProvenanceRef[]
+  oracleStressScore?: number
   chainConfig?: HashKeyChainConfig
   kycSnapshot?: KycOnchainResult
   marketSnapshots?: MarketDataSnapshot[]

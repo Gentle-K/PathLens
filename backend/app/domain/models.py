@@ -10,13 +10,17 @@ from pydantic import BaseModel, Field
 from app.domain.rwa import (
     AssetAnalysisCard,
     AttestationDraft,
+    ConfidenceBand,
     HashKeyChainConfig,
     HoldingPeriodSimulation,
     KycOnchainResult,
     MarketDataSnapshot,
     MethodologyReference,
     PortfolioAllocation,
+    ReserveBackingSummary,
     RwaIntakeContext,
+    SourceProvenanceRef,
+    StressScenario,
     TxDraft,
 )
 
@@ -211,6 +215,11 @@ class AnalysisReport(BaseModel):
     open_questions: list[str] = Field(default_factory=list)
     chart_refs: list[str] = Field(default_factory=list)
     markdown: str = ""
+    confidence_band: ConfidenceBand | None = None
+    stress_scenarios: list[StressScenario] = Field(default_factory=list)
+    reserve_backing_summary: ReserveBackingSummary | None = None
+    source_provenance_refs: list[SourceProvenanceRef] = Field(default_factory=list)
+    oracle_stress_score: float | None = None
     budget_summary: BudgetSummary | None = None
     budget_items: list[BudgetLineItem] = Field(default_factory=list)
     option_profiles: list[OptionProfile] = Field(default_factory=list)

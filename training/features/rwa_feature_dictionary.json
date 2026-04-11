@@ -1,0 +1,46 @@
+{
+  "feature_groups": {
+    "asset_market": [
+      "expected_return_low",
+      "expected_return_base",
+      "expected_return_high",
+      "price_volatility",
+      "max_drawdown_180d",
+      "avg_daily_volume_usd"
+    ],
+    "liquidity_terms": [
+      "redemption_days",
+      "lockup_days",
+      "management_fee_bps",
+      "entry_fee_bps",
+      "exit_fee_bps",
+      "slippage_bps",
+      "minimum_ticket_usd"
+    ],
+    "governance_and_disclosure": [
+      "issuer_disclosure_score",
+      "custody_disclosure_score",
+      "audit_disclosure_score",
+      "contract_is_upgradeable",
+      "has_admin_key",
+      "oracle_count",
+      "onchain_verified",
+      "issuer_disclosed"
+    ],
+    "access_constraints": [
+      "requires_kyc_level",
+      "wallet_kyc_level_onchain",
+      "wallet_kyc_verified",
+      "liquidity_need",
+      "risk_tolerance"
+    ],
+    "report_targets": [
+      "confidence_band",
+      "stress_scenarios",
+      "reserve_backing_summary",
+      "oracle_stress_score",
+      "source_provenance_refs"
+    ]
+  }
+}
+

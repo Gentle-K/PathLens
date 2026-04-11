@@ -45,6 +45,16 @@ function assetTypeLabel(value: AssetAnalysisCard['assetType'], isZh: boolean) {
   return labels[value]
 }
 
+function stressTone(severity: string): 'gold' | 'neutral' | 'warning' {
+  if (severity === 'severe') {
+    return 'warning'
+  }
+  if (severity === 'baseline') {
+    return 'gold'
+  }
+  return 'neutral'
+}
+
 function txReceiptFromReport(report: AnalysisReport): TxReceipt | undefined {
   if (!report.attestationDraft?.transactionHash || !report.attestationDraft.transactionUrl) {
     return undefined
@@ -151,6 +161,137 @@ export function ReportPage() {
           </Card>
         ))}
       </div>
+
+      {report.confidenceBand || report.reserveBackingSummary || typeof report.oracleStressScore === 'number' || (report.sourceProvenanceRefs ?? []).length ? (
+        <div className="grid gap-4 xl:grid-cols-[1.02fr_0.98fr]">
+          <Card className="space-y-4 p-6">
+            <div className="flex items-center gap-3">
+              <ShieldCheck className="size-5 text-gold-primary" />
+              <h2 className="text-lg font-semibold text-text-primary">{isZh ? '精算信号' : 'Actuarial Signals'}</h2>
+            </div>
+
+            {report.confidenceBand ? (
+              <div className="rounded-xl border border-border-subtle bg-app-bg-elevated p-4">
+                <div className="flex items-center justify-between gap-3">
+                  <p className="font-medium text-text-primary">{report.confidenceBand.label}</p>
+                  <Badge tone="gold">{Math.round(report.confidenceBand.confidenceLevel * 100)}%</Badge>
+                </div>
+                <div className="mt-4 grid gap-3 md:grid-cols-3">
+                  <div>
+                    <p className="text-xs text-text-muted">{isZh ? '低位' : 'Low'}</p>
+                    <p className="mt-1 text-lg font-semibold text-text-primary">{pct(report.confidenceBand.low, locale)}{report.confidenceBand.unit}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-text-muted">{isZh ? '基准' : 'Base'}</p>
+                    <p className="mt-1 text-lg font-semibold text-text-primary">{pct(report.confidenceBand.base, locale)}{report.confidenceBand.unit}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-text-muted">{isZh ? '高位' : 'High'}</p>
+                    <p className="mt-1 text-lg font-semibold text-text-primary">{pct(report.confidenceBand.high, locale)}{report.confidenceBand.unit}</p>
+                  </div>
+                </div>
+                {report.confidenceBand.note ? <p className="mt-3 text-sm leading-7 text-text-secondary">{report.confidenceBand.note}</p> : null}
+              </div>
+            ) : null}
+
+            <div className="grid gap-3 md:grid-cols-2">
+              <div className="rounded-xl border border-border-subtle bg-app-bg-elevated p-4">
+                <p className="text-xs text-text-muted">{isZh ? '预言机压力分' : 'Oracle stress score'}</p>
+                <p className="mt-2 text-lg font-semibold text-text-primary">
+                  {typeof report.oracleStressScore === 'number' ? `${report.oracleStressScore.toFixed(1)} / 100` : '--'}
+                </p>
+              </div>
+              <div className="rounded-xl border border-border-subtle bg-app-bg-elevated p-4">
+                <p className="text-xs text-text-muted">{isZh ? '来源引用数' : 'Provenance refs'}</p>
+                <p className="mt-2 text-lg font-semibold text-text-primary">{(report.sourceProvenanceRefs ?? []).length}</p>
+              </div>
+            </div>
+
+            {report.reserveBackingSummary ? (
+              <div className="rounded-xl border border-border-subtle bg-app-bg-elevated p-4">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <p className="font-medium text-text-primary">{report.reserveBackingSummary.title}</p>
+                    <p className="mt-2 text-sm leading-7 text-text-secondary">{report.reserveBackingSummary.summary}</p>
+                  </div>
+                  <Badge tone="neutral">{report.reserveBackingSummary.attestationStatus}</Badge>
+                </div>
+                <div className="mt-4 grid gap-3 md:grid-cols-2">
+                  <div>
+                    <p className="text-xs text-text-muted">{isZh ? '储备质量分' : 'Reserve quality'}</p>
+                    <p className="mt-1 text-text-primary">{report.reserveBackingSummary.reserveQualityScore.toFixed(1)} / 100</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-text-muted">{isZh ? '覆盖资产' : 'Covered assets'}</p>
+                    <p className="mt-1 text-text-primary">{report.reserveBackingSummary.assetSymbols.join(', ') || '--'}</p>
+                  </div>
+                </div>
+                {report.reserveBackingSummary.liquidityNotice ? <p className="mt-3 text-xs text-text-muted">{report.reserveBackingSummary.liquidityNotice}</p> : null}
+                {report.reserveBackingSummary.sourceProvenanceRefs.length ? <p className="mt-2 text-xs text-text-muted">{isZh ? '引用' : 'References'}: {report.reserveBackingSummary.sourceProvenanceRefs.join(', ')}</p> : null}
+              </div>
+            ) : null}
+          </Card>
+
+          <Card className="space-y-4 p-6">
+            <div className="flex items-center gap-3">
+              <ScrollText className="size-5 text-gold-primary" />
+              <h2 className="text-lg font-semibold text-text-primary">{isZh ? '来源锚点' : 'Source Provenance'}</h2>
+            </div>
+            {(report.sourceProvenanceRefs ?? []).length ? (
+              (report.sourceProvenanceRefs ?? []).map((source) => (
+                <div key={source.refId} className="rounded-xl border border-border-subtle bg-app-bg-elevated p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="font-medium text-text-primary">{source.title}</p>
+                      <p className="mt-1 text-xs text-text-muted">{source.sourceName} · {source.sourceTier} · {source.sourceKind}</p>
+                    </div>
+                    <a href={source.sourceUrl} target="_blank" rel="noreferrer" className="inline-flex shrink-0 items-center gap-1 text-xs text-gold-ink underline-offset-4 hover:underline">
+                      <ExternalLink className="size-3.5" />
+                      {isZh ? '打开' : 'Open'}
+                    </a>
+                  </div>
+                  <p className="mt-3 text-sm leading-7 text-text-secondary">{source.verifiedSummary}</p>
+                  {source.freshnessDate ? <p className="mt-2 text-xs text-text-muted">{isZh ? '日期' : 'Date'}: {source.freshnessDate}</p> : null}
+                </div>
+              ))
+            ) : (
+              <p className="text-sm text-text-secondary">{isZh ? '当前报告还没有结构化来源锚点。' : 'No structured provenance references are attached to this report yet.'}</p>
+            )}
+          </Card>
+        </div>
+      ) : null}
+
+      {(report.stressScenarios ?? []).length ? (
+        <Card className="space-y-4 p-6">
+          <div className="flex items-center gap-3">
+            <ShieldCheck className="size-5 text-gold-primary" />
+            <h2 className="text-lg font-semibold text-text-primary">{isZh ? '压力情景' : 'Stress Scenarios'}</h2>
+          </div>
+          <div className="grid gap-4 xl:grid-cols-2">
+            {(report.stressScenarios ?? []).map((scenario) => (
+              <div key={scenario.scenarioKey} className="rounded-xl border border-border-subtle bg-app-bg-elevated p-4">
+                <div className="flex items-center justify-between gap-3">
+                  <p className="font-medium text-text-primary">{scenario.title}</p>
+                  <Badge tone={stressTone(scenario.severity)}>{scenario.severity}</Badge>
+                </div>
+                <p className="mt-3 text-sm leading-7 text-text-secondary">{scenario.narrative}</p>
+                <div className="mt-4 grid gap-3 md:grid-cols-2">
+                  <div>
+                    <p className="text-xs text-text-muted">{isZh ? '组合影响' : 'Portfolio impact'}</p>
+                    <p className="mt-1 text-text-primary">{pct(scenario.portfolioImpactPct, locale)}%</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-text-muted">{isZh ? '流动性拖延' : 'Liquidity delay'}</p>
+                    <p className="mt-1 text-text-primary">{pct(scenario.liquidityImpactDays, locale)} {isZh ? '天' : 'days'}</p>
+                  </div>
+                </div>
+                {scenario.affectedAssetIds.length ? <p className="mt-3 text-xs text-text-muted">{isZh ? '影响资产' : 'Affected assets'}: {scenario.affectedAssetIds.join(', ')}</p> : null}
+                {scenario.sourceProvenanceRefs.length ? <p className="mt-2 text-xs text-text-muted">{isZh ? '引用' : 'References'}: {scenario.sourceProvenanceRefs.join(', ')}</p> : null}
+              </div>
+            ))}
+          </div>
+        </Card>
+      ) : null}
 
       <div className="grid gap-4 xl:grid-cols-[1.02fr_0.98fr]">
         <div className="space-y-4">

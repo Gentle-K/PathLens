@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 
 from app.adapters.calculation import DisabledCalculationAdapter, LocalCalculationAdapter
+from app.adapters.actuary_expert import RwaActuarialExpertAdapter
 from app.adapters.chart import DisabledChartAdapter, MockChartAdapter, StructuredChartAdapter
 from app.adapters.llm_analysis import MockAnalysisAdapter, OpenAICompatibleAnalysisAdapter
 from app.adapters.search import BraveSearchAdapter, MockSearchAdapter
@@ -21,16 +22,18 @@ class AppServices:
 _services: AppServices | None = None
 
 
-def _create_analysis_adapter(settings: Settings) -> MockAnalysisAdapter | OpenAICompatibleAnalysisAdapter:
+def _create_analysis_adapter(
+    settings: Settings,
+) -> MockAnalysisAdapter | OpenAICompatibleAnalysisAdapter | RwaActuarialExpertAdapter:
+    adapter: MockAnalysisAdapter | OpenAICompatibleAnalysisAdapter
     if settings.analysis_adapter == "mock":
-        return MockAnalysisAdapter()
-
-    if settings.analysis_adapter in {"openai", "openai_compatible"}:
+        adapter = MockAnalysisAdapter()
+    elif settings.analysis_adapter in {"openai", "openai_compatible"}:
         if not settings.analysis_api_key:
             raise RuntimeError(
                 "ANALYSIS_API_KEY is required when ANALYSIS_ADAPTER=openai_compatible."
             )
-        return OpenAICompatibleAnalysisAdapter(
+        adapter = OpenAICompatibleAnalysisAdapter(
             provider=settings.analysis_provider,
             base_url=settings.analysis_api_base_url,
             api_key=settings.analysis_api_key,
@@ -38,10 +41,17 @@ def _create_analysis_adapter(settings: Settings) -> MockAnalysisAdapter | OpenAI
             timeout_seconds=settings.analysis_timeout_seconds,
             retry_attempts=settings.analysis_retry_attempts,
         )
+    else:
+        raise RuntimeError(
+            f"Unsupported ANALYSIS_ADAPTER value: {settings.analysis_adapter}."
+        )
 
-    raise RuntimeError(
-        f"Unsupported ANALYSIS_ADAPTER value: {settings.analysis_adapter}."
-    )
+    if settings.actuary_expert_mode not in {"", "off", "disabled"}:
+        return RwaActuarialExpertAdapter(
+            delegate=adapter,
+            settings=settings,
+        )
+    return adapter
 
 
 def _create_search_adapter(settings: Settings) -> MockSearchAdapter | BraveSearchAdapter:

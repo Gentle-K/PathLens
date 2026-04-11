@@ -49,6 +49,11 @@ Most important variables:
 - `ANALYSIS_API_BASE_URL`
 - `ANALYSIS_API_KEY`
 - `ANALYSIS_MODEL`
+- `ACTUARY_EXPERT_MODE`
+- `ACTUARY_STUDENT_MODEL_PATH`
+- `ACTUARY_TEACHER_PROVIDER`
+- `ACTUARY_DATA_REFRESH_PROFILE`
+- `ACTUARY_EVAL_SET_VERSION`
 - `HASHKEY_DEFAULT_EXECUTION_NETWORK`
 - `HASHKEY_TESTNET_RPC_URL`
 - `HASHKEY_TESTNET_EXPLORER_URL`
@@ -64,6 +69,22 @@ Most important variables:
 - `PLAN_REGISTRY_DEPLOYER_PRIVATE_KEY`
 
 If the plan registry address is blank, the app still produces a deterministic attestation draft but disables the live on-chain write.
+
+## RWA actuary expert mode
+
+The repo now ships a repo-local RWA actuary skill and a distilled-student scaffolding path.
+
+- `training/sources/public_sources.json` is the shared provenance registry used by both backend report enrichment and the repo-local skill
+- `training/features/rwa_feature_dictionary.json` defines the current feature groups exposed to the student pipeline
+- `training/eval/gold_eval_cases.jsonl` is the seed eval set for clarify, plan, stress, score-explain, and report tasks
+- `.codex/skills/actuary-rwa/` contains the repo-local skill that points back to the same registry and eval assets
+
+Enable expert routing with:
+
+- `ACTUARY_EXPERT_MODE=shadow`
+- `ACTUARY_STUDENT_MODEL_PATH=training/config/student_manifest.example.json`
+
+The current v1 adapter keeps KYC gating, minimum ticket checks, liquidity windows, fees, and risk monotonicity deterministic while enriching reports with confidence bands, stress scenarios, reserve-backing summaries, oracle stress scores, and source provenance references.
 
 ## Run the backend
 
@@ -170,6 +191,15 @@ cd ../frontend
 npm run lint
 npm run test:run
 npm run build
+```
+
+Training helpers:
+
+```bash
+python training/scripts/refresh_public_corpus.py
+python training/scripts/extract_supervised_samples.py --db-path backend/data/genius_actuary.db
+python training/scripts/generate_synthetic_cases.py --locale zh
+python training/scripts/evaluate_predictions.py training/eval/gold_eval_cases.jsonl --prediction-key target_output
 ```
 
 ## Verified in this repository

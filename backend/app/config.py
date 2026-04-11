@@ -83,6 +83,11 @@ class Settings:
     analysis_model: str
     analysis_timeout_seconds: float
     analysis_retry_attempts: int
+    actuary_expert_mode: str
+    actuary_student_model_path: str
+    actuary_teacher_provider: str
+    actuary_data_refresh_profile: str
+    actuary_eval_set_version: str
     clarification_follow_up_round_limit: int
     search_adapter: str
     search_api_base_url: str
@@ -162,6 +167,11 @@ class Settings:
             analysis_model=os.getenv("ANALYSIS_MODEL", default_analysis_model),
             analysis_timeout_seconds=float(os.getenv("ANALYSIS_TIMEOUT_SECONDS", "30")),
             analysis_retry_attempts=max(1, int(os.getenv("ANALYSIS_RETRY_ATTEMPTS", "4"))),
+            actuary_expert_mode=os.getenv("ACTUARY_EXPERT_MODE", "off").strip().lower(),
+            actuary_student_model_path=os.getenv("ACTUARY_STUDENT_MODEL_PATH", "").strip(),
+            actuary_teacher_provider=os.getenv("ACTUARY_TEACHER_PROVIDER", "openai").strip().lower(),
+            actuary_data_refresh_profile=os.getenv("ACTUARY_DATA_REFRESH_PROFILE", "monthly").strip().lower(),
+            actuary_eval_set_version=os.getenv("ACTUARY_EVAL_SET_VERSION", "v1").strip(),
             clarification_follow_up_round_limit=max(
                 1,
                 int(os.getenv("CLARIFICATION_FOLLOW_UP_ROUND_LIMIT", "10")),

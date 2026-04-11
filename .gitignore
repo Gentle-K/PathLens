@@ -9,3 +9,4 @@ backend/**/*.pyc
 .env.local
 .env.*.local
 external/
+training/artifacts/

@@ -1,0 +1,7 @@
+interface:
+  display_name: "RWA Actuary"
+  short_description: "Build and validate the repo's RWA actuary expert mode"
+  default_prompt: "Use $actuary-rwa to extend the repo's RWA actuarial expert path, training assets, or provenance-aware reporting workflow."
+
+policy:
+  allow_implicit_invocation: true
