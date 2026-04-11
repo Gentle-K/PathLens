@@ -1,0 +1,13 @@
+{
+  "name": "genius-actuary-workspace",
+  "private": true,
+  "scripts": {
+    "test:frontend": "npm --prefix frontend run test:json",
+    "test:backend": "python3 scripts/run_backend_tests.py unit",
+    "test:integration": "python3 scripts/run_backend_tests.py integration contract",
+    "test:e2e": "npm --prefix frontend run test:e2e",
+    "test:coverage": "python3 scripts/run_backend_tests.py all --coverage && npm --prefix frontend run test:json",
+    "test:report": "python3 scripts/generate_test_report.py",
+    "test:all": "python3 scripts/run_backend_tests.py all --coverage && npm --prefix frontend run test:json && npm --prefix frontend run test:e2e && python3 scripts/generate_test_report.py"
+  }
+}

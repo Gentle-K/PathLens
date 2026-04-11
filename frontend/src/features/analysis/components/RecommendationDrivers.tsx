@@ -18,7 +18,7 @@ export function RecommendationDrivers({
   }
 
   return (
-    <Card className="space-y-4 p-6">
+    <Card className="space-y-4 p-6" data-testid="recommendation-drivers">
       <div>
         <h2 className="text-lg font-semibold text-text-primary">
           {isZh ? '为什么这样推荐？' : 'Why this recommendation?'}

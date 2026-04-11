@@ -1,5 +1,11 @@
 .DS_Store
 tmp/
+coverage/
+.coverage.backend
+test-results/
+reports/*
+!reports/test-summary.md
+playwright-report/
 backend/.env
 frontend/.env
 backend/.venv*

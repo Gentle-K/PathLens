@@ -12,7 +12,10 @@
     "preview": "vite preview",
     "deploy:plan-registry": "node ../scripts/deploy_plan_registry.mjs",
     "test": "vitest",
-    "test:run": "vitest run --coverage"
+    "test:unit": "vitest run",
+    "test:run": "vitest run --coverage",
+    "test:json": "vitest run --coverage --reporter=default --reporter=json --outputFile=../test-results/frontend/vitest.json --coverage.reportsDirectory ../coverage/frontend",
+    "test:e2e": "playwright test --config playwright.config.ts"
   },
   "dependencies": {
     "@fontsource-variable/manrope": "^5.2.8",
@@ -51,6 +54,7 @@
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
     "@testing-library/user-event": "^14.6.1",
+    "@playwright/test": "^1.55.1",
     "@types/node": "^24.12.0",
     "@types/papaparse": "^5.5.2",
     "@types/react": "^19.2.14",

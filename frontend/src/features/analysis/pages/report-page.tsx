@@ -138,7 +138,7 @@ export function ReportPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" data-testid="report-page">
       <PageHeader
         eyebrow={isZh ? '页面 3 / RWA 报告' : 'Page 3 / RWA Report'}
         title={report.summaryTitle}

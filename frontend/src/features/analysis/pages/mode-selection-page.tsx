@@ -440,7 +440,7 @@ export function ModeSelectionPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" data-testid="mode-selection-page">
       <PageHeader
         eyebrow={text.eyebrow}
         title={text.title}
@@ -582,6 +582,7 @@ export function ModeSelectionPage() {
           return (
             <Card
               key={mode.id}
+              data-testid={`mode-card-${mode.id}`}
               role="button"
               tabIndex={0}
               aria-pressed={isSelected}
@@ -678,6 +679,7 @@ export function ModeSelectionPage() {
             </label>
             <Textarea
               id="problemStatement"
+              data-testid="analysis-problem-input"
               value={problemStatement}
               onChange={(event) => setProblemStatement(event.target.value)}
               placeholder={text.questionPlaceholder}
@@ -952,6 +954,7 @@ export function ModeSelectionPage() {
           </div>
 
           <Button
+            data-testid="start-rwa-analysis"
             onClick={() =>
               void createMutation.mutateAsync({
                 mode: selectedMode,

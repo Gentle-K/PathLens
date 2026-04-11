@@ -1,5 +1,6 @@
 import { cleanup, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { Route, Routes } from 'react-router-dom'
 import { afterEach, describe, expect, it } from 'vitest'
 
 import { ModeSelectionPage } from '@/features/analysis/pages/mode-selection-page'
@@ -63,5 +64,25 @@ describe('ModeSelectionPage', () => {
     expect(
       screen.getByRole('button', { name: /Including non-production assets/i }),
     ).toBeInTheDocument()
+  })
+
+  it('switches modes and starts the analysis workspace flow', async () => {
+    const user = userEvent.setup()
+
+    renderWithAppState(
+      <Routes>
+        <Route path="/analysis/modes" element={<ModeSelectionPage />} />
+        <Route path="/analysis/session/:sessionId" element={<div>analysis workspace</div>} />
+      </Routes>,
+      {
+        route: '/analysis/modes',
+        locale: 'en',
+      },
+    )
+
+    await user.click(await screen.findByTestId('mode-card-single-option'))
+    await user.click(screen.getByTestId('start-rwa-analysis'))
+
+    expect(await screen.findByText('analysis workspace')).toBeInTheDocument()
   })
 })

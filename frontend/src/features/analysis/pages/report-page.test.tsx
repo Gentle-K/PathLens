@@ -435,4 +435,24 @@ describe('ReportPage', () => {
     expect(screen.getByText('74%')).toBeInTheDocument()
     expect(screen.getByText('Fresh')).toBeInTheDocument()
   })
+
+  it('shows a recoverable error surface when the report payload fails', async () => {
+    getReport.mockRejectedValueOnce(new Error('backend exploded'))
+
+    renderWithAppState(
+      <Routes>
+        <Route path="/analysis/session/:sessionId/report" element={<ReportPage />} />
+      </Routes>,
+      {
+        route: '/analysis/session/session-rwa-demo/report',
+        apiMode: 'rest',
+        locale: 'en',
+      },
+    )
+
+    expect(
+      await screen.findByText('The result page is temporarily unavailable'),
+    ).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Retry report' })).toBeInTheDocument()
+  })
 })

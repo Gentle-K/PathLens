@@ -35,7 +35,7 @@ export function ComparisonMatrix({
   }
 
   return (
-    <Card className="space-y-4 p-6">
+    <Card className="space-y-4 p-6" data-testid="comparison-matrix">
       <div className="flex items-center justify-between gap-3">
         <div>
           <h2 className="text-lg font-semibold text-text-primary">{matrix.title}</h2>

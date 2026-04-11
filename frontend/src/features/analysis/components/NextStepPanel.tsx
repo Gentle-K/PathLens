@@ -20,7 +20,7 @@ export function NextStepPanel({
   }
 
   return (
-    <Card className="space-y-4 p-6">
+    <Card className="space-y-4 p-6" data-testid="next-step-panel">
       <div>
         <h2 className="text-lg font-semibold text-text-primary">
           {isZh ? '下一步执行' : 'Next steps'}
