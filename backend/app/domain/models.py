@@ -14,6 +14,7 @@ from app.domain.rwa import (
     HoldingPeriodSimulation,
     KycOnchainResult,
     MarketDataSnapshot,
+    MethodologyReference,
     PortfolioAllocation,
     RwaIntakeContext,
     TxDraft,
@@ -92,6 +93,10 @@ class CalculationTask(BaseModel):
     error_margin: str = ""
     notes: str = ""
     status: str = "pending"
+    validation_state: str = "pending"
+    failure_reason: str = ""
+    user_visible: bool = True
+    semantic_signature: str = ""
 
 
 class ChartTask(BaseModel):
@@ -216,6 +221,7 @@ class AnalysisReport(BaseModel):
     asset_cards: list[AssetAnalysisCard] = Field(default_factory=list)
     simulations: list[HoldingPeriodSimulation] = Field(default_factory=list)
     recommended_allocations: list[PortfolioAllocation] = Field(default_factory=list)
+    methodology_references: list[MethodologyReference] = Field(default_factory=list)
     tx_draft: TxDraft | None = None
     attestation_draft: AttestationDraft | None = None
 

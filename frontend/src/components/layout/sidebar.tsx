@@ -2,7 +2,6 @@ import { ClipboardPenLine, Settings, UserRound, Workflow } from 'lucide-react'
 import { NavLink } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 
-import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils/cn'
 
 const navItems = [
@@ -19,31 +18,26 @@ interface SidebarProps {
 export function Sidebar({ collapsed }: SidebarProps) {
   const { i18n, t } = useTranslation()
   const isZh = i18n.language.startsWith('zh')
-  const title = 'Genius Actuary RWA'
-  const tagline = isZh ? 'HashKey Chain RWA 决策引擎' : 'HashKey Chain RWA decision engine'
+
   const getNavLabel = (key: (typeof navItems)[number]['key']) => {
     if (key === 'resources') {
-      return isZh ? '历史分析记录' : 'Analysis History'
+      return isZh ? '历史记录' : 'History'
     }
-
     return t(`nav.${key}`)
   }
 
   return (
     <aside
       className={cn(
-        'panel-card hidden h-[calc(100vh-2rem)] flex-col justify-between overflow-hidden p-4 lg:flex',
-        collapsed ? 'w-[92px]' : 'w-[286px]',
+        'panel-card hidden h-[calc(100vh-2rem)] flex-col overflow-hidden p-3 lg:flex',
+        collapsed ? 'w-[84px]' : 'w-[196px]',
       )}
     >
       <div className="space-y-6">
-        <div className="gold-hairline space-y-2 px-3 pb-4">
+        <div className="gold-hairline px-3 pb-4">
           <p className="text-gold-primary text-xs font-semibold tracking-[0.22em] uppercase">
-            {title}
+            Genius Actuary RWA
           </p>
-          {!collapsed ? (
-            <p className="text-text-secondary text-sm leading-6">{tagline}</p>
-          ) : null}
         </div>
 
         <nav className="space-y-2">
@@ -63,16 +57,7 @@ export function Sidebar({ collapsed }: SidebarProps) {
                 }
               >
                 <Icon className="size-5 shrink-0" />
-                {!collapsed ? (
-                  <>
-                    <span className="truncate">{getNavLabel(item.key)}</span>
-                    {item.key === 'analyze' ? (
-                      <Badge tone="gold" className="ml-auto">
-                        {isZh ? '推荐' : 'Recommended'}
-                      </Badge>
-                    ) : null}
-                  </>
-                ) : null}
+                {!collapsed ? <span className="truncate">{getNavLabel(item.key)}</span> : null}
               </NavLink>
             )
           })}

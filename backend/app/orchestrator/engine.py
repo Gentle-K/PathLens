@@ -19,6 +19,7 @@ from app.domain.models import (
 )
 from app.domain.schemas import SessionStepResponse
 from app.persistence.base import SessionRepository
+from app.services.calculation_tasks import calculation_semantic_signature, sanitize_calculation_tasks
 from app.services.audit import AuditLogService
 
 
@@ -589,21 +590,15 @@ class AnalysisOrchestrator:
         session: AnalysisSession,
         tasks: list[CalculationTask],
     ) -> list[CalculationTask]:
+        session.calculation_tasks = sanitize_calculation_tasks(session.calculation_tasks)
         existing = {
-            (
-                AnalysisOrchestrator._normalize_text(task.objective),
-                AnalysisOrchestrator._normalize_text(task.formula_hint),
-                AnalysisOrchestrator._serialize_json(task.input_params),
-            )
+            task.semantic_signature or calculation_semantic_signature(task)
             for task in session.calculation_tasks
         }
         added: list[CalculationTask] = []
         for task in tasks:
-            key = (
-                AnalysisOrchestrator._normalize_text(task.objective),
-                AnalysisOrchestrator._normalize_text(task.formula_hint),
-                AnalysisOrchestrator._serialize_json(task.input_params),
-            )
+            key = task.semantic_signature or calculation_semantic_signature(task)
+            task.semantic_signature = key
             if key in existing:
                 continue
             session.calculation_tasks.append(task)
@@ -695,7 +690,7 @@ class AnalysisOrchestrator:
 
     @staticmethod
     def _task_is_pending(status: str) -> bool:
-        return status.strip().lower() not in {"completed", "failed", "skipped", "cancelled"}
+        return status.strip().lower() not in {"completed", "failed", "rejected", "skipped", "cancelled"}
 
     @staticmethod
     def _question_signature(question: ClarificationQuestion) -> str:

@@ -84,6 +84,8 @@ function buildBackendSession(overrides: Partial<BackendSession> = {}): BackendSe
         error_margin: 'Exact deterministic evaluation over the provided parameters.',
         notes: 'Calculated locally by the backend calculation adapter.',
         status: 'completed',
+        validation_state: 'validated',
+        user_visible: true,
       },
     ],
     chart_tasks: [],
@@ -133,6 +135,14 @@ function buildBackendSession(overrides: Partial<BackendSession> = {}): BackendSe
       open_questions: ['What is the visa processing lead time?'],
       chart_refs: ['chart-1'],
       markdown: '# Report\n\nExchange remains attractive under the right funding conditions.',
+      methodology_references: [
+        {
+          key: 'markowitz-1952',
+          title: 'Markowitz (1952) Portfolio Selection',
+          url: 'https://traders.berkeley.edu/papers/Markowitz.pdf',
+          summary: 'Risk-return separation.',
+        },
+      ],
     },
     events: [
       {
@@ -296,5 +306,44 @@ describe('genius backend contract mapping', () => {
     expect(report.chainConfig?.oracleFeeds[0]?.pair).toBe('USDC/USD')
     expect(report.marketSnapshots?.[0]?.status).toBe('live')
     expect(report.attestationDraft?.transactionUrl).toContain('/tx/0xaaaaaaaa')
+  })
+
+  it('keeps hidden calculations on the session but filters them out of the report bundle', () => {
+    const backendSession = buildBackendSession({
+      calculation_tasks: [
+        {
+          task_id: 'calc-visible',
+          objective: 'Visible task',
+          formula_hint: 'principal * 1.01',
+          input_params: { principal: 10000 },
+          unit: 'USDT',
+          result_value: 10100,
+          result_text: '10100',
+          result_payload: {},
+          status: 'completed',
+          validation_state: 'validated',
+          user_visible: true,
+        },
+        {
+          task_id: 'calc-hidden',
+          objective: 'Rejected task',
+          formula_hint: '待搜索数据填充',
+          input_params: {},
+          unit: 'USDT',
+          result_payload: {},
+          status: 'rejected',
+          validation_state: 'rejected',
+          user_visible: false,
+          failure_reason: 'formula_hint must be ASCII-only and machine-executable.',
+        },
+      ],
+    })
+
+    const session = mapBackendSession(backendSession)
+    const report = mapBackendReport(backendSession)
+
+    expect(session.calculations).toHaveLength(2)
+    expect(report.calculations).toHaveLength(1)
+    expect(report.calculations[0]?.taskType).toBe('Visible task')
   })
 })

@@ -5,6 +5,7 @@ import math
 from typing import Any
 
 from app.domain.models import CalculationTask
+from app.services.calculation_tasks import normalize_formula_hint, validate_calculation_task
 
 
 def _mean(values: list[float]) -> float:
@@ -61,23 +62,38 @@ class LocalCalculationAdapter:
 
     def _run_single(self, task: CalculationTask) -> None:
         try:
-            formula = self._normalize_formula(task.formula_hint)
+            validate_calculation_task(task)
+            formula = normalize_formula_hint(task.formula_hint)
             variables = self._prepare_variables(task.input_params)
             result = self._evaluate_expression(formula, variables)
 
             task.status = "completed"
+            task.validation_state = "validated"
             task.result_value = self._scalar_number(result)
             task.result_text = self._format_result(result)
             task.result_payload = self._build_result_payload(result, task.input_params)
             task.error_margin = "Exact deterministic evaluation over the provided parameters."
             task.notes = "Calculated locally by the backend calculation adapter."
+            task.failure_reason = ""
+            task.user_visible = True
         except Exception as error:
-            task.status = "failed"
+            message = str(error)
+            is_validation_error = (
+                "formula_hint" in message
+                or "variable" in message.lower()
+                or "formula" in message.lower()
+                or "parameter" in message.lower()
+                or "ASCII" in message
+            )
+            task.status = "rejected" if is_validation_error else "failed"
+            task.validation_state = "rejected" if is_validation_error else "validated"
             task.result_value = None
             task.result_text = ""
             task.result_payload = {}
             task.error_margin = "Unavailable because the expression or parameters could not be evaluated."
             task.notes = f"Calculation failed: {error}"
+            task.failure_reason = message
+            task.user_visible = False
 
     def _evaluate_expression(self, expression: str, variables: dict[str, Any]) -> Any:
         parsed = ast.parse(expression, mode="eval")
@@ -160,17 +176,6 @@ class LocalCalculationAdapter:
         if isinstance(node, ast.Name):
             return node.id
         raise ValueError("Only direct function calls are allowed.")
-
-    @staticmethod
-    def _normalize_formula(formula: str) -> str:
-        normalized = formula.strip().strip("`")
-        if not normalized:
-            raise ValueError("formula_hint is required for calculation tasks.")
-        if "=" in normalized and "==" not in normalized:
-            normalized = normalized.split("=", 1)[1].strip()
-        if "^" in normalized and "**" not in normalized:
-            normalized = normalized.replace("^", "**")
-        return normalized
 
     def _prepare_variables(self, params: dict[str, Any]) -> dict[str, Any]:
         return {

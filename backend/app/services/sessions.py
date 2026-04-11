@@ -4,6 +4,7 @@ from app.i18n import normalize_locale
 from app.persistence.base import SessionRepository
 from app.rwa.catalog import build_chain_config
 from app.rwa.explorer_service import address_url, tx_url
+from app.services.calculation_tasks import sanitize_calculation_tasks
 from app.config import Settings
 from app.services.audit import AuditLogService
 
@@ -18,6 +19,14 @@ class SessionService:
         self.repository = repository
         self.audit_log_service = audit_log_service
         self.follow_up_round_limit = max(1, follow_up_round_limit)
+
+    @staticmethod
+    def _sanitize_session(session: AnalysisSession | None) -> AnalysisSession | None:
+        if session is None:
+            return None
+        sanitized = session.model_copy(deep=True)
+        sanitized.calculation_tasks = sanitize_calculation_tasks(sanitized.calculation_tasks)
+        return sanitized
 
     def create_session(
         self,
@@ -80,13 +89,26 @@ class SessionService:
         return saved
 
     def get_session(self, session_id: str) -> AnalysisSession | None:
-        return self.repository.get(session_id)
+        return self._sanitize_session(self.repository.get(session_id))
 
     def list_sessions(self) -> list[AnalysisSession]:
-        return self.repository.list_sessions()
+        return [
+            sanitized
+            for sanitized in (
+                self._sanitize_session(session) for session in self.repository.list_sessions()
+            )
+            if sanitized is not None
+        ]
 
     def list_sessions_by_owner(self, owner_client_id: str) -> list[AnalysisSession]:
-        return self.repository.list_sessions_by_owner(owner_client_id)
+        return [
+            sanitized
+            for sanitized in (
+                self._sanitize_session(session)
+                for session in self.repository.list_sessions_by_owner(owner_client_id)
+            )
+            if sanitized is not None
+        ]
 
     def delete_sessions_by_owner(self, owner_client_id: str) -> int:
         deleted = self.repository.delete_sessions_by_owner(owner_client_id)

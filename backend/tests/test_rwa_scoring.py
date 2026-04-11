@@ -82,6 +82,23 @@ class ScoreRiskTests(unittest.TestCase):
         self.assertEqual(v1.market, v2.market)
         self.assertEqual(v1.liquidity, v2.liquidity)
 
+    def test_risk_score_worsens_when_drawdown_and_lockup_increase(self):
+        asset = _asset_library()[0].model_copy(deep=True)
+        safer = asset.model_copy(deep=True)
+        safer.max_drawdown_180d = 0.02
+        safer.lockup_days = 0
+
+        riskier = asset.model_copy(deep=True)
+        riskier.max_drawdown_180d = 0.28
+        riskier.lockup_days = 120
+
+        safer_vector = score_risk(safer)
+        riskier_vector = score_risk(riskier)
+
+        self.assertLess(safer_vector.peg_redemption, riskier_vector.peg_redemption)
+        self.assertLess(safer_vector.liquidity, riskier_vector.liquidity)
+        self.assertLess(safer_vector.overall, riskier_vector.overall)
+
 
 class SimulateHoldingTests(unittest.TestCase):
     def test_simulation_returns_valid_structure(self):
@@ -177,6 +194,7 @@ class BuildReportTests(unittest.TestCase):
         self.assertIn("/address/", report.attestation_draft.explorer_url or "")
         self.assertEqual("testnet", report.market_snapshots[0].network if report.market_snapshots else "testnet")
         self.assertGreater(len(evidence), 0)
+        self.assertGreater(len(report.methodology_references), 0)
 
     def test_build_rwa_report_includes_structured_kyc_snapshot(self):
         library = _asset_library()

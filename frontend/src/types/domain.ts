@@ -360,6 +360,9 @@ export interface CalculationTask {
   errorMargin?: string
   notes?: string
   status?: string
+  validationState?: 'pending' | 'validated' | 'rejected'
+  failureReason?: string
+  userVisible?: boolean
   createdAt: string
 }
 
@@ -488,6 +491,16 @@ export interface RiskVector {
   overall: number
 }
 
+export interface RiskBreakdownItem {
+  dimension: string
+  rawValue?: number
+  normalizedScore: number
+  weight: number
+  evidenceRefs: string[]
+  dataStatus?: string
+  note?: string
+}
+
 export interface SimulationPathPoint {
   day: number
   p10Value: number
@@ -585,8 +598,17 @@ export interface AssetAnalysisCard {
   onchainVerified?: boolean
   issuerDisclosed?: boolean
   riskVector: RiskVector
+  riskBreakdown: RiskBreakdownItem[]
+  riskDataQuality: number
   metadata: Record<string, unknown>
   evidenceRefs: string[]
+}
+
+export interface MethodologyReference {
+  key: string
+  title: string
+  url: string
+  summary: string
 }
 
 export interface RwaBootstrap {
@@ -629,6 +651,7 @@ export interface AnalysisReport {
   assetCards: AssetAnalysisCard[]
   simulations: HoldingPeriodSimulation[]
   recommendedAllocations: PortfolioAllocation[]
+  methodologyReferences?: MethodologyReference[]
   txDraft?: TxDraft
   attestationDraft?: AttestationDraft
   exportedAt?: string

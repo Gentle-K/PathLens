@@ -81,7 +81,7 @@ export const useAppStore = create<AppStoreState>()(
       locale: 'zh',
       displayDensity: 'cozy',
       apiMode: defaultApiMode,
-      sidebarOpen: true,
+      sidebarOpen: false,
       accessToken: null,
       refreshToken: null,
       currentUser: null,

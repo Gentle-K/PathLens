@@ -33,6 +33,7 @@ from app.domain.rwa import (
 )
 from app.i18n import text_for_locale
 from app.rwa.explorer_service import address_url, chain_id_for, oracle_docs_url
+from app.rwa.risk_model import allocation_reason, build_risk_profiles, methodology_references
 
 logger = logging.getLogger(__name__)
 
@@ -134,65 +135,21 @@ def _resolve_attestation_network(
 
 
 def score_risk(asset: AssetTemplate) -> RiskVector:
-    market = 30.0
-    market += 50.0 * sigmoid01((asset.price_volatility - 0.25) / 0.15)
-    market += 40.0 * sigmoid01((abs(asset.max_drawdown_180d) - 0.15) / 0.10)
-    market = clamp(market)
-
-    liquidity = 20.0
-    if asset.avg_daily_volume_usd > 0:
-        liquidity += 60.0 * sigmoid01((100_000 - asset.avg_daily_volume_usd) / 500_000)
-    liquidity += clamp(5.0 * asset.redemption_days, 0, 40)
-    liquidity += clamp(2.0 * asset.lockup_days, 0, 40)
-    liquidity = clamp(liquidity)
-
-    peg_redemption = 0.0
-    if asset.depeg_events_90d is not None and asset.worst_depeg_bps_90d is not None:
-        peg_redemption = 20.0 + 10.0 * asset.depeg_events_90d + 0.08 * asset.worst_depeg_bps_90d
-    peg_redemption = clamp(peg_redemption)
-
-    issuer_custody = (
-        80.0 * (1 - asset.issuer_disclosure_score)
-        + 60.0 * (1 - asset.custody_disclosure_score)
-        + 40.0 * (1 - asset.audit_disclosure_score)
+    fallback_context = RwaIntakeContext(
+        investment_amount=max(asset.minimum_ticket_usd, 10_000.0),
+        holding_period_days=max(asset.redemption_days or 30, 30),
+        risk_tolerance=RiskTolerance.BALANCED,
+        liquidity_need=LiquidityNeed.T_PLUS_3,
+        minimum_kyc_level=0,
     )
-    issuer_custody = clamp(issuer_custody)
-
-    smart_contract = 10.0
-    smart_contract += 25.0 if asset.contract_is_upgradeable else 0.0
-    smart_contract += 25.0 if asset.has_admin_key else 0.0
-    smart_contract = clamp(smart_contract)
-
-    oracle_dependency = clamp(60.0 * sigmoid01((2 - asset.oracle_count) / 0.8))
-
-    compliance_access = 0.0
-    if asset.requires_kyc_level is not None and asset.requires_kyc_level > 0:
-        compliance_access = clamp(10.0 * asset.requires_kyc_level + 20.0)
-
-    overall = mean(
-        [
-            market,
-            liquidity,
-            peg_redemption,
-            issuer_custody,
-            smart_contract,
-            oracle_dependency,
-            compliance_access,
-        ]
+    simulation = simulate_holding(
+        asset,
+        fallback_context.investment_amount,
+        fallback_context.holding_period_days,
+        locale="en",
     )
-
-    return RiskVector(
-        asset_id=asset.asset_id,
-        asset_name=asset.name,
-        market=round(market, 1),
-        liquidity=round(liquidity, 1),
-        peg_redemption=round(peg_redemption, 1),
-        issuer_custody=round(issuer_custody, 1),
-        smart_contract=round(smart_contract, 1),
-        oracle_dependency=round(oracle_dependency, 1),
-        compliance_access=round(compliance_access, 1),
-        overall=round(overall, 1),
-    )
+    profile = build_risk_profiles([asset], [simulation], fallback_context)[asset.asset_id]
+    return profile.risk_vector
 
 
 def _checkpoint_days(holding_period_days: int) -> list[int]:
@@ -544,6 +501,65 @@ def recommend_allocations(
     return allocations
 
 
+def recommend_allocations(
+    context: RwaIntakeContext,
+    asset_cards: list[AssetAnalysisCard],
+    *,
+    locale: str = "zh",
+) -> list[PortfolioAllocation]:
+    effective_kyc_level = _effective_kyc_level(context)
+    scored_cards: list[tuple[AssetAnalysisCard, float, str]] = []
+
+    for card in asset_cards:
+        blocked_reason = ""
+        if card.kyc_required_level and effective_kyc_level < card.kyc_required_level:
+            blocked_reason = text_for_locale(
+                locale,
+                f"闇€瑕佽嚦灏?KYC 绛夌骇 {card.kyc_required_level}",
+                f"Requires at least KYC level {card.kyc_required_level}",
+            )
+        minimum_ticket_usd = float(card.metadata.get("minimum_ticket_usd", 0) or 0)
+        if not blocked_reason and minimum_ticket_usd > context.investment_amount:
+            blocked_reason = text_for_locale(
+                locale,
+                f"鏈€浣庤璐棬妲涙槸 {minimum_ticket_usd:.0f} USD",
+                f"Minimum ticket is {minimum_ticket_usd:.0f} USD",
+            )
+        utility_score = float(card.metadata.get("utility_score", 0.0) or 0.0)
+        scored_cards.append((card, utility_score, blocked_reason))
+
+    eligible_scores = [(card, score) for card, score, blocked_reason in scored_cards if not blocked_reason]
+    baseline = max((score for _, score in eligible_scores), default=0.0)
+    scaled_scores = {
+        card.asset_id: math.exp((score - baseline) / 8)
+        for card, score in eligible_scores
+    }
+    score_sum = sum(scaled_scores.values()) or 1.0
+    allocations: list[PortfolioAllocation] = []
+
+    for card, _, blocked_reason in scored_cards:
+        usable_score = scaled_scores.get(card.asset_id, 0.0) if not blocked_reason else 0.0
+        target_weight = 0.0 if blocked_reason else usable_score / score_sum * 100
+        rationale = text_for_locale(
+            locale,
+            "鍏堢湅椋庨櫓璋冩暣鍚庢晥鐢ㄥ拰鍑嗗叆绾︽潫锛屽啀鍐冲畾鏉冮噸銆?",
+            allocation_reason(card, card.metadata.get("utility_components", {})),
+        )
+        allocations.append(
+            PortfolioAllocation(
+                asset_id=card.asset_id,
+                asset_name=card.name,
+                target_weight_pct=round(target_weight, 1),
+                suggested_amount=round(context.investment_amount * target_weight / 100, 2),
+                rationale=rationale,
+                blocked_reason=blocked_reason,
+            )
+        )
+
+    allocations.sort(key=lambda item: item.target_weight_pct, reverse=True)
+    return allocations
+
+
 def _source_name(url: str) -> str:
     hostname = urlparse(url).hostname or ""
     return hostname.replace("www.", "") or "source"
@@ -612,10 +628,17 @@ def build_catalog_evidence(
 def build_asset_cards(
     assets: list[AssetTemplate],
     context: RwaIntakeContext,
+    simulations: list[HoldingPeriodSimulation] | None = None,
 ) -> list[AssetAnalysisCard]:
+    if simulations is None:
+        simulations = [
+            simulate_holding(asset, context.investment_amount, context.holding_period_days, locale="en")
+            for asset in assets
+        ]
+    profiles = build_risk_profiles(assets, simulations, context)
     cards: list[AssetAnalysisCard] = []
     for asset in assets:
-        risk_vector = score_risk(asset)
+        profile = profiles[asset.asset_id]
         cards.append(
             AssetAnalysisCard(
                 asset_id=asset.asset_id,
@@ -638,7 +661,9 @@ def build_asset_cards(
                 primary_source_url=asset.primary_source_url or (asset.evidence_urls[0] if asset.evidence_urls else ""),
                 onchain_verified=asset.onchain_verified,
                 issuer_disclosed=asset.issuer_disclosed,
-                risk_vector=risk_vector,
+                risk_vector=profile.risk_vector,
+                risk_breakdown=profile.risk_breakdown,
+                risk_data_quality=profile.risk_data_quality,
                 metadata={
                     "minimum_ticket_usd": asset.minimum_ticket_usd,
                     "oracle_count": asset.oracle_count,
@@ -646,6 +671,8 @@ def build_asset_cards(
                     "oracle_sources": asset.oracle_sources,
                     "pricing_source_label": "APRO Oracle" if asset.oracle_count else "Issuer / disclosure",
                     "source_url": asset.primary_source_url or (asset.evidence_urls[0] if asset.evidence_urls else ""),
+                    "utility_score": profile.utility_score,
+                    "utility_components": profile.utility_components,
                 },
                 evidence_refs=list(asset.evidence_urls),
             )
@@ -786,6 +813,206 @@ def build_option_profiles(
                 currency="bps",
                 score=round(max(0, 100 - card.risk_vector.overall + simulation.return_pct_base), 1),
                 confidence=0.79,
+                basis_refs=card.evidence_refs,
+            )
+        )
+    return profiles
+
+"""
+def build_comparison_tables(
+    asset_cards: list[AssetAnalysisCard],
+    simulations: list[HoldingPeriodSimulation],
+    *,
+    locale: str = "zh",
+) -> list[ReportTable]:
+    simulation_map = {simulation.asset_id: simulation for simulation in simulations}
+    comparison_rows = []
+    risk_rows = []
+    for card in asset_cards:
+        simulation = simulation_map[card.asset_id]
+        utility_score = float(card.metadata.get("utility_score", 0.0) or 0.0)
+        comparison_rows.append(
+            {
+                text_for_locale(locale, "璧勪骇", "Asset"): card.name,
+                text_for_locale(locale, "绫诲瀷", "Type"): _asset_type_label(card.asset_type, locale),
+                text_for_locale(locale, "鍩哄噯鎸佹湁鏈熸敹鐩?, "Base holding return"): f"{simulation.return_pct_base:.2f}%",
+                "CVaR95": f"{simulation.cvar_95_pct:.2f}%",
+                text_for_locale(locale, "鏈€鐭€€鍑?, "Earliest exit"): "T+0" if card.exit_days == 0 else f"T+{card.exit_days}",
+                "Risk-adjusted utility": round(utility_score, 2),
+                "Risk score": card.risk_vector.overall,
+                "Data quality": round(card.risk_data_quality, 2),
+            }
+        )
+        risk_rows.append(
+            {
+                text_for_locale(locale, "璧勪骇", "Asset"): card.name,
+                text_for_locale(locale, "甯傚満", "Market"): card.risk_vector.market,
+                text_for_locale(locale, "娴佸姩鎬?, "Liquidity"): card.risk_vector.liquidity,
+                text_for_locale(locale, "灏鹃儴鎹熷け", "Tail / redemption"): card.risk_vector.peg_redemption,
+                text_for_locale(locale, "鍙戣涓庢墭绠?, "Issuer / custody"): card.risk_vector.issuer_custody,
+                text_for_locale(locale, "鍚堢害娌荤悊", "Contract governance"): card.risk_vector.smart_contract,
+                text_for_locale(locale, "棰勮█鏈轰緷璧?, "Oracle dependency"): card.risk_vector.oracle_dependency,
+                text_for_locale(locale, "鍑嗗叆绾︽潫", "Compliance access"): card.risk_vector.compliance_access,
+                "Overall": card.risk_vector.overall,
+            }
+        )
+
+    return [
+        ReportTable(
+            title=text_for_locale(locale, "RWA 瀵规瘮鐭╅樀", "RWA comparison matrix"),
+            columns=list(comparison_rows[0].keys()) if comparison_rows else [],
+            rows=comparison_rows,
+            notes=text_for_locale(
+                locale,
+                "鏀剁泭銆丆VaR銆侀€€鍑洪€熷害鍜岄闄╄皟鏁存晥鐢ㄦ寜鍚屼竴鍙ｅ緞瀵规瘮锛岄伩鍏嶅彧鐪?APY 銆?",
+                "Returns, CVaR, exit speed, and risk-adjusted utility are shown on one basis so the ranking is not driven by APY alone.",
+            ),
+        ),
+        ReportTable(
+            title=text_for_locale(locale, "RiskVector 缁嗗垎", "RiskVector breakdown"),
+            columns=list(risk_rows[0].keys()) if risk_rows else [],
+            rows=risk_rows,
+            notes=text_for_locale(
+                locale,
+                "鍚勭淮搴﹀垎鏁板厛鍋?winsorize 鍐嶆牴鎹綋鍓嶈祫浜ч泦鍚堝拰 CRITIC/AHP 鏉冮噸缁勫悎锛?0-100 鍒嗚秺楂樿秺鍗遍櫓銆?",
+                "Each dimension is winsorized first and then blended with AHP/CRITIC weights across the current asset set; higher scores are riskier on a 0-100 scale.",
+            ),
+        ),
+    ]
+
+"""
+
+def build_comparison_tables(
+    asset_cards: list[AssetAnalysisCard],
+    simulations: list[HoldingPeriodSimulation],
+    *,
+    locale: str = "zh",
+) -> list[ReportTable]:
+    simulation_map = {simulation.asset_id: simulation for simulation in simulations}
+    comparison_rows = []
+    risk_rows = []
+    for card in asset_cards:
+        simulation = simulation_map[card.asset_id]
+        utility_score = float(card.metadata.get("utility_score", 0.0) or 0.0)
+        comparison_rows.append(
+            {
+                text_for_locale(locale, "资产", "Asset"): card.name,
+                text_for_locale(locale, "类型", "Type"): _asset_type_label(card.asset_type, locale),
+                text_for_locale(locale, "基准持有期收益", "Base holding return"): f"{simulation.return_pct_base:.2f}%",
+                "CVaR95": f"{simulation.cvar_95_pct:.2f}%",
+                text_for_locale(locale, "最早退出", "Earliest exit"): "T+0" if card.exit_days == 0 else f"T+{card.exit_days}",
+                "Risk-adjusted utility": round(utility_score, 2),
+                "Risk score": card.risk_vector.overall,
+                "Data quality": round(card.risk_data_quality, 2),
+            }
+        )
+        risk_rows.append(
+            {
+                text_for_locale(locale, "资产", "Asset"): card.name,
+                text_for_locale(locale, "市场", "Market"): card.risk_vector.market,
+                text_for_locale(locale, "流动性", "Liquidity"): card.risk_vector.liquidity,
+                text_for_locale(locale, "尾部损失", "Tail / redemption"): card.risk_vector.peg_redemption,
+                text_for_locale(locale, "发行人 / 托管", "Issuer / custody"): card.risk_vector.issuer_custody,
+                text_for_locale(locale, "合约治理", "Contract governance"): card.risk_vector.smart_contract,
+                text_for_locale(locale, "预言机依赖", "Oracle dependency"): card.risk_vector.oracle_dependency,
+                text_for_locale(locale, "准入约束", "Compliance access"): card.risk_vector.compliance_access,
+                "Overall": card.risk_vector.overall,
+            }
+        )
+
+    return [
+        ReportTable(
+            title=text_for_locale(locale, "RWA 对比矩阵", "RWA comparison matrix"),
+            columns=list(comparison_rows[0].keys()) if comparison_rows else [],
+            rows=comparison_rows,
+            notes=text_for_locale(
+                locale,
+                "收益、CVaR、退出速度和风险调整效用放在同一口径下比较，避免只看 APY。",
+                "Returns, CVaR, exit speed, and risk-adjusted utility are shown on one basis so the ranking is not driven by APY alone.",
+            ),
+        ),
+        ReportTable(
+            title=text_for_locale(locale, "RiskVector 细分", "RiskVector breakdown"),
+            columns=list(risk_rows[0].keys()) if risk_rows else [],
+            rows=risk_rows,
+            notes=text_for_locale(
+                locale,
+                "各维度先做 winsorize，再结合当前资产集的 AHP / CRITIC 权重；0-100 分越高越危险。",
+                "Each dimension is winsorized first and then blended with AHP/CRITIC weights across the current asset set; higher scores are riskier on a 0-100 scale.",
+            ),
+        ),
+    ]
+
+def build_option_profiles(
+    asset_cards: list[AssetAnalysisCard],
+    simulations: list[HoldingPeriodSimulation],
+    *,
+    locale: str = "zh",
+) -> list[OptionProfile]:
+    simulation_map = {simulation.asset_id: simulation for simulation in simulations}
+    raw_utility_scores = [float(card.metadata.get("utility_score", 0.0) or 0.0) for card in asset_cards]
+    utility_low = min(raw_utility_scores) if raw_utility_scores else 0.0
+    utility_high = max(raw_utility_scores) if raw_utility_scores else 1.0
+    utility_span = max(utility_high - utility_low, 1.0)
+
+    profiles: list[OptionProfile] = []
+    for card in asset_cards:
+        simulation = simulation_map[card.asset_id]
+        utility_score = float(card.metadata.get("utility_score", 0.0) or 0.0)
+        score = 20 + ((utility_score - utility_low) / utility_span) * 70
+        top_risks = sorted(card.risk_breakdown, key=lambda item: item.normalized_score * item.weight, reverse=True)[:2]
+        profiles.append(
+            OptionProfile(
+                name=card.name,
+                summary=card.fit_summary,
+                pros=[
+                    text_for_locale(
+                        locale,
+                        f"鍩哄噯鎸佹湁鏈熸敹鐩婄害 {simulation.return_pct_base:.2f}%锛孋VaR95 {simulation.cvar_95_pct:.2f}%",
+                        f"Base holding return is about {simulation.return_pct_base:.2f}% with CVaR95 at {simulation.cvar_95_pct:.2f}%.",
+                    ),
+                    text_for_locale(
+                        locale,
+                        f"鏁版嵁璐ㄩ噺 {card.risk_data_quality:.2f}锛岄€€鍑鸿妭濂?{'T+0' if card.exit_days == 0 else f'T+{card.exit_days}'}",
+                        f"Data quality is {card.risk_data_quality:.2f} and exit cadence is {'T+0' if card.exit_days == 0 else f'T+{card.exit_days}'}.",
+                    ),
+                ],
+                cons=[
+                    text_for_locale(
+                        locale,
+                        f"缁煎悎椋庨櫓 {card.risk_vector.overall:.1f}/100",
+                        f"Overall risk is {card.risk_vector.overall:.1f}/100.",
+                    ),
+                    text_for_locale(
+                        locale,
+                        f"鎬绘垚鏈?{card.total_cost_bps} bps",
+                        f"All-in cost is {card.total_cost_bps} bps over the modeled hold.",
+                    ),
+                ],
+                conditions=[
+                    text_for_locale(
+                        locale,
+                        f"KYC 绛夌骇瑕佹眰: {card.kyc_required_level or 0}",
+                        f"KYC requirement: {card.kyc_required_level or 0}",
+                    ),
+                ],
+                fit_for=[card.fit_summary],
+                caution_flags=[
+                    text_for_locale(
+                        locale,
+                        f"閲嶇偣椋庨櫓: {item.dimension} {item.normalized_score:.1f}/100"
+                        if locale == "zh"
+                        else f"Primary risk: {item.dimension} {item.normalized_score:.1f}/100",
+                        f"Primary risk: {item.dimension} {item.normalized_score:.1f}/100",
+                    )
+                    for item in top_risks
+                ],
+                estimated_cost_low=card.total_cost_bps * 0.85,
+                estimated_cost_base=float(card.total_cost_bps),
+                estimated_cost_high=card.total_cost_bps * 1.15,
+                currency="bps",
+                score=round(max(0.0, min(100.0, score)), 1),
+                confidence=round(max(0.55, min(0.95, 0.6 + card.risk_data_quality * 0.3)), 2),
                 basis_refs=card.evidence_refs,
             )
         )
@@ -1135,7 +1362,6 @@ def build_rwa_report(
     oracle_snapshots: list[OracleSnapshot] | None = None,
 ) -> tuple[AnalysisReport, list[EvidenceItem]]:
     selected_assets = resolve_selected_assets(mode, problem_statement, context, asset_library)
-    asset_cards = build_asset_cards(selected_assets, context)
     effective_kyc_level = _effective_kyc_level(context)
     resolved_report_network = _report_network(context, chain_config)
     kyc_snapshot: KycOnchainResult | None = None
@@ -1184,6 +1410,7 @@ def build_rwa_report(
         )
         for asset in selected_assets
     ]
+    asset_cards = build_asset_cards(selected_assets, context, simulations)
     simulation_map = {simulation.asset_id: simulation for simulation in simulations}
     allocations = recommend_allocations(context, asset_cards, locale=locale)
     asset_lookup = {asset.asset_id: asset for asset in selected_assets}
@@ -1320,6 +1547,7 @@ def build_rwa_report(
         asset_cards=asset_cards,
         simulations=simulations,
         recommended_allocations=allocations,
+        methodology_references=methodology_references(),
         tx_draft=tx_draft,
     )
     report.attestation_draft = build_attestation_draft(markdown, allocations, chain_config)

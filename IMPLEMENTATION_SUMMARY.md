@@ -2,35 +2,55 @@
 
 ## What was fixed
 
-- Default HashKey execution context now resolves to testnet for local/demo use unless env overrides it.
-- Backend reports now persist a structured KYC snapshot and use the resolved on-chain network consistently.
-- Backend oracle snapshots are fetched and normalized on the backend, then exposed to the frontend through typed APIs.
-- Evidence items now preserve source type and source tags, including explicit third-party source tagging.
-- Explorer links for attestation contracts and transactions now use centralized backend builders instead of ad hoc UI string assembly.
-- Transaction draft generation now handles network transitions between asset execution and attestation networks.
-- Frontend wallet hooks now fetch KYC and oracle data from the backend instead of reading live chain data directly in the UI.
-- The execution page was replaced with a real session-backed state machine covering pre-check, signing, submission, pending, success, and failure states.
-- The result page now routes attestation execution through the dedicated execution console and surfaces KYC snapshots, oracle snapshots, evidence, tx receipts, and explorer links coherently.
-- Cross-platform smoke/full verification runners were added in Python, with bash and PowerShell wrappers preserved for compatibility.
+- Replaced the narrow heuristic RWA scoring path with an explainable two-layer model in `backend/app/rwa/risk_model.py` and `backend/app/rwa/engine.py`:
+  - seven preserved risk dimensions
+  - robust cross-asset normalization with winsorization
+  - AHP prior weights by risk tolerance
+  - CRITIC adjustment so assets do not collapse into near-identical scores
+  - explicit `risk_breakdown` and `risk_data_quality` on each asset card
+- Reworked allocation ranking to use risk-adjusted utility instead of the old `return - risk - fee` style heuristic.
+- Fixed the history/result crash caused by formatting `USDT` as an ISO currency code.
+- Added route-level error boundaries and recoverable result-page states so report/history failures no longer drop users into the default React Router crash screen.
+- Cleaned the RWA calculation pipeline:
+  - only validated deterministic calculations are user-visible
+  - invalid free-text formulas are rejected before execution
+  - duplicate tasks are merged by semantic signature instead of raw string equality
+  - polluted historical sessions are sanitized on read instead of requiring destructive data rewrites
+- Restored the non-RWA LLM retry path so existing planning/clarification regression tests still pass while RWA sessions remain deterministic.
+- Tightened chart behavior to reduce label and legend overlap on long asset names.
+- Compressed the shell UI:
+  - sidebar defaults to a compact rail
+  - topbar uses a lighter chrome with a three-dot expander
+  - main content now uses the screen more aggressively instead of being boxed into the previous wide max width
 
 ## What was added
 
-- `AUDIT_REPORT.md`
-- `IMPLEMENTATION_SUMMARY.md`
-- backend KYC status enum support: `none`, `approved`, `revoked`, `unavailable`
-- backend/frontend typed adapters for `/api/kyc/{wallet}` and `/api/oracle/snapshots`
-- transaction error classification utilities for wallet and chain failures
-- PowerShell wrappers: `scripts/test_smoke.ps1`, `scripts/test_full.ps1`
-- Python runners: `scripts/test_smoke.py`, `scripts/test_full.py`
-- regression tests for transaction error classification
+- Backend task hygiene module: `backend/app/services/calculation_tasks.py`
+- Backend risk methodology module: `backend/app/rwa/risk_model.py`
+- New typed report fields:
+  - `AssetAnalysisCard.risk_breakdown`
+  - `AssetAnalysisCard.risk_data_quality`
+  - `CalculationTask.validation_state`
+  - `CalculationTask.failure_reason`
+  - `CalculationTask.user_visible`
+  - `CalculationTask.semantic_signature`
+  - `AnalysisReport.methodology_references`
+- Frontend route error boundary: `frontend/src/app/route-error-boundary.tsx`
+- Frontend token-format regression tests: `frontend/src/lib/utils/format.test.ts`
+- New regression coverage for:
+  - invalid calculation-task rejection
+  - duplicate/polluted session cleanup
+  - risk monotonicity under worse drawdown / lockup inputs
+  - hidden calculations being excluded from report bundles
 
 ## What remains
 
-- The frontend production build still emits large chunk-size warnings for the report page bundle. This does not block runtime, but further code-splitting would improve load performance.
-- Live testnet writes still depend on real environment configuration for `HASHKEY_TESTNET_PLAN_REGISTRY_ADDRESS`, `HASHKEY_TESTNET_RPC_URL`, and wallet funding.
-- The KYC and oracle paths correctly avoid faking state, so if RPC endpoints or contract addresses are missing, the UI will show real unavailable/error states rather than simulated success.
+- The frontend production build still emits large chunk-size warnings, especially for the report page. Runtime is fine, but further code-splitting would improve load performance.
+- Live testnet writes still require a real deployed `PlanRegistry`, working RPC endpoints, and a funded wallet.
+- Oracle and KYC availability still depend on real contract addresses and RPC health. The system now reports genuine unavailable/error states instead of simulating success.
 
 ## Limitations
 
-- The repository can run fully in mock-analysis mode without external model credentials, but richer LLM-generated language still requires an optional compatible model endpoint.
-- The smoke/full scripts prefer Python 3.13 or 3.12 on Windows because Python 3.14 currently causes `pydantic-core` wheel/install friction in fresh virtualenvs.
+- The explainable risk model is literature-backed and auditable, but it still operates on the current repository's available asset features rather than long institutional time series for every instrument.
+- RWA sessions intentionally prefer deterministic planning/calculation templates; the optional LLM path is still used for narrative generation and for non-RWA sessions.
+- Historical polluted sessions are sanitized at read time. Old raw task payloads are preserved for traceability rather than deleted in place.

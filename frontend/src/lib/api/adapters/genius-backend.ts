@@ -15,12 +15,14 @@ import type {
   HashKeyChainConfig,
   HoldingPeriodSimulation,
   MarketDataSnapshot,
+  MethodologyReference,
   ModeDefinition,
   OptionProfile,
   OracleSnapshotBackend,
   OracleFeedConfig,
   PortfolioAllocation,
   ReportTable,
+  RiskBreakdownItem,
   RiskVector,
   ResourceRecord,
   RwaAssetTemplate,
@@ -187,6 +189,10 @@ export interface BackendCalculationTask {
   error_margin?: string
   notes?: string
   status: string
+  validation_state?: 'pending' | 'validated' | 'rejected' | string
+  failure_reason?: string
+  user_visible?: boolean
+  semantic_signature?: string
 }
 
 export interface BackendChartTask {
@@ -347,6 +353,16 @@ export interface BackendRiskVector {
   overall: number
 }
 
+export interface BackendRiskBreakdownItem {
+  dimension: string
+  raw_value?: number | null
+  normalized_score: number
+  weight: number
+  evidence_refs?: string[]
+  data_status?: string
+  note?: string
+}
+
 export interface BackendSimulationPathPoint {
   day: number
   p10_value: number
@@ -444,8 +460,17 @@ export interface BackendAssetAnalysisCard {
   onchain_verified: boolean
   issuer_disclosed: boolean
   risk_vector: BackendRiskVector
+  risk_breakdown?: BackendRiskBreakdownItem[]
+  risk_data_quality?: number
   metadata: Record<string, unknown>
   evidence_refs: string[]
+}
+
+export interface BackendMethodologyReference {
+  key: string
+  title: string
+  url: string
+  summary?: string
 }
 
 export interface BackendReport {
@@ -465,6 +490,7 @@ export interface BackendReport {
   asset_cards?: BackendAssetAnalysisCard[]
   simulations?: BackendHoldingPeriodSimulation[]
   recommended_allocations?: BackendPortfolioAllocation[]
+  methodology_references?: BackendMethodologyReference[]
   tx_draft?: BackendTxDraft | null
   attestation_draft?: BackendAttestationDraft | null
 }
@@ -871,6 +897,31 @@ function mapAttestationDraft(
   }
 }
 
+function mapRiskBreakdownItem(
+  item: BackendRiskBreakdownItem,
+): RiskBreakdownItem {
+  return {
+    dimension: item.dimension,
+    rawValue: typeof item.raw_value === 'number' ? item.raw_value : undefined,
+    normalizedScore: item.normalized_score,
+    weight: item.weight,
+    evidenceRefs: item.evidence_refs ?? [],
+    dataStatus: item.data_status ?? '',
+    note: item.note ?? '',
+  }
+}
+
+function mapMethodologyReference(
+  item: BackendMethodologyReference,
+): MethodologyReference {
+  return {
+    key: item.key,
+    title: item.title,
+    url: item.url,
+    summary: item.summary ?? '',
+  }
+}
+
 function mapAssetAnalysisCard(
   card: BackendAssetAnalysisCard,
 ): AssetAnalysisCard {
@@ -896,6 +947,9 @@ function mapAssetAnalysisCard(
     onchainVerified: Boolean(card.onchain_verified),
     issuerDisclosed: Boolean(card.issuer_disclosed),
     riskVector: mapRiskVector(card.risk_vector),
+    riskBreakdown: (card.risk_breakdown ?? []).map(mapRiskBreakdownItem),
+    riskDataQuality:
+      typeof card.risk_data_quality === 'number' ? card.risk_data_quality : 1,
     metadata: card.metadata ?? {},
     evidenceRefs: card.evidence_refs ?? [],
   }
@@ -1077,6 +1131,12 @@ function mapBackendCalculationTask(
     errorMargin: task.error_margin ?? undefined,
     notes: task.notes ?? undefined,
     status: task.status,
+    validationState:
+      task.validation_state === 'validated' || task.validation_state === 'rejected'
+        ? task.validation_state
+        : 'pending',
+    failureReason: task.failure_reason ?? undefined,
+    userVisible: task.user_visible ?? task.status === 'completed',
     createdAt: fallbackCreatedAt,
   }
 }
@@ -1631,7 +1691,7 @@ export function mapBackendReport(session: BackendSession): AnalysisReport {
     summaryTitle: session.problem_statement,
     markdown: report?.markdown?.trim() || buildFallbackMarkdown(session),
     highlights: buildHighlights(session),
-    calculations: mappedSession.calculations,
+    calculations: mappedSession.calculations.filter((task) => task.userVisible !== false),
     charts: mappedSession.chartArtifacts ?? [],
     evidence: mappedSession.evidence,
     assumptions: report?.assumptions ?? [],
@@ -1653,6 +1713,7 @@ export function mapBackendReport(session: BackendSession): AnalysisReport {
     assetCards: (report?.asset_cards ?? []).map(mapAssetAnalysisCard),
     simulations: (report?.simulations ?? []).map(mapSimulation),
     recommendedAllocations: (report?.recommended_allocations ?? []).map(mapAllocation),
+    methodologyReferences: (report?.methodology_references ?? []).map(mapMethodologyReference),
     txDraft: mapTxDraft(report?.tx_draft),
     attestationDraft: mapAttestationDraft(report?.attestation_draft),
   }

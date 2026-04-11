@@ -3,6 +3,7 @@ import { Suspense, lazy, type ReactNode } from 'react'
 import { createBrowserRouter, Navigate, useParams } from 'react-router-dom'
 
 import { Skeleton } from '@/components/feedback/skeleton'
+import { RouteErrorBoundary } from '@/app/route-error-boundary'
 import { AppShell } from '@/components/layout/app-shell'
 import { DebugShell } from '@/components/layout/debug-shell'
 import { RequireAuth } from '@/features/auth/require-auth'
@@ -115,12 +116,15 @@ export const router = createBrowserRouter([
   {
     path: '/login',
     element: withRouteSuspense(<LoginPage />),
+    errorElement: <RouteErrorBoundary />,
   },
   {
     element: <RequireAuth />,
+    errorElement: <RouteErrorBoundary />,
     children: [
       {
         element: <AppShell />,
+        errorElement: <RouteErrorBoundary />,
         children: [
           { index: true, element: <Navigate to="/analysis/modes" replace /> },
           {
@@ -196,12 +200,15 @@ export const router = createBrowserRouter([
   {
     path: '/debug/login',
     element: withRouteSuspense(<DebugLoginPage />),
+    errorElement: <RouteErrorBoundary />,
   },
   {
     element: <RequireDebugAuth />,
+    errorElement: <RouteErrorBoundary />,
     children: [
       {
         element: <DebugShell />,
+        errorElement: <RouteErrorBoundary />,
         children: [
           { path: '/debug', element: <Navigate to="/debug/logs" replace /> },
           { path: '/debug/logs', element: withRouteSuspense(<AuditLogPage />) },
@@ -220,5 +227,6 @@ export const router = createBrowserRouter([
   {
     path: '*',
     element: <Navigate to="/analysis/modes" replace />,
+    errorElement: <RouteErrorBoundary />,
   },
 ])

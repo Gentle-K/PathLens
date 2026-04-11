@@ -15,6 +15,12 @@ interface ChartPalette {
   goldBright: string
 }
 
+interface AxisTooltipDatum {
+  axisValueLabel?: string
+  seriesName?: string
+  value?: unknown
+}
+
 function readCssVar(name: string, fallback: string) {
   if (typeof window === 'undefined') {
     return fallback
@@ -22,6 +28,13 @@ function readCssVar(name: string, fallback: string) {
 
   const value = window.getComputedStyle(document.documentElement).getPropertyValue(name).trim()
   return value || fallback
+}
+
+function normalizeTooltipParams(params: unknown): AxisTooltipDatum[] {
+  if (!Array.isArray(params)) {
+    return typeof params === 'object' && params !== null ? [params as AxisTooltipDatum] : []
+  }
+  return params.filter((item): item is AxisTooltipDatum => typeof item === 'object' && item !== null)
 }
 
 function getPalette(): ChartPalette {
@@ -73,6 +86,10 @@ function createSharedOption(palette: ChartPalette): EChartsOption {
       },
     },
   }
+}
+
+function truncateLabel(value: string, limit = 18) {
+  return value.length > limit ? `${value.slice(0, limit - 1)}…` : value
 }
 
 function axisLabelStyle(palette: ChartPalette) {
@@ -141,10 +158,20 @@ function buildBarOption(chart: ChartArtifact, palette: ChartPalette): EChartsOpt
   const categories = Array.from(new Set(seriesData.map((item) => item.label)))
   const groups = Array.from(new Set(seriesData.map((item) => item.group ?? 'Value')))
   const goldGradient = createGoldGradient()
+  const rotateLabels = categories.some((category) => category.length > 14)
 
   return {
     ...createSharedOption(palette),
+    grid: {
+      top: 72,
+      right: 24,
+      bottom: rotateLabels ? 86 : 58,
+      left: 54,
+      containLabel: true,
+    },
     legend: {
+      top: 8,
+      right: 0,
       textStyle: {
         color: palette.textSecondary,
       },
@@ -152,7 +179,12 @@ function buildBarOption(chart: ChartArtifact, palette: ChartPalette): EChartsOpt
     xAxis: {
       type: 'category',
       data: categories,
-      axisLabel: axisLabelStyle(palette),
+      axisLabel: {
+        ...axisLabelStyle(palette),
+        interval: 0,
+        rotate: rotateLabels ? 24 : 0,
+        formatter: (value: string) => truncateLabel(value),
+      },
       axisLine: { lineStyle: { color: palette.axisLine } },
       splitLine: {
         show: true,
@@ -166,6 +198,20 @@ function buildBarOption(chart: ChartArtifact, palette: ChartPalette): EChartsOpt
       splitLine: {
         show: true,
         lineStyle: { color: palette.gridLine },
+      },
+    },
+    tooltip: {
+      trigger: 'axis',
+      axisPointer: {
+        type: 'shadow',
+      },
+      backgroundColor: palette.panel,
+      borderColor: palette.borderStrong,
+      formatter: (params: unknown) => {
+        const items = normalizeTooltipParams(params)
+        const title = items[0]?.axisValueLabel ?? ''
+        const lines = items.map((item) => `${item.seriesName ?? 'Value'}: ${item.value ?? '-'}`)
+        return [title, ...lines].join('<br/>')
       },
     },
     series: groups.map((group, index) => ({
@@ -238,12 +284,23 @@ function buildRadarOption(chart: ChartArtifact, palette: ChartPalette): EChartsO
 
   return {
     ...createSharedOption(palette),
+    legend: {
+      top: 0,
+      right: 0,
+      type: radarSeries.length > 2 ? 'scroll' : 'plain',
+      textStyle: {
+        color: palette.textSecondary,
+      },
+    },
     radar: {
+      center: ['50%', '56%'],
+      radius: '62%',
       indicator: dimensions.map((dimension) => ({ name: dimension, max: 10 })),
       splitLine: { lineStyle: { color: palette.gridLine } },
       splitArea: { areaStyle: { color: ['rgba(255,255,255,0.02)', 'rgba(255,255,255,0.01)'] } },
       axisName: {
         color: palette.textSecondary,
+        formatter: (value?: string) => truncateLabel(value ?? '', 16),
       },
     },
     series: [
@@ -354,6 +411,7 @@ function buildPieOption(chart: ChartArtifact, palette: ChartPalette): EChartsOpt
     },
     legend: {
       bottom: 0,
+      type: 'scroll',
       textStyle: {
         color: palette.textSecondary,
       },

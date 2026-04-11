@@ -11,8 +11,8 @@ export function AppShell() {
   const sidebarOpen = useAppStore((state) => state.sidebarOpen)
 
   return (
-    <div className="bg-app-bg text-text-primary min-h-screen p-4">
-      <div className="mx-auto flex max-w-[1600px] gap-4">
+    <div className="bg-app-bg text-text-primary min-h-screen p-3 md:p-4">
+      <div className="flex w-full gap-4">
         <Sidebar collapsed={!sidebarOpen} />
         <div className="flex min-h-[calc(100vh-2rem)] min-w-0 flex-1 flex-col">
           <Topbar />

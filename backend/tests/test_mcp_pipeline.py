@@ -161,6 +161,21 @@ class CalculationAdapterTests(unittest.TestCase):
         self.assertEqual(100.0, task.result_value)
         self.assertEqual("100", task.result_text)
 
+    def test_local_calculation_adapter_rejects_natural_language_formula(self):
+        task = CalculationTask(
+            objective="Invalid task",
+            formula_hint="待搜索数据填充",
+            input_params={"principal": 1000},
+            unit="USDT",
+        )
+
+        LocalCalculationAdapter().run([task])
+
+        self.assertEqual("rejected", task.status)
+        self.assertEqual("rejected", task.validation_state)
+        self.assertFalse(task.user_visible)
+        self.assertIn("formula", task.failure_reason.lower())
+
 
 class ChartAdapterTests(unittest.TestCase):
     def test_structured_chart_adapter_builds_artifact_from_completed_calculations(self):
@@ -268,6 +283,56 @@ class OrchestratorMcpPipelineTests(unittest.TestCase):
         self.assertIsNotNone(saved_final)
         self.assertIsNotNone(saved_final.report)
         self.assertEqual(1, len(saved_final.report.chart_refs))
+
+    def test_session_service_sanitizes_duplicate_and_invalid_calculations_on_read(self):
+        repository = RepositoryWithAudit()
+        audit_log_service = AuditLogService(repository)
+        session_service = SessionService(repository, audit_log_service)
+
+        session = session_service.create_session(
+            mode=AnalysisMode.MULTI_OPTION,
+            problem_statement="Build a 30-day HashKey Chain RWA allocation for 10,000 USDT.",
+            owner_client_id="client-1",
+        )
+        raw = repository.get(session.session_id)
+        self.assertIsNotNone(raw)
+        raw.calculation_tasks = [
+            CalculationTask(
+                objective="Visible task",
+                formula_hint="principal * (1 + annual_return)",
+                input_params={"principal": 10000, "annual_return": 0.01},
+                unit="USDT",
+                result_value=10100,
+                result_text="10100",
+                status="completed",
+            ),
+            CalculationTask(
+                objective="Visible task duplicate wording",
+                formula_hint="principal * (1 + annual_return)",
+                input_params={"principal": 10000, "annual_return": 0.01},
+                unit="USDT",
+                result_value=10100,
+                result_text="10100",
+                status="completed",
+            ),
+            CalculationTask(
+                objective="Rejected task",
+                formula_hint="待搜索数据填充",
+                input_params={"principal": 10000},
+                unit="USDT",
+                status="failed",
+            ),
+        ]
+        repository.save(raw)
+
+        sanitized = session_service.get_session(session.session_id)
+        self.assertIsNotNone(sanitized)
+        visible = [task for task in sanitized.calculation_tasks if task.user_visible]
+        hidden = [task for task in sanitized.calculation_tasks if not task.user_visible]
+
+        self.assertEqual(1, len(visible))
+        self.assertEqual("completed", visible[0].status)
+        self.assertTrue(any(task.validation_state == "rejected" for task in hidden))
 
 
 if __name__ == "__main__":

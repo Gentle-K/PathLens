@@ -12,6 +12,26 @@ interface ChartCardProps {
   chart: ChartArtifact
 }
 
+function chartHeight(chart: ChartArtifact) {
+  const categoryCount = new Set(chart.compareSeries?.map((item) => item.label) ?? []).size
+  const maxLabelLength = Math.max(
+    0,
+    ...(chart.compareSeries?.map((item) => item.label.length) ?? []),
+    ...(chart.radarSeries?.flatMap((item) => item.values.map((value) => value.dimension.length)) ?? []),
+  )
+
+  if (chart.kind === 'bar') {
+    return maxLabelLength > 18 || categoryCount > 4 ? 420 : 360
+  }
+  if (chart.kind === 'radar') {
+    return chart.radarSeries && chart.radarSeries.length > 2 ? 420 : 380
+  }
+  if (chart.kind === 'pie') {
+    return 360
+  }
+  return 320
+}
+
 export function ChartCard({ chart }: ChartCardProps) {
   const { i18n } = useTranslation()
   const resolvedTheme = useAppStore((state) => state.resolvedTheme)
@@ -33,7 +53,7 @@ export function ChartCard({ chart }: ChartCardProps) {
           key={`${chart.id}-${resolvedTheme}`}
           echarts={echarts}
           option={option}
-          style={{ height: 320, width: '100%' }}
+          style={{ height: chartHeight(chart), width: '100%' }}
           notMerge
           lazyUpdate
         />

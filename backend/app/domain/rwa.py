@@ -186,6 +186,23 @@ class RiskVector(BaseModel):
     overall: float
 
 
+class RiskBreakdownItem(BaseModel):
+    dimension: str
+    raw_value: float | None = None
+    normalized_score: float
+    weight: float
+    evidence_refs: list[str] = Field(default_factory=list)
+    data_status: str = "live"
+    note: str = ""
+
+
+class MethodologyReference(BaseModel):
+    key: str
+    title: str
+    url: str
+    summary: str = ""
+
+
 class SimulationPathPoint(BaseModel):
     day: int
     p10_value: float
@@ -283,6 +300,8 @@ class AssetAnalysisCard(BaseModel):
     onchain_verified: bool = False
     issuer_disclosed: bool = False
     risk_vector: RiskVector
+    risk_breakdown: list[RiskBreakdownItem] = Field(default_factory=list)
+    risk_data_quality: float = 1.0
     metadata: dict[str, Any] = Field(default_factory=dict)
     evidence_refs: list[str] = Field(default_factory=list)
 

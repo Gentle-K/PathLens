@@ -36,11 +36,46 @@ export function formatCurrency(
   currency = 'USD',
   language: LanguageCode = 'zh',
 ) {
-  return new Intl.NumberFormat(localeMap[language], {
-    style: 'currency',
-    currency,
-    maximumFractionDigits: 0,
-  }).format(value)
+  return formatMoney(value, currency, language, { maximumFractionDigits: 0 })
+}
+
+const tokenCodeSet = new Set(['USDT', 'USDC', 'BTC', 'HSK', 'ETH'])
+
+function isIsoCurrencyCode(currency: string) {
+  return /^[A-Z]{3}$/.test(currency) && !tokenCodeSet.has(currency)
+}
+
+export function formatMoney(
+  value: number | undefined,
+  currency = 'USD',
+  language: LanguageCode = 'zh',
+  options: Intl.NumberFormatOptions = {},
+) {
+  if (typeof value !== 'number' || Number.isNaN(value)) {
+    return '--'
+  }
+
+  const locale = localeMap[language]
+  if (isIsoCurrencyCode(currency.toUpperCase())) {
+    return new Intl.NumberFormat(locale, {
+      style: 'currency',
+      currency: currency.toUpperCase(),
+      maximumFractionDigits: 2,
+      ...options,
+    }).format(value)
+  }
+
+  const digits =
+    typeof options.maximumFractionDigits === 'number'
+      ? options.maximumFractionDigits
+      : currency.toUpperCase() === 'BTC'
+        ? 6
+        : 2
+
+  return `${new Intl.NumberFormat(locale, {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: digits,
+  }).format(value)} ${currency.toUpperCase()}`
 }
 
 export function formatBytes(bytes: number) {

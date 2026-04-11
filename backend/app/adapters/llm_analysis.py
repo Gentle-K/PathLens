@@ -28,6 +28,7 @@ from app.prompts import (
     build_planning_prompts,
     build_reporting_prompts,
 )
+from app.services.calculation_tasks import calculation_semantic_signature, validate_calculation_task
 from app.i18n import text_for_locale
 from app.rwa.catalog import build_asset_library, build_chain_config
 from app.rwa.engine import build_rwa_report, resolve_selected_assets
@@ -235,6 +236,49 @@ def _build_multi_initial_questions(problem: str) -> list[ClarificationQuestion]:
 
 def _answer_values(session: AnalysisSession) -> list[str]:
     return [answer.value.strip() for answer in session.answers if answer.value.strip()]
+
+
+def _is_rwa_session(session: AnalysisSession) -> bool:
+    normalized = " ".join(
+        part
+        for part in [
+            session.problem_statement.strip().lower(),
+            session.intake_context.additional_constraints.strip().lower(),
+            " ".join(session.intake_context.preferred_asset_ids).lower(),
+        ]
+        if part
+    )
+    hard_keywords = (
+        "hashkey",
+        "rwa",
+        "kyc",
+        "attestation",
+        "plan registry",
+        "onchain",
+        "oracle",
+        "testnet",
+        "mainnet",
+    )
+    asset_keywords = (
+        "usdt",
+        "usdc",
+        "wbtc",
+        "mmf",
+        "stablecoin",
+        "silver",
+        "real estate",
+        "allocation",
+        "holding period",
+    )
+    hard_hits = sum(1 for keyword in hard_keywords if keyword in normalized)
+    asset_hits = sum(1 for keyword in asset_keywords if keyword in normalized)
+    return bool(
+        hard_hits
+        or asset_hits >= 2
+        or session.intake_context.wallet_address
+        or session.intake_context.wallet_network
+        or session.intake_context.preferred_asset_ids
+    )
 
 
 def _merged_rwa_context(session: AnalysisSession) -> RwaIntakeContext:
@@ -534,6 +578,11 @@ def _build_rwa_calculation_tasks(session: AnalysisSession) -> list[CalculationTa
                 ),
             )
         )
+    for task in tasks:
+        validate_calculation_task(task)
+        task.semantic_signature = calculation_semantic_signature(task)
+        task.validation_state = "validated"
+        task.user_visible = False
     return tasks
 
 
@@ -746,9 +795,40 @@ def _build_multi_report(session: AnalysisSession) -> AnalysisReport:
 
 class MockAnalysisAdapter:
     def generate_initial_questions(self, session: AnalysisSession) -> list[ClarificationQuestion]:
+        if not _is_rwa_session(session):
+            if session.mode == AnalysisMode.SINGLE_DECISION:
+                return _build_cost_initial_questions(session.problem_statement)
+            return _build_multi_initial_questions(session.problem_statement)
         return _build_rwa_questions(session)
 
     def plan_next_round(self, session: AnalysisSession) -> AnalysisLoopPlan:
+        if not _is_rwa_session(session):
+            unanswered = [question for question in session.clarification_questions if not question.answered]
+            if unanswered:
+                return AnalysisLoopPlan(
+                    major_conclusions=[
+                        MajorConclusionItem(
+                            content="The current clarification round still has unanswered questions.",
+                            conclusion_type="inference",
+                            confidence=0.72,
+                        )
+                    ],
+                    reasoning_focus="Wait for the remaining user-specific answers.",
+                    stop_reason="Waiting for clarification answers before the next planning round.",
+                )
+            return AnalysisLoopPlan(
+                major_conclusions=[
+                    MajorConclusionItem(
+                        content="The session now has enough structure to produce a bounded recommendation report.",
+                        conclusion_type="inference",
+                        confidence=0.82,
+                    )
+                ],
+                ready_for_report=True,
+                reasoning_focus="Consolidate the clarified goals, trade-offs, and constraints into the final recommendation.",
+                stop_reason="No additional clarification is required for the current snapshot.",
+            )
+
         unanswered = [question for question in session.clarification_questions if not question.answered]
         if unanswered:
             return AnalysisLoopPlan(
@@ -857,6 +937,10 @@ class MockAnalysisAdapter:
         )
 
     def build_report(self, session: AnalysisSession) -> AnalysisReport:
+        if not _is_rwa_session(session):
+            if session.mode == AnalysisMode.SINGLE_DECISION:
+                return _build_budget_report(session)
+            return _build_multi_report(session)
         settings = Settings.from_env()
         chain_config = build_chain_config(settings)
         asset_library = build_asset_library(chain_config, locale=session.locale)
@@ -909,15 +993,29 @@ class OpenAICompatibleAnalysisAdapter(MockAnalysisAdapter):
         self.retry_attempts = max(1, retry_attempts)
 
     def generate_initial_questions(self, session: AnalysisSession) -> list[ClarificationQuestion]:
-        # For HashKey RWAs, deterministic template questions provide perfectly stable
-        # prompts for Risk Vector tuning. This bypasses the long wait time of a reasoning
-        # model while maintaining all functionality.
-        return super().generate_initial_questions(session)
+        if _is_rwa_session(session):
+            return super().generate_initial_questions(session)
+        system_prompt, user_prompt = build_clarification_prompts(session)
+        return self._request_json_with_retry(
+            session=session,
+            system_prompt=system_prompt,
+            user_prompt=user_prompt,
+            operation="generate initial clarification questions",
+            validator=self._validate_initial_questions_payload,
+        )
 
     def plan_next_round(self, session: AnalysisSession) -> AnalysisLoopPlan:
-        # For RWA evaluation, deterministic MCP task generation reliably loads all the APRO
-        # oracle data without infinite loops. Bypass LLM planning to save 20+ minutes of waiting. 
-        return super().plan_next_round(session)
+        if _is_rwa_session(session):
+            return super().plan_next_round(session)
+        return self._request_json_with_retry(
+            session=session,
+            operation="plan the next analysis round",
+            validator=self._validate_planning_payload,
+            prompt_builder=lambda prompt_mode: build_planning_prompts(
+                session,
+                compact=prompt_mode == "compact",
+            ),
+        )
 
     def build_report(self, session: AnalysisSession) -> AnalysisReport:
         try:
@@ -1091,14 +1189,20 @@ class OpenAICompatibleAnalysisAdapter(MockAnalysisAdapter):
             if not isinstance(item, dict):
                 continue
             input_params = item.get("input_params")
-            parsed.append(
-                CalculationTask(
-                    objective=str(item.get("objective", "")).strip() or "Deterministic estimate",
-                    formula_hint=str(item.get("formula_hint", "")).strip() or "0",
-                    input_params=input_params if isinstance(input_params, dict) else {},
-                    unit=str(item.get("unit", "")).strip(),
-                )
+            task = CalculationTask(
+                objective=str(item.get("objective", "")).strip() or "Deterministic estimate",
+                formula_hint=str(item.get("formula_hint", "")).strip() or "0",
+                input_params=input_params if isinstance(input_params, dict) else {},
+                unit=str(item.get("unit", "")).strip(),
             )
+            try:
+                validate_calculation_task(task)
+                task.semantic_signature = calculation_semantic_signature(task)
+                task.validation_state = "validated"
+                task.user_visible = False
+                parsed.append(task)
+            except Exception:
+                continue
         return parsed
 
     def _parse_chart_tasks(self, value: Any) -> list[ChartTask]:

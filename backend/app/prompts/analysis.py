@@ -4,6 +4,7 @@ import json
 
 from app.domain.models import AnalysisMode, AnalysisSession
 from app.i18n import is_zh_locale
+from app.services.calculation_tasks import sanitize_calculation_tasks
 
 
 def _trim_text(value: str, limit: int) -> str:
@@ -214,8 +215,11 @@ def build_reporting_prompts(session: AnalysisSession) -> tuple[str, str]:
             "result_text": task.result_text,
             "result_payload": task.result_payload,
             "status": task.status,
+            "validation_state": task.validation_state,
+            "failure_reason": task.failure_reason,
         }
-        for task in session.calculation_tasks
+        for task in sanitize_calculation_tasks(session.calculation_tasks)
+        if task.user_visible
     ]
 
     system_prompt = (
