@@ -1,8 +1,20 @@
 from __future__ import annotations
 
 from app.config import Settings
-from app.domain.rwa import AssetTemplate, AssetType, HashKeyChainConfig, OracleFeedConfig
+from app.domain.rwa import (
+    ActionLink,
+    ActionReadiness,
+    ActionType,
+    AssetStatus,
+    AssetTemplate,
+    AssetType,
+    HashKeyChainConfig,
+    LiveReadiness,
+    OracleFeedConfig,
+    TruthLevel,
+)
 from app.i18n import text_for_locale
+from app.rwa.explorer_service import token_url
 
 HASHKEY_DOCS_BASE = "https://docs.hashkeychain.net"
 HASHKEY_NETWORK_INFO_URL = (
@@ -48,6 +60,27 @@ HASHKEY_ORACLE_FEEDS = [
         mainnet_address="0x823d7f90f7A3498DB6595886b6B5dC95E6B0B7f3",
     ),
 ]
+
+
+def _asset_action_links(
+    chain_config: HashKeyChainConfig,
+    *,
+    primary_source_url: str = "",
+    contract_address: str = "",
+    contract_network: str = "mainnet",
+) -> list[ActionLink]:
+    links: list[ActionLink] = []
+    if primary_source_url:
+        links.append(ActionLink(kind="docs", label="Docs", url=primary_source_url))
+    if contract_address:
+        links.append(
+            ActionLink(
+                kind="contract",
+                label="Contract",
+                url=token_url(chain_config, contract_network, contract_address),
+            )
+        )
+    return links
 
 
 def build_chain_config(settings: Settings) -> HashKeyChainConfig:
@@ -149,6 +182,39 @@ def build_asset_library(
             onchain_verified=True,
             issuer_disclosed=True,
             featured=True,
+            statuses=[AssetStatus.PRODUCTION, AssetStatus.VERIFIED],
+            truth_level=TruthLevel.ONCHAIN_VERIFIED,
+            live_readiness=LiveReadiness.READY,
+            default_rank_eligible=True,
+            status_explanation=text_for_locale(
+                locale,
+                "生产可用的链上稳定币基准，合约地址可核验，可直接作为流动性底仓候选。",
+                "Production-ready onchain stablecoin baseline with a verifiable contract and direct liquidity-bucket utility.",
+            ),
+            truth_level_explanation=text_for_locale(
+                locale,
+                "核心事实来自 HashKey 官方网络文档与链上合约地址，可做链上交叉验证。",
+                "Core facts come from HashKey network docs plus an onchain contract address that can be cross-verified.",
+            ),
+            action_type=ActionType.HOLD,
+            action_readiness=ActionReadiness.READY,
+            action_links=_asset_action_links(
+                chain_config,
+                primary_source_url=HASHKEY_TOKEN_CONTRACTS_URL,
+                contract_address="0xf1b50ed67a9e2cc94ad3c477779e2d4cbfff9029",
+            ),
+            execution_notes=[
+                text_for_locale(
+                    locale,
+                    "确认钱包网络在 HashKey Chain 主网，并核对目标合约地址。",
+                    "Confirm the wallet is on HashKey Chain mainnet and verify the target contract address.",
+                ),
+                text_for_locale(
+                    locale,
+                    "若通过桥接或二级路径建仓，先检查滑点与授权额度。",
+                    "If entering via bridge or secondary routing, check slippage and allowance scope first.",
+                ),
+            ],
             issuer_model="Bridge-backed ERC20 token issued by Tether on HashKey Chain",
             holder_eligibility_note="No KYC requirement; open to all wallet holders",
             transfer_compliance_note="Freely transferable ERC20; subject to bridge operator controls",
@@ -210,6 +276,34 @@ def build_asset_library(
             onchain_verified=True,
             issuer_disclosed=True,
             featured=True,
+            statuses=[AssetStatus.PRODUCTION, AssetStatus.VERIFIED],
+            truth_level=TruthLevel.ONCHAIN_VERIFIED,
+            live_readiness=LiveReadiness.READY,
+            default_rank_eligible=True,
+            status_explanation=text_for_locale(
+                locale,
+                "生产可用的链上稳定币基线，适合与 MMF 或 permissioned RWA 做流动性比较。",
+                "Production-ready onchain stablecoin baseline suited for liquidity comparisons against MMFs or permissioned RWAs.",
+            ),
+            truth_level_explanation=text_for_locale(
+                locale,
+                "储备与合约事实主要来自官方文档和链上可验证地址。",
+                "Reserve and contract facts are primarily grounded in official docs and verifiable onchain addresses.",
+            ),
+            action_type=ActionType.HOLD,
+            action_readiness=ActionReadiness.READY,
+            action_links=_asset_action_links(
+                chain_config,
+                primary_source_url=HASHKEY_TOKEN_CONTRACTS_URL,
+                contract_address="0x054ed45810DbBAb8B27668922D110669c9D88D0a",
+            ),
+            execution_notes=[
+                text_for_locale(
+                    locale,
+                    "适合作为现金管理或待机仓位，执行前重点看路由深度和桥接来源。",
+                    "Useful as a cash-management sleeve; focus execution checks on route depth and bridge provenance.",
+                ),
+            ],
             issuer_model="Bridged USDC issued by Circle with reserve attestation program",
             holder_eligibility_note="No KYC requirement; open to all wallet holders",
             transfer_compliance_note="Freely transferable ERC20; Circle may blacklist specific addresses",
@@ -269,6 +363,50 @@ def build_asset_library(
             onchain_verified=False,
             issuer_disclosed=True,
             featured=True,
+            statuses=[AssetStatus.PRODUCTION, AssetStatus.ISSUER_DISCLOSED],
+            truth_level=TruthLevel.ISSUER_DISCLOSED,
+            live_readiness=LiveReadiness.PARTIAL,
+            default_rank_eligible=True,
+            status_explanation=text_for_locale(
+                locale,
+                "面向真实 RWA 配置场景的发行人披露型资产，但申购和赎回仍依赖发行方入口。",
+                "A production-intent issuer-disclosed RWA, but subscription and redemption still depend on the issuer workflow.",
+            ),
+            truth_level_explanation=text_for_locale(
+                locale,
+                "主要事实来自发行方和生态披露，链上只能验证部分辅助信息。",
+                "Most facts come from issuer and ecosystem disclosure, while only limited support data is verifiable onchain.",
+            ),
+            action_type=ActionType.SUBSCRIBE,
+            action_readiness=ActionReadiness.PARTIAL,
+            action_links=_asset_action_links(
+                chain_config,
+                primary_source_url=HASHKEY_CPIC_MMF_URL,
+            ),
+            action_blocker_reasons=[
+                text_for_locale(
+                    locale,
+                    "需要更高等级 KYC / 专业投资者资格。",
+                    "Requires higher-tier KYC / professional-investor eligibility.",
+                ),
+                text_for_locale(
+                    locale,
+                    "暂无公开链上申购合约，需走发行方或平台入口。",
+                    "No public onchain subscription contract is exposed; execution depends on the issuer or platform portal.",
+                ),
+            ],
+            execution_notes=[
+                text_for_locale(
+                    locale,
+                    "先确认白名单、最小申购门槛和结算币种，再进入发行人流程。",
+                    "Confirm whitelist status, minimum ticket, and settlement currency before entering the issuer flow.",
+                ),
+                text_for_locale(
+                    locale,
+                    "退出节奏应按 T+2 处理，流动性要求更高时不应把它当作现金替代。",
+                    "Treat exits as T+2; do not use it as a cash substitute when liquidity needs are tighter.",
+                ),
+            ],
             issuer_model="Regulated MMF managed by CPIC Investment Management via Estable platform",
             holder_eligibility_note="Requires KYC level 2 (professional investor); minimum ticket $10,000",
             transfer_compliance_note="Transfer restricted to whitelisted addresses per issuer compliance policy",
@@ -328,6 +466,45 @@ def build_asset_library(
             onchain_verified=False,
             issuer_disclosed=True,
             featured=True,
+            statuses=[AssetStatus.PRODUCTION, AssetStatus.ISSUER_DISCLOSED],
+            truth_level=TruthLevel.ISSUER_DISCLOSED,
+            live_readiness=LiveReadiness.PARTIAL,
+            default_rank_eligible=True,
+            status_explanation=text_for_locale(
+                locale,
+                "生产意图明确的金属 RWA 模板，适合做通胀对冲比较，但依旧依赖发行方条款和托管披露。",
+                "A production-intent metals RWA suited for inflation-hedge comparisons, but still dependent on issuer terms and custody disclosure.",
+            ),
+            truth_level_explanation=text_for_locale(
+                locale,
+                "核心 backing 与托管事实来自发行方披露，尚非全量链上可核验。",
+                "Core backing and custody facts come from issuer disclosure rather than full onchain verification.",
+            ),
+            action_type=ActionType.SUBSCRIBE,
+            action_readiness=ActionReadiness.PARTIAL,
+            action_links=_asset_action_links(
+                chain_config,
+                primary_source_url=HASHKEY_SILVER_RWA_URL,
+            ),
+            action_blocker_reasons=[
+                text_for_locale(
+                    locale,
+                    "需要专业投资者资格与白名单准入。",
+                    "Requires professional-investor eligibility and whitelist access.",
+                ),
+                text_for_locale(
+                    locale,
+                    "赎回和交收条款需要通过发行方渠道确认。",
+                    "Redemption and settlement terms must be confirmed through issuer channels.",
+                ),
+            ],
+            execution_notes=[
+                text_for_locale(
+                    locale,
+                    "把它当作通胀对冲腿时，应同时检查波动承受度和 T+3 赎回约束。",
+                    "When using it as an inflation-hedge sleeve, check both volatility tolerance and the T+3 redemption constraint.",
+                ),
+            ],
             issuer_model="Hong Kong regulated silver RWA issuer with physical vault backing",
             holder_eligibility_note="Requires KYC level 2 (professional investor); minimum ticket $5,000",
             transfer_compliance_note="Transfer restricted per Hong Kong SFC compliance; whitelist-gated",
@@ -387,6 +564,45 @@ def build_asset_library(
             onchain_verified=False,
             issuer_disclosed=False,
             featured=False,
+            statuses=[AssetStatus.DEMO, AssetStatus.EXPERIMENTAL],
+            truth_level=TruthLevel.DEMO_ONLY,
+            live_readiness=LiveReadiness.DEMO_ONLY,
+            default_rank_eligible=False,
+            status_explanation=text_for_locale(
+                locale,
+                "Hackathon 演示资产，用于展示高摩擦房地产 RWA 情形，不应默认与生产资产同台排名。",
+                "Hackathon demo asset for a high-friction real-estate RWA case; it should not rank alongside production assets by default.",
+            ),
+            truth_level_explanation=text_for_locale(
+                locale,
+                "该模板用于演示报告结构和风险差异，不代表已验证的真实发行产品。",
+                "This template exists to demonstrate reporting structure and risk trade-offs, not a verified live issuance.",
+            ),
+            action_type=ActionType.LEARN_MORE,
+            action_readiness=ActionReadiness.UNAVAILABLE,
+            action_links=_asset_action_links(
+                chain_config,
+                primary_source_url=HASHKEY_ABOUT_URL,
+            ),
+            action_blocker_reasons=[
+                text_for_locale(
+                    locale,
+                    "Demo 资产默认不进入正式推荐排名，除非用户显式纳入非生产资产。",
+                    "Demo assets are excluded from the default recommendation ranking unless the user explicitly includes non-production assets.",
+                ),
+                text_for_locale(
+                    locale,
+                    "没有可执行的真实申购入口或已验证合约。",
+                    "There is no live subscription path or verified execution contract.",
+                ),
+            ],
+            execution_notes=[
+                text_for_locale(
+                    locale,
+                    "把它理解为条款压力测试样本，而不是可直接下单的产品。",
+                    "Treat it as a term-sheet stress-test example rather than an asset you can directly subscribe to.",
+                ),
+            ],
             issuer_model="Demo SPV structure with offchain trustee; not fully disclosed",
             holder_eligibility_note="Requires KYC level 2; minimum ticket $25,000; accredited investor check",
             transfer_compliance_note="Highly restricted transfers; requires issuer approval per SPV terms",
@@ -446,6 +662,41 @@ def build_asset_library(
             onchain_verified=True,
             issuer_disclosed=True,
             featured=False,
+            statuses=[AssetStatus.BENCHMARK, AssetStatus.VERIFIED],
+            truth_level=TruthLevel.BENCHMARK_REFERENCE,
+            live_readiness=LiveReadiness.READY,
+            default_rank_eligible=False,
+            status_explanation=text_for_locale(
+                locale,
+                "链上可执行的 benchmark，用来衡量机会成本和波动基线，不默认参与正式 RWA 推荐排名。",
+                "An executable onchain benchmark used to frame opportunity cost and volatility, not a default candidate in formal RWA rankings.",
+            ),
+            truth_level_explanation=text_for_locale(
+                locale,
+                "合约本身可链上核验，但该资产在系统里承担 benchmark 参考角色。",
+                "The contract itself is verifiable onchain, but the asset is treated here as a benchmark reference.",
+            ),
+            action_type=ActionType.HOLD,
+            action_readiness=ActionReadiness.READY,
+            action_links=_asset_action_links(
+                chain_config,
+                primary_source_url=HASHKEY_TOKEN_CONTRACTS_URL,
+                contract_address="0x6119ca49a79f5825c8b345f8d7ac36b272565b14",
+            ),
+            action_blocker_reasons=[
+                text_for_locale(
+                    locale,
+                    "默认只作 benchmark，不与生产型 RWA 候选同权竞争。",
+                    "Shown as a benchmark by default rather than competing on equal footing with production-style RWA candidates.",
+                ),
+            ],
+            execution_notes=[
+                text_for_locale(
+                    locale,
+                    "若显式纳入比较，应把它理解为高波动机会成本锚点，而不是保守资金停泊位。",
+                    "If explicitly included, treat it as a high-volatility opportunity-cost anchor rather than a conservative parking sleeve.",
+                ),
+            ],
             issuer_model="Wrapped BTC bridge representation on HashKey Chain",
             holder_eligibility_note="No KYC requirement; open to all wallet holders",
             transfer_compliance_note="Freely transferable ERC20; bridge operator retains admin key",

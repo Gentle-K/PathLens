@@ -4,6 +4,7 @@ import hashlib
 import json
 import math
 import random
+from datetime import datetime, timezone
 from statistics import mean
 from typing import Iterable
 from urllib.parse import urlparse
@@ -12,22 +13,39 @@ import logging
 
 from app.domain.models import AnalysisMode, AnalysisReport, EvidenceItem, OptionProfile, ReportTable
 from app.domain.rwa import (
+    ActionBlocker,
+    ActionIntent,
+    ActionReadiness,
+    ActionType,
     AssetAnalysisCard,
+    AssetStatus,
     AssetTemplate,
     AssetType,
     AttestationDraft,
+    ComparisonMatrix,
+    ComparisonMatrixCell,
+    ComparisonMatrixMetric,
+    ComparisonMatrixRow,
+    ConstraintImpact,
     DataSourceTag,
+    EvidenceFactType,
+    ExcludedAssetReason,
     HashKeyChainConfig,
     HoldingPeriodSimulation,
     KycOnchainResult,
     LiquidityNeed,
+    LiveReadiness,
     MarketDataSnapshot,
     OracleSnapshot,
     PortfolioAllocation,
+    RecommendationDriver,
+    RecommendationReason,
     RiskTolerance,
     RiskVector,
     RwaIntakeContext,
+    SensitivitySummary,
     SimulationPathPoint,
+    TruthLevel,
     TxDraft,
     TxDraftStep,
 )
@@ -40,6 +58,13 @@ from app.rwa.actuary_signals import (
     build_stress_scenarios,
 )
 from app.rwa.actuary_source_registry import build_source_provenance_refs
+from app.rwa.demo import (
+    DEMO_REFERENCE_TIME,
+    build_demo_kyc_snapshot,
+    build_demo_oracle_snapshots,
+    get_demo_scenario,
+)
+from app.rwa.evidence import build_evidence_governance, enrich_report_evidence
 from app.rwa.risk_model import allocation_reason, build_risk_profiles, methodology_references
 
 logger = logging.getLogger(__name__)
@@ -170,8 +195,10 @@ def simulate_holding(
     holding_period_days: int,
     *,
     locale: str = "zh",
+    analysis_seed: int | None = None,
 ) -> HoldingPeriodSimulation:
-    seed_source = f"{asset.asset_id}:{investment_amount:.2f}:{holding_period_days}"
+    seed_suffix = f":{analysis_seed}" if analysis_seed is not None else ""
+    seed_source = f"{asset.asset_id}:{investment_amount:.2f}:{holding_period_days}{seed_suffix}"
     seed = int(hashlib.sha256(seed_source.encode("utf-8")).hexdigest()[:12], 16)
     rng = random.Random(seed)
     checkpoints = _checkpoint_days(holding_period_days)
@@ -279,6 +306,7 @@ def simulate_multi_horizon(
     horizons: list[int] | None = None,
     *,
     locale: str = "zh",
+    analysis_seed: int | None = None,
 ) -> list[HoldingPeriodSimulation]:
     """Run ``simulate_holding`` for multiple holding horizons.
 
@@ -295,7 +323,7 @@ def simulate_multi_horizon(
     if horizons is None:
         horizons = list(DEFAULT_HORIZONS)
     return [
-        simulate_holding(asset, investment_amount, days, locale=locale)
+        simulate_holding(asset, investment_amount, days, locale=locale, analysis_seed=analysis_seed)
         for days in horizons
     ]
 
@@ -514,44 +542,23 @@ def recommend_allocations(
     *,
     locale: str = "zh",
 ) -> list[PortfolioAllocation]:
-    effective_kyc_level = _effective_kyc_level(context)
     scored_cards: list[tuple[AssetAnalysisCard, float, str]] = []
 
     for card in asset_cards:
-        blocked_reason = ""
-        if card.kyc_required_level and effective_kyc_level < card.kyc_required_level:
-            blocked_reason = text_for_locale(
-                locale,
-                f"闇€瑕佽嚦灏?KYC 绛夌骇 {card.kyc_required_level}",
-                f"Requires at least KYC level {card.kyc_required_level}",
-            )
-        minimum_ticket_usd = float(card.metadata.get("minimum_ticket_usd", 0) or 0)
-        if not blocked_reason and minimum_ticket_usd > context.investment_amount:
-            blocked_reason = text_for_locale(
-                locale,
-                f"鏈€浣庤璐棬妲涙槸 {minimum_ticket_usd:.0f} USD",
-                f"Minimum ticket is {minimum_ticket_usd:.0f} USD",
-            )
         utility_score = float(card.metadata.get("utility_score", 0.0) or 0.0)
+        blocked_reason = _allocation_block_reason(context, card, locale=locale)
         scored_cards.append((card, utility_score, blocked_reason))
 
     eligible_scores = [(card, score) for card, score, blocked_reason in scored_cards if not blocked_reason]
     baseline = max((score for _, score in eligible_scores), default=0.0)
-    scaled_scores = {
-        card.asset_id: math.exp((score - baseline) / 8)
-        for card, score in eligible_scores
-    }
+    scaled_scores = {card.asset_id: math.exp((score - baseline) / 8) for card, score in eligible_scores}
     score_sum = sum(scaled_scores.values()) or 1.0
     allocations: list[PortfolioAllocation] = []
 
     for card, _, blocked_reason in scored_cards:
         usable_score = scaled_scores.get(card.asset_id, 0.0) if not blocked_reason else 0.0
         target_weight = 0.0 if blocked_reason else usable_score / score_sum * 100
-        rationale = text_for_locale(
-            locale,
-            "鍏堢湅椋庨櫓璋冩暣鍚庢晥鐢ㄥ拰鍑嗗叆绾︽潫锛屽啀鍐冲畾鏉冮噸銆?",
-            allocation_reason(card, card.metadata.get("utility_components", {})),
-        )
+        rationale = _allocation_rationale(card, locale=locale)
         allocations.append(
             PortfolioAllocation(
                 asset_id=card.asset_id,
@@ -567,6 +574,77 @@ def recommend_allocations(
     return allocations
 
 
+def _allocation_block_reason(
+    context: RwaIntakeContext,
+    card: AssetAnalysisCard,
+    *,
+    locale: str = "zh",
+) -> str:
+    effective_kyc_level = _effective_kyc_level(context)
+    if (
+        not context.include_non_production_assets
+        and not card.default_rank_eligible
+    ):
+        if AssetStatus.DEMO in card.statuses:
+            return text_for_locale(
+                locale,
+                "Demo 资产默认不参与正式推荐排名，除非你显式纳入非生产资产。",
+                "Demo assets are excluded from the default ranking unless you explicitly include non-production assets.",
+            )
+        if AssetStatus.BENCHMARK in card.statuses:
+            return text_for_locale(
+                locale,
+                "Benchmark 资产默认只作机会成本比较，不参与正式推荐排名。",
+                "Benchmark assets stay in the comparison set by default but do not compete in the formal recommendation ranking.",
+            )
+    if card.kyc_required_level and effective_kyc_level < card.kyc_required_level:
+        return text_for_locale(
+            locale,
+            f"需要至少 KYC 等级 {card.kyc_required_level}",
+            f"Requires at least KYC level {card.kyc_required_level}",
+        )
+    minimum_ticket_usd = float(card.metadata.get("minimum_ticket_usd", 0) or 0)
+    if minimum_ticket_usd > context.investment_amount:
+        return text_for_locale(
+            locale,
+            f"最低认购门槛是 {minimum_ticket_usd:.0f} USD",
+            f"Minimum ticket is {minimum_ticket_usd:.0f} USD",
+        )
+    if context.liquidity_need == LiquidityNeed.INSTANT and card.exit_days > 0:
+        return text_for_locale(
+            locale,
+            "当前流动性要求为 T+0，该资产的退出节奏不匹配。",
+            "Your current liquidity requirement is T+0, which this asset cannot satisfy.",
+        )
+    return ""
+
+
+def _allocation_rationale(card: AssetAnalysisCard, *, locale: str = "zh") -> str:
+    if card.asset_type == AssetType.STABLECOIN:
+        return text_for_locale(
+            locale,
+            "承担流动性核心仓位，优先保证退出速度和回撤控制。",
+            "Provides the liquidity anchor while keeping tail risk comparatively contained.",
+        )
+    if card.asset_type == AssetType.MMF:
+        return text_for_locale(
+            locale,
+            "兼顾稳态收益与较短赎回节奏，适合作为低波动收益腿。",
+            "Combines modest carry with shorter redemption friction than longer-lockup RWAs.",
+        )
+    if card.asset_type == AssetType.PRECIOUS_METAL:
+        return text_for_locale(
+            locale,
+            "提供通胀与宏观分散化，但仓位应受流动性和波动约束。",
+            "Adds macro and inflation diversification, but sizing should stay below the liquidity core.",
+        )
+    return text_for_locale(
+        locale,
+        "保留投资价值，但需要明确管理流动性、条款和准入风险。",
+        allocation_reason(card, card.metadata.get("utility_components", {})),
+    )
+
+
 def _source_name(url: str) -> str:
     hostname = urlparse(url).hostname or ""
     return hostname.replace("www.", "") or "source"
@@ -576,6 +654,7 @@ def build_catalog_evidence(
     asset: AssetTemplate,
     *,
     locale: str = "zh",
+    fetched_at: datetime | None = None,
 ) -> list[EvidenceItem]:
     evidence_items: list[EvidenceItem] = []
     for index, url in enumerate(asset.evidence_urls[:2], start=1):
@@ -613,6 +692,7 @@ def build_catalog_evidence(
         ]
         evidence_items.append(
             EvidenceItem(
+                asset_id=asset.asset_id,
                 title=text_for_locale(
                     locale,
                     f"{asset.name} 依据 {index}",
@@ -620,6 +700,7 @@ def build_catalog_evidence(
                 ),
                 source_url=url,
                 source_name=_source_name(url),
+                fetched_at=fetched_at or datetime.now(timezone.utc),
                 summary=text_for_locale(
                     locale,
                     f"{asset.name} 的模板基于官方网络文档、Token Contracts、KYC 说明或发行方披露构建。",
@@ -627,6 +708,13 @@ def build_catalog_evidence(
                 ),
                 extracted_facts=facts,
                 confidence=0.82,
+                fact_type=(
+                    asset.onchain_verified and index == 1
+                    and EvidenceFactType.ONCHAIN_VERIFIED_FACT
+                    or asset.issuer_disclosed
+                    and EvidenceFactType.OFFCHAIN_DISCLOSED_FACT
+                    or EvidenceFactType.INFERRED_FACT
+                ),
             )
         )
     return evidence_items
@@ -636,10 +724,18 @@ def build_asset_cards(
     assets: list[AssetTemplate],
     context: RwaIntakeContext,
     simulations: list[HoldingPeriodSimulation] | None = None,
+    *,
+    locale: str = "zh",
 ) -> list[AssetAnalysisCard]:
     if simulations is None:
         simulations = [
-            simulate_holding(asset, context.investment_amount, context.holding_period_days, locale="en")
+            simulate_holding(
+                asset,
+                context.investment_amount,
+                context.holding_period_days,
+                locale=locale,
+                analysis_seed=context.analysis_seed,
+            )
             for asset in assets
         ]
     profiles = build_risk_profiles(assets, simulations, context)
@@ -668,6 +764,12 @@ def build_asset_cards(
                 primary_source_url=asset.primary_source_url or (asset.evidence_urls[0] if asset.evidence_urls else ""),
                 onchain_verified=asset.onchain_verified,
                 issuer_disclosed=asset.issuer_disclosed,
+                statuses=list(asset.statuses),
+                truth_level=asset.truth_level,
+                live_readiness=asset.live_readiness,
+                default_rank_eligible=asset.default_rank_eligible,
+                status_explanation=asset.status_explanation,
+                truth_level_explanation=asset.truth_level_explanation,
                 risk_vector=profile.risk_vector,
                 risk_breakdown=profile.risk_breakdown,
                 risk_data_quality=profile.risk_data_quality,
@@ -680,6 +782,11 @@ def build_asset_cards(
                     "source_url": asset.primary_source_url or (asset.evidence_urls[0] if asset.evidence_urls else ""),
                     "utility_score": profile.utility_score,
                     "utility_components": profile.utility_components,
+                    "action_type": asset.action_type.value,
+                    "action_readiness": asset.action_readiness.value,
+                    "action_links": [link.model_dump(mode="json") for link in asset.action_links],
+                    "action_blocker_reasons": list(asset.action_blocker_reasons),
+                    "execution_notes": list(asset.execution_notes),
                 },
                 evidence_refs=list(asset.evidence_urls),
             )
@@ -824,6 +931,655 @@ def build_option_profiles(
             )
         )
     return profiles
+
+
+def build_comparison_matrix(
+    context: RwaIntakeContext,
+    assets: list[AssetTemplate],
+    asset_cards: list[AssetAnalysisCard],
+    simulations: list[HoldingPeriodSimulation],
+    *,
+    locale: str = "zh",
+) -> ComparisonMatrix:
+    simulation_map = {simulation.asset_id: simulation for simulation in simulations}
+    asset_map = {asset.asset_id: asset for asset in assets}
+    metrics = [
+        ComparisonMatrixMetric(key="expected_return", label=text_for_locale(locale, "预期收益", "Expected return"), unit="%"),
+        ComparisonMatrixMetric(key="net_return_after_fees", label=text_for_locale(locale, "费后净收益", "Net return after fees"), unit="%"),
+        ComparisonMatrixMetric(key="liquidity", label=text_for_locale(locale, "流动性", "Liquidity")),
+        ComparisonMatrixMetric(key="earliest_exit", label=text_for_locale(locale, "最早退出", "Earliest exit")),
+        ComparisonMatrixMetric(key="lockup_burden", label=text_for_locale(locale, "锁定负担", "Lockup burden")),
+        ComparisonMatrixMetric(key="issuer_backing_risk", label=text_for_locale(locale, "发行人 / backing 风险", "Issuer / backing risk")),
+        ComparisonMatrixMetric(key="redemption_friction", label=text_for_locale(locale, "赎回摩擦", "Redemption friction")),
+        ComparisonMatrixMetric(key="volatility_drawdown", label=text_for_locale(locale, "波动 / 回撤", "Volatility / drawdown")),
+        ComparisonMatrixMetric(key="data_quality", label=text_for_locale(locale, "数据质量", "Data quality")),
+        ComparisonMatrixMetric(key="kyc_fit", label=text_for_locale(locale, "KYC 适配", "KYC fit")),
+        ComparisonMatrixMetric(key="suitability", label=text_for_locale(locale, "当前画像适配度", "Profile suitability")),
+    ]
+    rows: list[ComparisonMatrixRow] = []
+    for card in asset_cards:
+        asset = asset_map[card.asset_id]
+        simulation = simulation_map[card.asset_id]
+        fee_estimate = estimate_net_return_after_fees(asset, context.investment_amount, context.holding_period_days)
+        blocked_reason = _allocation_block_reason(context, card, locale=locale)
+        badges = _matrix_badges(card, blocked_reason)
+        cells = [
+            ComparisonMatrixCell(
+                metric_key="expected_return",
+                label=text_for_locale(locale, "预期收益", "Expected return"),
+                display_value=f"{card.expected_return_base * 100:.2f}%",
+                raw_value=round(card.expected_return_base * 100, 2),
+                tone=_higher_is_better_tone(card.expected_return_base * 100),
+                badges=badges,
+                rationale=text_for_locale(locale, "模板的基准年化收益假设。", "Base annualized return assumption from the template."),
+                tooltip=text_for_locale(locale, "统一口径的基准收益，不是承诺收益。", "Normalized base return, not a promised yield."),
+                is_blocked=bool(blocked_reason),
+            ),
+            ComparisonMatrixCell(
+                metric_key="net_return_after_fees",
+                label=text_for_locale(locale, "费后净收益", "Net return after fees"),
+                display_value=f"{fee_estimate['net_return_pct']:.2f}%",
+                raw_value=fee_estimate["net_return_pct"],
+                tone=_higher_is_better_tone(fee_estimate["net_return_pct"]),
+                badges=[],
+                rationale=text_for_locale(locale, "已扣除管理费、进出费用和滑点估算。", "Includes management fees, entry/exit fees, and slippage."),
+                tooltip=text_for_locale(locale, "更适合拿来做跨资产比较。", "A better apples-to-apples value for comparing assets."),
+                is_blocked=bool(blocked_reason),
+            ),
+            ComparisonMatrixCell(
+                metric_key="liquidity",
+                label=text_for_locale(locale, "流动性", "Liquidity"),
+                display_value=_liquidity_display(asset, locale=locale),
+                raw_value=asset.redemption_days,
+                tone=_lower_is_better_tone(asset.redemption_days * 8 + asset.lockup_days),
+                badges=[],
+                rationale=text_for_locale(locale, "综合退出天数、锁定期和可交易深度。", "Combines exit days, lockups, and tradability."),
+                tooltip=text_for_locale(locale, "越快退出、锁定越短，流动性越高。", "Higher liquidity means faster exits and lighter lockups."),
+                is_blocked=bool(blocked_reason),
+            ),
+            ComparisonMatrixCell(
+                metric_key="earliest_exit",
+                label=text_for_locale(locale, "最早退出", "Earliest exit"),
+                display_value="T+0" if asset.redemption_days == 0 else f"T+{asset.redemption_days}",
+                raw_value=asset.redemption_days,
+                tone=_lower_is_better_tone(asset.redemption_days * 10),
+                rationale=text_for_locale(locale, "按模板条款下的最短退出节奏。", "Earliest modeled redemption cadence under the asset terms."),
+                tooltip=text_for_locale(locale, "这是最短退出节奏，不等于保证成交。", "This is the earliest exit cadence, not a liquidity guarantee."),
+                is_blocked=bool(blocked_reason),
+            ),
+            ComparisonMatrixCell(
+                metric_key="lockup_burden",
+                label=text_for_locale(locale, "锁定负担", "Lockup burden"),
+                display_value=text_for_locale(
+                    locale,
+                    f"{asset.lockup_days} 天" if asset.lockup_days else "无锁定",
+                    f"{asset.lockup_days} days" if asset.lockup_days else "No lockup",
+                ),
+                raw_value=asset.lockup_days,
+                tone=_lower_is_better_tone(asset.lockup_days),
+                rationale=text_for_locale(locale, "锁定期越长，对流动性约束越重。", "Longer lockups create a heavier liquidity burden."),
+                tooltip=text_for_locale(locale, "锁定期会显著影响再平衡能力。", "Lockups materially affect rebalancing flexibility."),
+                is_blocked=bool(blocked_reason),
+            ),
+            ComparisonMatrixCell(
+                metric_key="issuer_backing_risk",
+                label=text_for_locale(locale, "发行人 / backing 风险", "Issuer / backing risk"),
+                display_value=f"{card.risk_vector.issuer_custody:.1f}/100",
+                raw_value=card.risk_vector.issuer_custody,
+                tone=_lower_is_better_tone(card.risk_vector.issuer_custody),
+                badges=_truth_badges(card),
+                rationale=card.truth_level_explanation or card.status_explanation,
+                tooltip=text_for_locale(locale, "越低代表发行人和托管披露越强。", "Lower scores mean stronger issuer and custody transparency."),
+                is_blocked=bool(blocked_reason),
+            ),
+            ComparisonMatrixCell(
+                metric_key="redemption_friction",
+                label=text_for_locale(locale, "赎回摩擦", "Redemption friction"),
+                display_value=f"{asset.entry_fee_bps + asset.exit_fee_bps + asset.slippage_bps} bps",
+                raw_value=asset.entry_fee_bps + asset.exit_fee_bps + asset.slippage_bps,
+                tone=_lower_is_better_tone(asset.entry_fee_bps + asset.exit_fee_bps + asset.slippage_bps),
+                rationale=text_for_locale(locale, "反映申赎费率、滑点和流程摩擦。", "Reflects fees, slippage, and process friction around entry and exit."),
+                tooltip=text_for_locale(locale, "同样收益下，摩擦越高越不利。", "With the same yield, higher friction is less attractive."),
+                is_blocked=bool(blocked_reason),
+            ),
+            ComparisonMatrixCell(
+                metric_key="volatility_drawdown",
+                label=text_for_locale(locale, "波动 / 回撤", "Volatility / drawdown"),
+                display_value=f"{simulation.max_drawdown_base_pct:.1f}% / {asset.price_volatility * 100:.1f}%",
+                raw_value=simulation.max_drawdown_base_pct,
+                tone=_lower_is_better_tone(simulation.max_drawdown_base_pct),
+                rationale=text_for_locale(locale, "同时看基础波动和模拟中的中位回撤。", "Combines base volatility with median simulated drawdown."),
+                tooltip=text_for_locale(locale, "用于识别收益背后的尾部风险。", "Helps expose tail risk behind the return number."),
+                is_blocked=bool(blocked_reason),
+            ),
+            ComparisonMatrixCell(
+                metric_key="data_quality",
+                label=text_for_locale(locale, "数据质量", "Data quality"),
+                display_value=f"{card.risk_data_quality:.2f}",
+                raw_value=card.risk_data_quality,
+                tone=_higher_is_better_tone(card.risk_data_quality * 100),
+                rationale=text_for_locale(locale, "越高代表关键输入更完整。", "Higher values indicate more complete core inputs."),
+                tooltip=text_for_locale(locale, "低数据质量会直接影响推荐可信度。", "Lower data quality directly weakens recommendation confidence."),
+                is_blocked=bool(blocked_reason),
+            ),
+            ComparisonMatrixCell(
+                metric_key="kyc_fit",
+                label=text_for_locale(locale, "KYC 适配", "KYC fit"),
+                display_value=_kyc_fit_display(context, card, locale=locale),
+                raw_value=card.kyc_required_level or 0,
+                tone="success" if not blocked_reason or "KYC" not in blocked_reason else "warning",
+                rationale=text_for_locale(locale, "按当前有效 KYC 约束判断是否可进入正式候选集。", "Whether the current effective KYC level keeps the asset investable."),
+                tooltip=text_for_locale(locale, "链上 KYC 快照存在时会覆盖手动输入。", "An onchain KYC snapshot overrides the manual constraint when available."),
+                is_blocked=bool(blocked_reason),
+            ),
+            ComparisonMatrixCell(
+                metric_key="suitability",
+                label=text_for_locale(locale, "当前画像适配度", "Profile suitability"),
+                display_value=_suitability_display(card, blocked_reason, locale=locale),
+                raw_value=float(card.metadata.get("utility_score", 0.0) or 0.0),
+                tone=_utility_tone(float(card.metadata.get("utility_score", 0.0) or 0.0), blocked_reason=blocked_reason),
+                rationale=blocked_reason or card.fit_summary,
+                tooltip=text_for_locale(locale, "综合收益、风险、流动性、准入和数据质量后的结果。", "Blends return, risk, liquidity, access, and data quality."),
+                is_blocked=bool(blocked_reason),
+            ),
+        ]
+        rows.append(
+            ComparisonMatrixRow(
+                asset_id=card.asset_id,
+                asset_name=card.name,
+                asset_symbol=card.symbol,
+                statuses=list(card.statuses),
+                truth_level=card.truth_level,
+                live_readiness=card.live_readiness,
+                default_rank_eligible=card.default_rank_eligible,
+                cells=cells,
+            )
+        )
+    return ComparisonMatrix(
+        title=text_for_locale(locale, "标准化比较矩阵", "Standardized comparison matrix"),
+        metrics=metrics,
+        rows=rows,
+        notes=[
+            text_for_locale(
+                locale,
+                "Demo 和 benchmark 资产会展示在矩阵中，但默认不进入正式推荐排名。",
+                "Demo and benchmark assets stay visible in the matrix, but are excluded from the default recommendation ranking.",
+            ),
+            text_for_locale(
+                locale,
+                "所有数值按当前持有期、KYC、流动性和费用假设统一口径比较。",
+                "All values are normalized to the current holding period, KYC, liquidity, and fee assumptions.",
+            ),
+        ],
+    )
+
+
+def build_action_intents(
+    context: RwaIntakeContext,
+    assets: list[AssetTemplate],
+    allocations: list[PortfolioAllocation],
+    *,
+    locale: str = "zh",
+) -> list[ActionIntent]:
+    allocation_map = {allocation.asset_id: allocation for allocation in allocations}
+    intents: list[ActionIntent] = []
+    for asset in assets:
+        allocation = allocation_map.get(asset.asset_id)
+        blocked_reason = allocation.blocked_reason if allocation else ""
+        blockers: list[ActionBlocker] = []
+        if blocked_reason:
+            blockers.append(
+                ActionBlocker(
+                    code="recommendation_blocked",
+                    label=text_for_locale(locale, "当前阻塞项", "Current blocker"),
+                    detail=blocked_reason,
+                    severity="warning",
+                )
+            )
+        blockers.extend(
+            ActionBlocker(
+                code=f"catalog_{index}",
+                label=text_for_locale(locale, "资产限制", "Asset constraint"),
+                detail=reason,
+                severity="warning",
+            )
+            for index, reason in enumerate(asset.action_blocker_reasons, start=1)
+        )
+        readiness = asset.action_readiness
+        if blocked_reason and readiness == ActionReadiness.READY:
+            readiness = ActionReadiness.PARTIAL
+        if AssetStatus.DEMO in asset.statuses:
+            readiness = ActionReadiness.UNAVAILABLE
+        if AssetStatus.BENCHMARK in asset.statuses and not context.include_non_production_assets:
+            readiness = ActionReadiness.PARTIAL
+        intents.append(
+            ActionIntent(
+                asset_id=asset.asset_id,
+                asset_name=asset.name,
+                action_type=asset.action_type,
+                action_readiness=readiness,
+                summary=_action_summary(asset, allocation, blocked_reason, locale=locale),
+                action_blockers=blockers,
+                action_links=list(asset.action_links),
+                execution_notes=list(asset.execution_notes),
+                checklist=_action_checklist(asset, blocked_reason, locale=locale),
+            )
+        )
+    return intents
+
+
+def build_recommendation_reason(
+    context: RwaIntakeContext,
+    assets: list[AssetTemplate],
+    asset_cards: list[AssetAnalysisCard],
+    allocations: list[PortfolioAllocation],
+    *,
+    locale: str = "zh",
+) -> RecommendationReason:
+    top_allocation = next((item for item in allocations if item.target_weight_pct > 0), None)
+    card_map = {card.asset_id: card for card in asset_cards}
+    top_drivers: list[RecommendationDriver] = []
+    if top_allocation:
+        top_card = card_map[top_allocation.asset_id]
+        utility = top_card.metadata.get("utility_components", {})
+        top_drivers = [
+            RecommendationDriver(
+                title=text_for_locale(locale, "核心胜出原因", "Primary edge"),
+                detail=text_for_locale(
+                    locale,
+                    f"{top_card.name} 的风险调整后适配度最高，当前建议权重 {top_allocation.target_weight_pct:.1f}%。",
+                    f"{top_card.name} ranks highest on risk-adjusted fit, with a suggested weight of {top_allocation.target_weight_pct:.1f}%.",
+                ),
+                impact="high",
+                asset_id=top_card.asset_id,
+            ),
+            RecommendationDriver(
+                title=text_for_locale(locale, "流动性与持有期匹配", "Liquidity and horizon fit"),
+                detail=text_for_locale(
+                    locale,
+                    f"该资产在 {context.holding_period_days} 天持有期下的流动性惩罚为 {utility.get('liquidity_penalty', 0):.1f}，更适合当前约束。",
+                    f"Its liquidity penalty is {utility.get('liquidity_penalty', 0):.1f} over the current {context.holding_period_days}-day horizon.",
+                ),
+                impact="high" if utility.get("liquidity_penalty", 0) < 8 else "medium",
+                asset_id=top_card.asset_id,
+            ),
+            RecommendationDriver(
+                title=text_for_locale(locale, "费后效用", "After-fee utility"),
+                detail=text_for_locale(
+                    locale,
+                    f"基准费后收益与风险、数据质量综合后仍保持可投资。数据质量 {top_card.risk_data_quality:.2f}。",
+                    f"After fees, risk, and data quality adjustments, the asset remains investable. Data quality is {top_card.risk_data_quality:.2f}.",
+                ),
+                impact="medium",
+                asset_id=top_card.asset_id,
+            ),
+        ]
+    excluded_reasons = [
+        ExcludedAssetReason(
+            asset_id=allocation.asset_id,
+            asset_name=allocation.asset_name,
+            category="blocked",
+            reason=allocation.blocked_reason,
+        )
+        for allocation in allocations
+        if allocation.blocked_reason
+    ]
+    constraint_impacts = _build_constraint_impacts(context, assets, allocations, locale=locale)
+    sensitivity_summary = _build_sensitivity_summary(context, assets, locale=locale)
+    summary = text_for_locale(
+        locale,
+        "推荐结果优先考虑风险调整后效用、当前流动性要求、KYC 准入和默认排名资格。",
+        "The recommendation prioritizes risk-adjusted utility, current liquidity needs, KYC access, and default ranking eligibility.",
+    )
+    return RecommendationReason(
+        summary=summary,
+        top_drivers=top_drivers,
+        excluded_reasons=excluded_reasons,
+        constraint_impacts=constraint_impacts,
+        sensitivity_summary=sensitivity_summary,
+    )
+
+
+def build_report_warnings(
+    context: RwaIntakeContext,
+    assets: list[AssetTemplate],
+    allocations: list[PortfolioAllocation],
+    *,
+    evidence_warning: str = "",
+    locale: str = "zh",
+) -> list[str]:
+    warnings: list[str] = [
+        text_for_locale(
+            locale,
+            "这不是金融建议，也不是法律、税务或合规意见。",
+            "This is not financial advice and not legal, tax, or compliance advice.",
+        ),
+        text_for_locale(
+            locale,
+            "KYC / eligibility 结论具有指示性；只有链上快照或发行方确认才可视为最终结果。",
+            "KYC and eligibility conclusions are indicative; only an onchain snapshot or issuer confirmation should be treated as final.",
+        ),
+    ]
+    if evidence_warning:
+        warnings.append(evidence_warning)
+    if any(AssetStatus.DEMO in asset.statuses for asset in assets):
+        warnings.append(
+            text_for_locale(
+                locale,
+                "报告中包含 demo 资产；demo 资产不代表真实可投产品。",
+                "This report includes demo assets; demo assets do not represent live investable products.",
+            )
+        )
+    if any(allocation.blocked_reason for allocation in allocations):
+        warnings.append(
+            text_for_locale(
+                locale,
+                "部分资产已因 KYC、最小门槛或默认排名规则被排除或降为观察项。",
+                "Some assets were excluded or downgraded because of KYC, minimum-ticket, or default-ranking rules.",
+            )
+        )
+    return warnings
+
+
+def build_report_unknowns(
+    context: RwaIntakeContext,
+    assets: list[AssetTemplate],
+    *,
+    locale: str = "zh",
+) -> list[str]:
+    unknowns = [
+        text_for_locale(
+            locale,
+            "发行人条款、白名单流程和真实申赎容量可能在报告生成后变化。",
+            "Issuer terms, whitelist workflows, and real redemption capacity can change after the report is generated.",
+        ),
+        text_for_locale(
+            locale,
+            "对 offchain backing、托管和法律结构的判断仍依赖发行人披露与外部文件。",
+            "Judgments on offchain backing, custody, and legal structure still rely on issuer disclosure and external documents.",
+        ),
+    ]
+    if not context.wallet_address:
+        unknowns.append(
+            text_for_locale(
+                locale,
+                "当前没有连接钱包，无法把链上准入状态与执行路径验证到具体地址。",
+                "No wallet is connected, so the system cannot verify access status or execution paths against a specific address.",
+            )
+        )
+    if any(asset.truth_level == TruthLevel.DEMO_ONLY for asset in assets):
+        unknowns.append(
+            text_for_locale(
+                locale,
+                "Demo 模板仅用于演示结构化比较，不代表真实发行和真实容量。",
+                "Demo templates exist to demonstrate structured comparisons, not real issuance or real capacity.",
+            )
+        )
+    return unknowns
+
+
+def _build_constraint_impacts(
+    context: RwaIntakeContext,
+    assets: list[AssetTemplate],
+    allocations: list[PortfolioAllocation],
+    *,
+    locale: str = "zh",
+) -> list[ConstraintImpact]:
+    impacts = [
+        ConstraintImpact(
+            constraint_key="holding_period_days",
+            label=text_for_locale(locale, "持有期", "Holding period"),
+            impact_level="high",
+            detail=text_for_locale(
+                locale,
+                f"当前以 {context.holding_period_days} 天为统一比较口径，直接影响费后收益和退出摩擦。",
+                f"The {context.holding_period_days}-day horizon directly affects after-fee return and exit friction.",
+            ),
+        ),
+        ConstraintImpact(
+            constraint_key="liquidity_need",
+            label=text_for_locale(locale, "流动性要求", "Liquidity requirement"),
+            impact_level="high",
+            detail=text_for_locale(
+                locale,
+                "流动性要求是最硬的筛选条件之一，先决定哪些资产可以进入正式候选。",
+                "Liquidity need is one of the hardest filters and determines which assets can enter the formal candidate set.",
+            ),
+        ),
+        ConstraintImpact(
+            constraint_key="minimum_kyc_level",
+            label=text_for_locale(locale, "KYC / 准入", "KYC / access"),
+            impact_level="high",
+            detail=text_for_locale(
+                locale,
+                "KYC 约束会直接改变可投资产集合，而不只是调整权重。",
+                "KYC changes the investable universe itself rather than only tweaking weights.",
+            ),
+        ),
+    ]
+    if not context.include_non_production_assets and any(not asset.default_rank_eligible for asset in assets):
+        impacts.append(
+            ConstraintImpact(
+                constraint_key="include_non_production_assets",
+                label=text_for_locale(locale, "非生产资产默认排除", "Default non-production exclusion"),
+                impact_level="medium",
+                detail=text_for_locale(
+                    locale,
+                    "Demo 和 benchmark 会保留展示，但默认不会与生产型资产同权竞争。",
+                    "Demo and benchmark assets remain visible, but do not compete on equal footing with production-style assets by default.",
+                ),
+            )
+        )
+    if any(allocation.blocked_reason for allocation in allocations):
+        impacts.append(
+            ConstraintImpact(
+                constraint_key="hard_constraints",
+                label=text_for_locale(locale, "硬约束", "Hard constraints"),
+                impact_level="high",
+                detail=text_for_locale(
+                    locale,
+                    "至少有一个候选因最低门槛或准入约束被直接排除。",
+                    "At least one candidate was removed outright by access or minimum-ticket constraints.",
+                ),
+            )
+        )
+    return impacts
+
+
+def _build_sensitivity_summary(
+    context: RwaIntakeContext,
+    assets: list[AssetTemplate],
+    *,
+    locale: str = "zh",
+) -> list[SensitivitySummary]:
+    scenarios = [
+        ("horizon_shift", text_for_locale(locale, "持有期变化", "Changed horizon"), _counterfactual_context(context, scenario_key="horizon_shift")),
+        ("stricter_liquidity", text_for_locale(locale, "更严格流动性", "Stricter liquidity"), _counterfactual_context(context, scenario_key="stricter_liquidity")),
+        ("changed_kyc", text_for_locale(locale, "KYC 变化", "Changed KYC"), _counterfactual_context(context, scenario_key="changed_kyc")),
+    ]
+    summaries: list[SensitivitySummary] = []
+    for scenario_key, label, scenario_context in scenarios:
+        simulations = [
+            simulate_holding(
+                asset,
+                scenario_context.investment_amount,
+                scenario_context.holding_period_days,
+                locale=locale,
+                analysis_seed=(scenario_context.analysis_seed or 0) + 17,
+            )
+            for asset in assets
+        ]
+        cards = build_asset_cards(assets, scenario_context, simulations, locale=locale)
+        allocations = recommend_allocations(scenario_context, cards, locale=locale)
+        winners = [item for item in allocations if item.target_weight_pct > 0][:2]
+        changed_assets = [item.asset_name for item in winners]
+        shift = changed_assets[0] if changed_assets else text_for_locale(locale, "无可投资产", "No investable asset")
+        summaries.append(
+            SensitivitySummary(
+                scenario_key=scenario_key,
+                label=label,
+                impact_summary=text_for_locale(
+                    locale,
+                    f"{label} 下的首选变为 {shift}。" if winners else f"{label} 下可投空间显著收缩。",
+                    f"Under {label.lower()}, the lead candidate becomes {shift}." if winners else f"Under {label.lower()}, the investable set shrinks materially.",
+                ),
+                changed_assets=changed_assets,
+                recommended_shift=text_for_locale(
+                    locale,
+                    "重新检查权重和硬约束，而不是沿用当前方案。",
+                    "Re-check both weights and hard constraints instead of carrying the current plan over unchanged.",
+                ),
+            )
+        )
+    return summaries
+
+
+def _counterfactual_context(context: RwaIntakeContext, *, scenario_key: str) -> RwaIntakeContext:
+    cloned = context.model_copy(deep=True)
+    if scenario_key == "horizon_shift":
+        cloned.holding_period_days = 180 if context.holding_period_days < 180 else 60
+        cloned.analysis_seed = (context.analysis_seed or 0) + 1
+    elif scenario_key == "stricter_liquidity":
+        cloned.liquidity_need = LiquidityNeed.INSTANT
+        cloned.analysis_seed = (context.analysis_seed or 0) + 2
+    elif scenario_key == "changed_kyc":
+        cloned.minimum_kyc_level = 2 if context.minimum_kyc_level < 2 else 0
+        cloned.wallet_kyc_level_onchain = None
+        cloned.wallet_kyc_verified = None
+        cloned.analysis_seed = (context.analysis_seed or 0) + 3
+    return cloned
+
+
+def _matrix_badges(card: AssetAnalysisCard, blocked_reason: str) -> list[str]:
+    badges: list[str] = []
+    if AssetStatus.VERIFIED in card.statuses:
+        badges.append("Verified")
+    if AssetStatus.ISSUER_DISCLOSED in card.statuses:
+        badges.append("Issuer disclosed")
+    if AssetStatus.DEMO in card.statuses:
+        badges.append("Demo")
+    if AssetStatus.BENCHMARK in card.statuses:
+        badges.append("Benchmark")
+    if blocked_reason:
+        badges.append("Blocked")
+    return badges
+
+
+def _truth_badges(card: AssetAnalysisCard) -> list[str]:
+    if card.truth_level == TruthLevel.ONCHAIN_VERIFIED:
+        return ["Onchain verified"]
+    if card.truth_level == TruthLevel.BENCHMARK_REFERENCE:
+        return ["Benchmark reference"]
+    if card.truth_level == TruthLevel.DEMO_ONLY:
+        return ["Demo only"]
+    return ["Issuer disclosed"]
+
+
+def _liquidity_display(asset: AssetTemplate, *, locale: str = "zh") -> str:
+    if asset.redemption_days == 0 and asset.lockup_days == 0:
+        return text_for_locale(locale, "高 / T+0", "High / T+0")
+    if asset.redemption_days <= 3 and asset.lockup_days == 0:
+        return text_for_locale(locale, f"中 / T+{asset.redemption_days}", f"Medium / T+{asset.redemption_days}")
+    return text_for_locale(locale, f"低 / T+{asset.redemption_days}", f"Low / T+{asset.redemption_days}")
+
+
+def _kyc_fit_display(context: RwaIntakeContext, card: AssetAnalysisCard, *, locale: str = "zh") -> str:
+    effective = _effective_kyc_level(context)
+    required = card.kyc_required_level or 0
+    if required <= effective:
+        return text_for_locale(locale, f"可投 (L{effective})", f"Eligible (L{effective})")
+    return text_for_locale(locale, f"不足 (需 L{required})", f"Insufficient (needs L{required})")
+
+
+def _suitability_display(card: AssetAnalysisCard, blocked_reason: str, *, locale: str = "zh") -> str:
+    if blocked_reason:
+        return text_for_locale(locale, "受限", "Constrained")
+    utility = float(card.metadata.get("utility_score", 0.0) or 0.0)
+    if utility >= 0:
+        return text_for_locale(locale, "高", "High")
+    if utility >= -10:
+        return text_for_locale(locale, "中", "Medium")
+    return text_for_locale(locale, "低", "Low")
+
+
+def _action_summary(
+    asset: AssetTemplate,
+    allocation: PortfolioAllocation | None,
+    blocked_reason: str,
+    *,
+    locale: str = "zh",
+) -> str:
+    if blocked_reason:
+        return text_for_locale(
+            locale,
+            f"当前不建议执行：{blocked_reason}",
+            f"Not execution-ready yet: {blocked_reason}",
+        )
+    if allocation and allocation.target_weight_pct > 0:
+        return text_for_locale(
+            locale,
+            f"建议作为下一步候选执行 {allocation.target_weight_pct:.1f}% 目标权重。",
+            f"Execution-ready as a next-step candidate at {allocation.target_weight_pct:.1f}% target weight.",
+        )
+    return text_for_locale(
+        locale,
+        "保留为观察项或备用路径，不是当前首选执行资产。",
+        "Keep as a watchlist or alternate path rather than the current primary execution asset.",
+    )
+
+
+def _action_checklist(asset: AssetTemplate, blocked_reason: str, *, locale: str = "zh") -> list[str]:
+    if blocked_reason:
+        return [
+            text_for_locale(locale, "先解决当前阻塞项。", "Resolve the current blocker first."),
+            text_for_locale(locale, "重新确认资格、最小门槛和退出条款。", "Re-check eligibility, minimum ticket, and exit terms."),
+        ]
+    if asset.action_type in {ActionType.HOLD, ActionType.MINT, ActionType.REDEEM}:
+        return [
+            text_for_locale(locale, "连接钱包并确认网络。", "Connect the wallet and confirm the network."),
+            text_for_locale(locale, "核对合约地址、路由和授权额度。", "Verify the contract address, route, and allowance scope."),
+            text_for_locale(locale, "按目标仓位执行并保存交易凭证。", "Execute to the target size and retain the transaction receipt."),
+        ]
+    if asset.action_type == ActionType.SUBSCRIBE:
+        return [
+            text_for_locale(locale, "确认 KYC / 白名单状态。", "Confirm KYC / whitelist status."),
+            text_for_locale(locale, "核对申购门槛、结算币种和赎回窗口。", "Verify the minimum ticket, settlement currency, and redemption window."),
+            text_for_locale(locale, "通过发行方入口提交认购。", "Submit the subscription through the issuer workflow."),
+        ]
+    return [
+        text_for_locale(locale, "查看发行方或协议文档。", "Review the issuer or protocol documentation."),
+        text_for_locale(locale, "确认是否存在真实可执行入口。", "Confirm whether a real execution path exists."),
+    ]
+
+
+def _higher_is_better_tone(value: float) -> str:
+    if value >= 8:
+        return "success"
+    if value >= 3:
+        return "gold"
+    if value >= 0:
+        return "neutral"
+    return "warning"
+
+
+def _lower_is_better_tone(value: float) -> str:
+    if value <= 5:
+        return "success"
+    if value <= 20:
+        return "gold"
+    if value <= 45:
+        return "warning"
+    return "danger"
+
+
+def _utility_tone(value: float, *, blocked_reason: str = "") -> str:
+    if blocked_reason:
+        return "warning"
+    if value >= 0:
+        return "success"
+    if value >= -10:
+        return "gold"
+    return "warning"
 
 """
 def build_comparison_tables(
@@ -1368,35 +2124,68 @@ def build_rwa_report(
     locale: str = "zh",
     oracle_snapshots: list[OracleSnapshot] | None = None,
 ) -> tuple[AnalysisReport, list[EvidenceItem]]:
-    selected_assets = resolve_selected_assets(mode, problem_statement, context, asset_library)
-    effective_kyc_level = _effective_kyc_level(context)
-    resolved_report_network = _report_network(context, chain_config)
+    working_context = context.model_copy(deep=True)
+    demo_scenario = (
+        get_demo_scenario(working_context.demo_scenario_id, locale=locale)
+        if working_context.demo_mode and working_context.demo_scenario_id
+        else None
+    )
+    if demo_scenario is not None:
+        working_context.preferred_asset_ids = list(demo_scenario.featured_asset_ids)
+        working_context.analysis_seed = demo_scenario.analysis_seed
+        working_context.demo_mode = True
+        working_context.demo_scenario_id = demo_scenario.scenario_id
+
+    selected_assets = resolve_selected_assets(mode, problem_statement, working_context, asset_library)
+    if demo_scenario is not None:
+        selected_ids = set(demo_scenario.featured_asset_ids)
+        ordered_assets = {asset.asset_id: asset for asset in asset_library if asset.asset_id in selected_ids}
+        selected_assets = [
+            ordered_assets[asset_id]
+            for asset_id in demo_scenario.featured_asset_ids
+            if asset_id in ordered_assets
+        ]
+
+    resolved_report_network = _report_network(working_context, chain_config)
+    evidence_reference_time = DEMO_REFERENCE_TIME if demo_scenario is not None else None
     kyc_snapshot: KycOnchainResult | None = None
 
-    # Try backend KYC override when wallet is connected
-    if context.wallet_address:
+    if demo_scenario is not None:
+        kyc_snapshot = build_demo_kyc_snapshot(
+            chain_config,
+            demo_scenario,
+            network=resolved_report_network,
+            wallet_address=working_context.wallet_address,
+        )
+        working_context.wallet_kyc_level_onchain = kyc_snapshot.level
+        working_context.wallet_kyc_verified = kyc_snapshot.is_human
+        if oracle_snapshots is None:
+            oracle_snapshots = build_demo_oracle_snapshots(
+                chain_config,
+                demo_scenario.scenario_id,
+                network=resolved_report_network,
+            )
+    elif working_context.wallet_address:
         try:
             from app.rwa.kyc_service import read_kyc_from_chain
             kyc_snapshot = read_kyc_from_chain(
                 chain_config,
-                context.wallet_address,
-                context.wallet_network or resolved_report_network,
+                working_context.wallet_address,
+                working_context.wallet_network or resolved_report_network,
             )
-            context.wallet_kyc_level_onchain = kyc_snapshot.level
-            context.wallet_kyc_verified = kyc_snapshot.is_human
-            context.wallet_network = context.wallet_network or resolved_report_network
-            effective_kyc_level = _effective_kyc_level(context)
+            working_context.wallet_kyc_level_onchain = kyc_snapshot.level
+            working_context.wallet_kyc_verified = kyc_snapshot.is_human
+            working_context.wallet_network = working_context.wallet_network or resolved_report_network
             logger.info(
                 "KYC snapshot: status=%s level=%d for %s on %s",
                 kyc_snapshot.status.value,
                 kyc_snapshot.level,
-                context.wallet_address,
-                context.wallet_network,
+                working_context.wallet_address,
+                working_context.wallet_network,
             )
         except Exception as exc:
             logger.warning("KYC backend read failed, using intake: %s", exc)
 
-    # Fetch oracle snapshots if not provided
     if oracle_snapshots is None:
         try:
             from app.rwa.oracle_service import fetch_oracle_snapshots
@@ -1411,18 +2200,19 @@ def build_rwa_report(
     simulations = [
         simulate_holding(
             asset,
-            context.investment_amount,
-            context.holding_period_days,
+            working_context.investment_amount,
+            working_context.holding_period_days,
             locale=locale,
+            analysis_seed=working_context.analysis_seed,
         )
         for asset in selected_assets
     ]
-    asset_cards = build_asset_cards(selected_assets, context, simulations)
+    asset_cards = build_asset_cards(selected_assets, working_context, simulations, locale=locale)
     simulation_map = {simulation.asset_id: simulation for simulation in simulations}
-    allocations = recommend_allocations(context, asset_cards, locale=locale)
+    allocations = recommend_allocations(working_context, asset_cards, locale=locale)
     asset_lookup = {asset.asset_id: asset for asset in selected_assets}
     tx_draft = build_tx_draft(
-        context,
+        working_context,
         allocations,
         asset_lookup,
         chain_config,
@@ -1431,12 +2221,52 @@ def build_rwa_report(
     evidence = [
         item
         for asset in selected_assets
-        for item in build_catalog_evidence(asset, locale=locale)
+        for item in build_catalog_evidence(
+            asset,
+            locale=locale,
+            fetched_at=evidence_reference_time,
+        )
     ]
+    for item in evidence:
+        item.source_tag = _classify_evidence_source(item)
+    evidence = enrich_report_evidence(evidence, reference_time=evidence_reference_time)
+    evidence_governance = build_evidence_governance(
+        evidence,
+        selected_assets,
+        reference_time=evidence_reference_time,
+    )
     option_profiles = build_option_profiles(asset_cards, simulations, locale=locale)
     tables = build_comparison_tables(asset_cards, simulations, locale=locale)
-    recommendations = _recommendation_lines(context, allocations, locale=locale)
-    open_questions = _open_questions(context, allocations, locale=locale)
+    comparison_matrix = build_comparison_matrix(
+        working_context,
+        selected_assets,
+        asset_cards,
+        simulations,
+        locale=locale,
+    )
+    recommendation_reason = build_recommendation_reason(
+        working_context,
+        selected_assets,
+        asset_cards,
+        allocations,
+        locale=locale,
+    )
+    action_intents = build_action_intents(
+        working_context,
+        selected_assets,
+        allocations,
+        locale=locale,
+    )
+    warnings = build_report_warnings(
+        working_context,
+        selected_assets,
+        allocations,
+        evidence_warning=evidence_governance.weak_evidence_warning,
+        locale=locale,
+    )
+    unknowns = build_report_unknowns(working_context, selected_assets, locale=locale)
+    recommendations = _recommendation_lines(working_context, allocations, locale=locale)
+    open_questions = _open_questions(working_context, allocations, locale=locale)
     source_provenance_refs = build_source_provenance_refs(selected_assets)
     top_choice = next(
         (allocation for allocation in allocations if allocation.target_weight_pct > 0),
@@ -1445,16 +2275,23 @@ def build_rwa_report(
     summary = text_for_locale(
         locale,
         (
-            f"当前更适合以 {top_choice.asset_name} 作为核心配置腿，并围绕 {context.holding_period_days} 天持有期管理流动性、KYC 和赎回风险。"
+            f"当前更适合以 {top_choice.asset_name} 作为核心配置腿，并围绕 {working_context.holding_period_days} 天持有期管理流动性、KYC 和赎回风险。"
             if top_choice
             else "当前更适合先确认准入门槛和退出条款，再决定是否进入 RWA 配置。"
         ),
         (
-            f"The current setup is best anchored by {top_choice.asset_name} as the core sleeve, with liquidity, KYC, and redemption risk managed around a {context.holding_period_days}-day hold."
+            f"The current setup is best anchored by {top_choice.asset_name} as the core sleeve, with liquidity, KYC, and redemption risk managed around a {working_context.holding_period_days}-day hold."
             if top_choice
             else "The safer posture is to confirm access gating and redemption terms before entering an RWA allocation."
         ),
     )
+    if demo_scenario is not None:
+        summary = text_for_locale(
+            locale,
+            f"[{demo_scenario.demo_label}] {summary}",
+            f"[{demo_scenario.demo_label}] {summary}",
+        )
+
     attestation_draft = build_attestation_draft(summary, allocations, chain_config)
     confidence_band = build_confidence_band(
         simulations,
@@ -1464,6 +2301,55 @@ def build_rwa_report(
     oracle_stress_score = build_oracle_stress_score(asset_cards, allocations)
     reserve_backing_summary = build_reserve_backing_summary(selected_assets, source_provenance_refs)
     stress_scenarios = build_stress_scenarios(asset_cards, allocations, source_provenance_refs)
+    effective_kyc_level = _effective_kyc_level(working_context)
+    assumptions = [
+        text_for_locale(
+            locale,
+            f"默认投资本金为 {working_context.investment_amount:.2f} {working_context.base_currency}",
+            f"Base principal assumed: {working_context.investment_amount:.2f} {working_context.base_currency}",
+        ),
+        text_for_locale(
+            locale,
+            f"持有期按 {working_context.holding_period_days} 天估算，收益为情景模拟而非预测。",
+            f"The holding period is modeled over {working_context.holding_period_days} days and returns are scenario outputs rather than forecasts.",
+        ),
+        text_for_locale(
+            locale,
+            "RWA 资产的准入、申赎和托管条款以发行人实际文件为准。",
+            "Issuer documents remain the source of truth for RWA eligibility, redemption, and custody terms.",
+        ),
+        text_for_locale(
+            locale,
+            "这不是金融建议，也不是法律、税务或合规意见。",
+            "This is not financial advice and not legal, tax, or compliance advice.",
+        ),
+        text_for_locale(
+            locale,
+            (
+                f"当前采用的有效 KYC 等级为 L{effective_kyc_level}，该值在已连接钱包时优先采用链上 KYC/SBT 快照。"
+                if working_context.wallet_address or demo_scenario is not None
+                else f"当前按用户声明的 KYC 约束 L{effective_kyc_level} 进行筛选。"
+            ),
+            (
+                f"The effective KYC level used in this report is L{effective_kyc_level}; an onchain KYC/SBT snapshot takes precedence when available."
+                if working_context.wallet_address or demo_scenario is not None
+                else f"The current screening uses the user-declared KYC constraint of L{effective_kyc_level}."
+            ),
+        ),
+        text_for_locale(
+            locale,
+            f"报告使用的链上数据网络为 {_network_label(resolved_report_network, locale=locale)}。",
+            f"The report uses {_network_label(resolved_report_network, locale='en')} as the active onchain data network.",
+        ),
+    ]
+    if demo_scenario is not None:
+        assumptions.append(
+            text_for_locale(
+                locale,
+                f"当前处于 {demo_scenario.demo_label}，使用固定资产池、固定快照和固定随机种子。",
+                f"This run is in {demo_scenario.demo_label} mode with a fixed asset universe, fixed snapshots, and a fixed random seed.",
+            )
+        )
 
     markdown = "\n".join(
         [
@@ -1475,6 +2361,12 @@ def build_rwa_report(
             "",
             text_for_locale(locale, "## 组合建议", "## Allocation guidance"),
             *[f"- {item}" for item in recommendations],
+            "",
+            text_for_locale(locale, "## 为什么推荐这些资产", "## Why this recommendation"),
+            *[
+                f"- {driver.title}: {driver.detail}"
+                for driver in recommendation_reason.top_drivers
+            ],
             "",
             text_for_locale(locale, "## 风险拆解", "## Risk decomposition"),
             text_for_locale(
@@ -1509,46 +2401,21 @@ def build_rwa_report(
                 f"- Plan Registry 地址: {attestation_draft.contract_address or '未配置，当前仅生成离线存证草案'}",
                 f"- Plan Registry address: {attestation_draft.contract_address or 'Not configured; only an offline attestation draft can be generated'}",
             ),
+            "",
+            text_for_locale(locale, "## 假设与未知项", "## Assumptions and unknowns"),
+            *[f"- {item}" for item in assumptions],
+            *[f"- {item}" for item in unknowns],
+            "",
+            text_for_locale(locale, "## 重要提醒", "## Key warnings"),
+            *[f"- {item}" for item in warnings],
         ]
     )
 
     report = AnalysisReport(
         summary=summary,
-        assumptions=[
-            text_for_locale(
-                locale,
-                f"默认投资本金为 {context.investment_amount:.2f} {context.base_currency}",
-                f"Base principal assumed: {context.investment_amount:.2f} {context.base_currency}",
-            ),
-            text_for_locale(
-                locale,
-                f"持有期按 {context.holding_period_days} 天估算，收益为情景模拟而非预测。",
-                f"The holding period is modeled over {context.holding_period_days} days and returns are scenario outputs rather than forecasts.",
-            ),
-            text_for_locale(
-                locale,
-                "RWA 资产的准入、申赎和托管条款以发行人实际文件为准。",
-                "Issuer documents remain the source of truth for RWA eligibility, redemption, and custody terms.",
-            ),
-            text_for_locale(
-                locale,
-                (
-                    f"当前采用的有效 KYC 等级为 L{effective_kyc_level}，该值在已连接钱包时优先采用链上 KYC/SBT 快照。"
-                    if context.wallet_address
-                    else f"当前按用户声明的 KYC 约束 L{effective_kyc_level} 进行筛选。"
-                ),
-                (
-                    f"The effective KYC level used in this report is L{effective_kyc_level}; when a wallet is connected, the onchain KYC/SBT snapshot takes precedence."
-                    if context.wallet_address
-                    else f"The current screening uses the user-declared KYC constraint of L{effective_kyc_level}."
-                ),
-            ),
-            text_for_locale(
-                locale,
-                f"报告使用的链上数据网络为 {_network_label(resolved_report_network, locale=locale)}。",
-                f"The report uses {_network_label(resolved_report_network, locale='en')} as the active onchain data network.",
-            ),
-        ],
+        assumptions=assumptions,
+        unknowns=unknowns,
+        warnings=warnings,
         recommendations=recommendations,
         open_questions=open_questions,
         markdown=markdown,
@@ -1568,13 +2435,13 @@ def build_rwa_report(
         asset_cards=asset_cards,
         simulations=simulations,
         recommended_allocations=allocations,
+        comparison_matrix=comparison_matrix,
+        recommendation_reason=recommendation_reason,
+        action_intents=action_intents,
+        evidence_governance=evidence_governance,
         methodology_references=methodology_references(),
         tx_draft=tx_draft,
     )
     report.attestation_draft = build_attestation_draft(markdown, allocations, chain_config)
-
-    # Classify evidence source tags
-    for item in evidence:
-        item.source_tag = _classify_evidence_source(item)
 
     return report, evidence

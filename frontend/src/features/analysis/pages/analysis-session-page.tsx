@@ -125,6 +125,7 @@ export function AnalysisSessionPage() {
       answerNormally: isZh ? '正常回答' : 'Answer normally',
       uncertain: isZh ? '暂不确定' : 'Not sure yet',
       skip: isZh ? '跳过' : 'Skip',
+      decline: isZh ? '暂不回答' : 'Prefer not to answer',
       submitAnswers: isZh ? '提交本轮回答' : 'Submit this answer set',
       thinkingTitle: isZh
         ? '当前没有新的追问，AI 正在继续推进分析。'
@@ -180,8 +181,9 @@ export function AnalysisSessionPage() {
       answered: text.answerNormally,
       uncertain: text.uncertain,
       skipped: text.skip,
+      declined: text.decline,
     }),
-    [text.answerNormally, text.skip, text.uncertain],
+    [text.answerNormally, text.decline, text.skip, text.uncertain],
   )
 
   const stageStatusLabels = useMemo(
@@ -323,7 +325,10 @@ export function AnalysisSessionPage() {
     session.status !== 'COMPLETED'
 
   return (
-    <div className="space-y-6 xl:flex xl:min-h-[calc(100vh-7rem)] xl:flex-col">
+    <div
+      className="space-y-6 xl:flex xl:min-h-[calc(100vh-7rem)] xl:flex-col"
+      data-testid="analysis-session-page"
+    >
       <PageHeader
         eyebrow={text.eyebrow}
         title={session.problemStatement}
@@ -504,7 +509,7 @@ export function AnalysisSessionPage() {
                       </div>
 
                       <div className="mt-4 flex flex-wrap gap-2">
-                        {(['answered', 'uncertain', 'skipped'] as const)
+                        {(['answered', 'uncertain', 'skipped', 'declined'] as const)
                           .filter((status) => status !== 'skipped' || question.allowSkip)
                           .map((status) => (
                             <Button
@@ -532,6 +537,7 @@ export function AnalysisSessionPage() {
                 })}
 
                 <Button
+                  data-testid="analysis-session-submit"
                   onClick={() =>
                     void submitMutation.mutateAsync(toAnswers(session, drafts))
                   }

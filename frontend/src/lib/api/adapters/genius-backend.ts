@@ -53,6 +53,197 @@ export interface BackendBootstrapResponse {
   supported_asset_types: string[]
   holding_period_presets: number[]
   oracle_snapshots?: BackendMarketDataSnapshot[]
+  demo_scenarios?: BackendDemoScenarioDefinition[]
+}
+
+export interface BackendActionLink {
+  kind: string
+  label: string
+  url: string
+}
+
+export interface BackendActionBlocker {
+  code: string
+  label: string
+  detail: string
+  severity?: string
+}
+
+export interface BackendActionIntent {
+  asset_id: string
+  asset_name: string
+  action_type: string
+  action_readiness: string
+  summary?: string
+  action_blockers?: BackendActionBlocker[]
+  action_links?: BackendActionLink[]
+  execution_notes?: string[]
+  checklist?: string[]
+}
+
+export interface BackendComparisonMatrixMetric {
+  key: string
+  label: string
+  description?: string
+  unit?: string
+}
+
+export interface BackendComparisonMatrixCell {
+  metric_key: string
+  label: string
+  display_value: string
+  raw_value?: string | number | boolean | null
+  tone?: string
+  badges?: string[]
+  rationale?: string
+  tooltip?: string
+  is_blocked?: boolean
+}
+
+export interface BackendComparisonMatrixRow {
+  asset_id: string
+  asset_name: string
+  asset_symbol: string
+  statuses?: string[]
+  truth_level?: string
+  live_readiness?: string
+  default_rank_eligible?: boolean
+  cells?: BackendComparisonMatrixCell[]
+}
+
+export interface BackendComparisonMatrix {
+  title: string
+  metrics?: BackendComparisonMatrixMetric[]
+  rows?: BackendComparisonMatrixRow[]
+  notes?: string[]
+}
+
+export interface BackendRecommendationDriver {
+  title: string
+  detail: string
+  impact?: string
+  asset_id?: string
+}
+
+export interface BackendExcludedAssetReason {
+  asset_id: string
+  asset_name: string
+  category?: string
+  reason: string
+}
+
+export interface BackendConstraintImpact {
+  constraint_key: string
+  label: string
+  impact_level?: string
+  detail: string
+}
+
+export interface BackendSensitivitySummary {
+  scenario_key: string
+  label: string
+  impact_summary: string
+  changed_assets?: string[]
+  recommended_shift?: string
+}
+
+export interface BackendRecommendationReason {
+  summary?: string
+  top_drivers?: BackendRecommendationDriver[]
+  excluded_reasons?: BackendExcludedAssetReason[]
+  constraint_impacts?: BackendConstraintImpact[]
+  sensitivity_summary?: BackendSensitivitySummary[]
+}
+
+export interface BackendEvidenceFreshness {
+  bucket?: string
+  label?: string
+  age_hours?: number | null
+  stale_warning?: string
+}
+
+export interface BackendEvidenceConflict {
+  asset_id?: string
+  field_key: string
+  severity?: string
+  summary: string
+  evidence_ids?: string[]
+}
+
+export interface BackendEvidenceCoverage {
+  asset_id: string
+  asset_name?: string
+  coverage_score: number
+  completeness_score: number
+  strengths?: string[]
+  gaps?: string[]
+  missing_fields?: string[]
+}
+
+export interface BackendEvidenceGovernance {
+  overall_score: number
+  weak_evidence_warning?: string
+  conflicts?: BackendEvidenceConflict[]
+  coverage?: BackendEvidenceCoverage[]
+}
+
+export interface BackendDemoScenarioDefinition {
+  scenario_id: string
+  title: string
+  description: string
+  problem_statement: string
+  intake_context: BackendRwaIntakeContext
+  featured_asset_ids?: string[]
+  analysis_seed: number
+  demo_label?: string
+  notes?: string[]
+}
+
+export interface BackendDiffFieldChange {
+  label: string
+  before: string
+  after: string
+  detail?: string
+}
+
+export interface BackendAllocationDiffItem {
+  asset_id: string
+  asset_name: string
+  before_weight_pct: number
+  after_weight_pct: number
+  delta_weight_pct: number
+  reason?: string
+}
+
+export interface BackendRiskDiffItem {
+  asset_id: string
+  asset_name: string
+  before_overall: number
+  after_overall: number
+  delta_overall: number
+}
+
+export interface BackendEvidenceDiffItem {
+  asset_id?: string
+  asset_name?: string
+  before_coverage_score: number
+  after_coverage_score: number
+  before_conflict_count: number
+  after_conflict_count: number
+  summary: string
+}
+
+export interface BackendReanalysisDiff {
+  previous_snapshot_at?: string | null
+  current_generated_at?: string
+  summary?: string
+  changed_constraints?: BackendDiffFieldChange[]
+  changed_weights?: BackendAllocationDiffItem[]
+  changed_risk?: BackendRiskDiffItem[]
+  changed_evidence?: BackendEvidenceDiffItem[]
+  previous_recommendation?: string[]
+  current_recommendation?: string[]
+  why_changed?: string[]
 }
 
 export interface BackendHashKeyChainConfig {
@@ -99,6 +290,10 @@ export interface BackendRwaIntakeContext {
   wallet_kyc_verified?: boolean
   wants_onchain_attestation: boolean
   additional_constraints?: string
+  include_non_production_assets?: boolean
+  demo_mode?: boolean
+  demo_scenario_id?: string
+  analysis_seed?: number | null
 }
 
 export interface BackendAssetTemplate {
@@ -145,6 +340,17 @@ export interface BackendAssetTemplate {
   onchain_verified: boolean
   issuer_disclosed: boolean
   featured: boolean
+  statuses?: string[]
+  truth_level?: string
+  live_readiness?: string
+  default_rank_eligible?: boolean
+  status_explanation?: string
+  truth_level_explanation?: string
+  action_type?: string
+  action_readiness?: string
+  action_links?: BackendActionLink[]
+  action_blocker_reasons?: string[]
+  execution_notes?: string[]
 }
 
 export interface BackendClarificationQuestion {
@@ -212,6 +418,7 @@ export interface BackendChartTask {
 
 export interface BackendEvidenceItem {
   evidence_id: string
+  asset_id?: string
   title: string
   source_url: string
   source_name: string
@@ -221,6 +428,9 @@ export interface BackendEvidenceItem {
   summary: string
   extracted_facts: string[]
   confidence: number
+  fact_type?: string
+  freshness?: BackendEvidenceFreshness
+  conflict_keys?: string[]
 }
 
 export interface BackendKycOnchainResult {
@@ -260,7 +470,7 @@ export interface BackendMarketDataSnapshot {
   updated_at?: string | null
   round_id?: number | null
   note?: string
-  status: 'live' | 'unavailable'
+  status: 'live' | 'unavailable' | 'demo' | string
 }
 
 export interface BackendChartArtifact {
@@ -463,6 +673,12 @@ export interface BackendAssetAnalysisCard {
   primary_source_url?: string
   onchain_verified: boolean
   issuer_disclosed: boolean
+  statuses?: string[]
+  truth_level?: string
+  live_readiness?: string
+  default_rank_eligible?: boolean
+  status_explanation?: string
+  truth_level_explanation?: string
   risk_vector: BackendRiskVector
   risk_breakdown?: BackendRiskBreakdownItem[]
   risk_data_quality?: number
@@ -522,6 +738,8 @@ export interface BackendReserveBackingSummary {
 export interface BackendReport {
   summary: string
   assumptions: string[]
+  unknowns?: string[]
+  warnings?: string[]
   recommendations: string[]
   open_questions: string[]
   chart_refs: string[]
@@ -541,6 +759,11 @@ export interface BackendReport {
   asset_cards?: BackendAssetAnalysisCard[]
   simulations?: BackendHoldingPeriodSimulation[]
   recommended_allocations?: BackendPortfolioAllocation[]
+  comparison_matrix?: BackendComparisonMatrix | null
+  recommendation_reason?: BackendRecommendationReason | null
+  action_intents?: BackendActionIntent[]
+  evidence_governance?: BackendEvidenceGovernance | null
+  reanalysis_diff?: BackendReanalysisDiff | null
   methodology_references?: BackendMethodologyReference[]
   tx_draft?: BackendTxDraft | null
   attestation_draft?: BackendAttestationDraft | null
@@ -769,6 +992,14 @@ export function mapRwaIntakeContext(
     walletKycVerified: context?.wallet_kyc_verified,
     wantsOnchainAttestation: context?.wants_onchain_attestation ?? true,
     additionalConstraints: context?.additional_constraints ?? '',
+    includeNonProductionAssets:
+      context?.include_non_production_assets ?? false,
+    demoMode: context?.demo_mode ?? false,
+    demoScenarioId: context?.demo_scenario_id ?? '',
+    analysisSeed:
+      typeof context?.analysis_seed === 'number'
+        ? context.analysis_seed
+        : undefined,
   }
 }
 
@@ -789,6 +1020,150 @@ export function toBackendIntakeContext(
     wallet_kyc_verified: context.walletKycVerified,
     wants_onchain_attestation: context.wantsOnchainAttestation,
     additional_constraints: context.additionalConstraints || '',
+    include_non_production_assets: context.includeNonProductionAssets,
+    demo_mode: context.demoMode,
+    demo_scenario_id: context.demoScenarioId || '',
+    analysis_seed: context.analysisSeed,
+  }
+}
+
+function mapAssetStatuses(
+  values?: string[],
+): NonNullable<RwaAssetTemplate['statuses']> {
+  const allowed = new Set([
+    'production',
+    'verified',
+    'issuer_disclosed',
+    'benchmark',
+    'demo',
+    'experimental',
+  ])
+  return (values ?? []).filter((value): value is NonNullable<RwaAssetTemplate['statuses']>[number] =>
+    allowed.has(value),
+  )
+}
+
+function mapTruthLevel(
+  value?: string,
+): NonNullable<RwaAssetTemplate['truthLevel']> {
+  switch (value) {
+    case 'onchain_verified':
+    case 'issuer_disclosed':
+    case 'benchmark_reference':
+    case 'demo_only':
+      return value
+    default:
+      return 'issuer_disclosed'
+  }
+}
+
+function mapLiveReadiness(
+  value?: string,
+): NonNullable<RwaAssetTemplate['liveReadiness']> {
+  switch (value) {
+    case 'ready':
+    case 'partial':
+    case 'unavailable':
+    case 'demo_only':
+      return value
+    default:
+      return 'partial'
+  }
+}
+
+function mapActionType(value?: string): NonNullable<RwaAssetTemplate['actionType']> {
+  switch (value) {
+    case 'subscribe':
+    case 'mint':
+    case 'redeem':
+    case 'hold':
+    case 'learn_more':
+    case 'external_only':
+      return value
+    default:
+      return 'learn_more'
+  }
+}
+
+function mapActionReadiness(
+  value?: string,
+): NonNullable<RwaAssetTemplate['actionReadiness']> {
+  switch (value) {
+    case 'ready':
+    case 'partial':
+    case 'unavailable':
+      return value
+    default:
+      return 'unavailable'
+  }
+}
+
+function mapActionLink(link: BackendActionLink) {
+  return {
+    kind: link.kind,
+    label: link.label,
+    url: link.url,
+  }
+}
+
+function mapFactType(
+  value?: string,
+): Exclude<NonNullable<AnalysisReport['evidence'][number]['factType']>, undefined> {
+  switch (value) {
+    case 'onchain_verified_fact':
+    case 'offchain_disclosed_fact':
+    case 'oracle_fact':
+    case 'third_party_fact':
+    case 'inferred_fact':
+      return value
+    default:
+      return 'offchain_disclosed_fact'
+  }
+}
+
+function mapSourceTag(
+  value?: string,
+): AnalysisReport['evidence'][number]['sourceTag'] {
+  switch (value) {
+    case 'onchain_verified':
+    case 'oracle_fed':
+    case 'issuer_disclosed':
+    case 'third_party_source':
+    case 'model_inference':
+    case 'user_assumption':
+      return value
+    default:
+      return undefined
+  }
+}
+
+function mapFreshnessBucket(
+  value?: string,
+): 'fresh' | 'aging' | 'stale' | 'undated' {
+  switch (value) {
+    case 'fresh':
+    case 'aging':
+    case 'stale':
+    case 'undated':
+      return value
+    default:
+      return 'undated'
+  }
+}
+
+function mapDemoScenario(
+  scenario: BackendDemoScenarioDefinition,
+) {
+  return {
+    scenarioId: scenario.scenario_id,
+    title: scenario.title,
+    description: scenario.description,
+    problemStatement: scenario.problem_statement,
+    intakeContext: mapRwaIntakeContext(scenario.intake_context),
+    featuredAssetIds: scenario.featured_asset_ids ?? [],
+    analysisSeed: scenario.analysis_seed,
+    demoLabel: scenario.demo_label ?? 'Official Demo',
+    notes: scenario.notes ?? [],
   }
 }
 
@@ -837,6 +1212,17 @@ function mapAssetTemplate(asset: BackendAssetTemplate): RwaAssetTemplate {
     onchainVerified: Boolean(asset.onchain_verified),
     issuerDisclosed: Boolean(asset.issuer_disclosed),
     featured: Boolean(asset.featured),
+    statuses: mapAssetStatuses(asset.statuses),
+    truthLevel: mapTruthLevel(asset.truth_level),
+    liveReadiness: mapLiveReadiness(asset.live_readiness),
+    defaultRankEligible: asset.default_rank_eligible ?? true,
+    statusExplanation: asset.status_explanation ?? '',
+    truthLevelExplanation: asset.truth_level_explanation ?? '',
+    actionType: mapActionType(asset.action_type),
+    actionReadiness: mapActionReadiness(asset.action_readiness),
+    actionLinks: (asset.action_links ?? []).map(mapActionLink),
+    actionBlockerReasons: asset.action_blocker_reasons ?? [],
+    executionNotes: asset.execution_notes ?? [],
   }
 }
 
@@ -1061,6 +1447,12 @@ function mapAssetAnalysisCard(
     primarySourceUrl: card.primary_source_url ?? '',
     onchainVerified: Boolean(card.onchain_verified),
     issuerDisclosed: Boolean(card.issuer_disclosed),
+    statuses: mapAssetStatuses(card.statuses),
+    truthLevel: mapTruthLevel(card.truth_level),
+    liveReadiness: mapLiveReadiness(card.live_readiness),
+    defaultRankEligible: card.default_rank_eligible ?? true,
+    statusExplanation: card.status_explanation ?? '',
+    truthLevelExplanation: card.truth_level_explanation ?? '',
     riskVector: mapRiskVector(card.risk_vector),
     riskBreakdown: (card.risk_breakdown ?? []).map(mapRiskBreakdownItem),
     riskDataQuality:
@@ -1090,6 +1482,211 @@ function mapMarketSnapshot(
       typeof snapshot.round_id === 'number' ? snapshot.round_id : undefined,
     note: snapshot.note ?? '',
     status: snapshot.status,
+  }
+}
+
+function mapEvidenceItem(
+  item: BackendEvidenceItem,
+  sessionId: string,
+) {
+  return {
+    id: item.evidence_id,
+    sessionId,
+    assetId: item.asset_id ?? '',
+    sourceType: item.source_type ?? 'internal',
+    sourceUrl: item.source_url,
+    sourceName: item.source_name,
+    title: item.title,
+    summary: item.summary,
+    extractedFacts: item.extracted_facts,
+    fetchedAt: item.fetched_at,
+    confidence: item.confidence,
+    sourceTag: mapSourceTag(item.source_tag),
+    factType: item.fact_type ? mapFactType(item.fact_type) : undefined,
+    freshness: item.freshness
+      ? {
+          bucket: mapFreshnessBucket(item.freshness.bucket),
+          label: item.freshness.label ?? '',
+          ageHours:
+            typeof item.freshness.age_hours === 'number'
+              ? item.freshness.age_hours
+              : undefined,
+          staleWarning: item.freshness.stale_warning ?? '',
+        }
+      : undefined,
+    conflictKeys: item.conflict_keys ?? [],
+  }
+}
+
+function mapComparisonMatrix(
+  matrix?: BackendComparisonMatrix | null,
+) {
+  if (!matrix) {
+    return undefined
+  }
+
+  return {
+    title: matrix.title,
+    metrics: (matrix.metrics ?? []).map((metric) => ({
+      key: metric.key,
+      label: metric.label,
+      description: metric.description ?? '',
+      unit: metric.unit ?? '',
+    })),
+    rows: (matrix.rows ?? []).map((row) => ({
+      assetId: row.asset_id,
+      assetName: row.asset_name,
+      assetSymbol: row.asset_symbol,
+      statuses: mapAssetStatuses(row.statuses) ?? [],
+      truthLevel: mapTruthLevel(row.truth_level),
+      liveReadiness: mapLiveReadiness(row.live_readiness),
+      defaultRankEligible: row.default_rank_eligible ?? true,
+      cells: (row.cells ?? []).map((cell) => ({
+        metricKey: cell.metric_key,
+        label: cell.label,
+        displayValue: cell.display_value,
+        rawValue: cell.raw_value,
+        tone: cell.tone ?? 'neutral',
+        badges: cell.badges ?? [],
+        rationale: cell.rationale ?? '',
+        tooltip: cell.tooltip ?? '',
+        isBlocked: cell.is_blocked ?? false,
+      })),
+    })),
+    notes: matrix.notes ?? [],
+  }
+}
+
+function mapRecommendationReason(
+  reason?: BackendRecommendationReason | null,
+) {
+  if (!reason) {
+    return undefined
+  }
+
+  return {
+    summary: reason.summary ?? '',
+    topDrivers: (reason.top_drivers ?? []).map((driver) => ({
+      title: driver.title,
+      detail: driver.detail,
+      impact: driver.impact ?? 'medium',
+      assetId: driver.asset_id ?? '',
+    })),
+    excludedReasons: (reason.excluded_reasons ?? []).map((item) => ({
+      assetId: item.asset_id,
+      assetName: item.asset_name,
+      category: item.category ?? '',
+      reason: item.reason,
+    })),
+    constraintImpacts: (reason.constraint_impacts ?? []).map((item) => ({
+      constraintKey: item.constraint_key,
+      label: item.label,
+      impactLevel: item.impact_level ?? 'medium',
+      detail: item.detail,
+    })),
+    sensitivitySummary: (reason.sensitivity_summary ?? []).map((item) => ({
+      scenarioKey: item.scenario_key,
+      label: item.label,
+      impactSummary: item.impact_summary,
+      changedAssets: item.changed_assets ?? [],
+      recommendedShift: item.recommended_shift ?? '',
+    })),
+  }
+}
+
+function mapActionIntent(
+  intent: BackendActionIntent,
+) {
+  return {
+    assetId: intent.asset_id,
+    assetName: intent.asset_name,
+    actionType: mapActionType(intent.action_type),
+    actionReadiness: mapActionReadiness(intent.action_readiness),
+    summary: intent.summary ?? '',
+    actionBlockers: (intent.action_blockers ?? []).map((blocker) => ({
+      code: blocker.code,
+      label: blocker.label,
+      detail: blocker.detail,
+      severity: blocker.severity ?? 'warning',
+    })),
+    actionLinks: (intent.action_links ?? []).map(mapActionLink),
+    executionNotes: intent.execution_notes ?? [],
+    checklist: intent.checklist ?? [],
+  }
+}
+
+function mapEvidenceGovernance(
+  governance?: BackendEvidenceGovernance | null,
+) {
+  if (!governance) {
+    return undefined
+  }
+  return {
+    overallScore: governance.overall_score,
+    weakEvidenceWarning: governance.weak_evidence_warning ?? '',
+    conflicts: (governance.conflicts ?? []).map((item) => ({
+      assetId: item.asset_id ?? '',
+      fieldKey: item.field_key,
+      severity: item.severity ?? 'warning',
+      summary: item.summary,
+      evidenceIds: item.evidence_ids ?? [],
+    })),
+    coverage: (governance.coverage ?? []).map((item) => ({
+      assetId: item.asset_id,
+      assetName: item.asset_name ?? '',
+      coverageScore: item.coverage_score,
+      completenessScore: item.completeness_score,
+      strengths: item.strengths ?? [],
+      gaps: item.gaps ?? [],
+      missingFields: item.missing_fields ?? [],
+    })),
+  }
+}
+
+function mapReanalysisDiff(
+  diff?: BackendReanalysisDiff | null,
+) {
+  if (!diff) {
+    return undefined
+  }
+
+  return {
+    previousSnapshotAt: diff.previous_snapshot_at ?? undefined,
+    currentGeneratedAt: diff.current_generated_at ?? undefined,
+    summary: diff.summary ?? '',
+    changedConstraints: (diff.changed_constraints ?? []).map((item) => ({
+      label: item.label,
+      before: item.before,
+      after: item.after,
+      detail: item.detail ?? '',
+    })),
+    changedWeights: (diff.changed_weights ?? []).map((item) => ({
+      assetId: item.asset_id,
+      assetName: item.asset_name,
+      beforeWeightPct: item.before_weight_pct,
+      afterWeightPct: item.after_weight_pct,
+      deltaWeightPct: item.delta_weight_pct,
+      reason: item.reason ?? '',
+    })),
+    changedRisk: (diff.changed_risk ?? []).map((item) => ({
+      assetId: item.asset_id,
+      assetName: item.asset_name,
+      beforeOverall: item.before_overall,
+      afterOverall: item.after_overall,
+      deltaOverall: item.delta_overall,
+    })),
+    changedEvidence: (diff.changed_evidence ?? []).map((item) => ({
+      assetId: item.asset_id ?? '',
+      assetName: item.asset_name ?? '',
+      beforeCoverageScore: item.before_coverage_score,
+      afterCoverageScore: item.after_coverage_score,
+      beforeConflictCount: item.before_conflict_count,
+      afterConflictCount: item.after_conflict_count,
+      summary: item.summary,
+    })),
+    previousRecommendation: diff.previous_recommendation ?? [],
+    currentRecommendation: diff.current_recommendation ?? [],
+    whyChanged: diff.why_changed ?? [],
   }
 }
 
@@ -1124,6 +1721,7 @@ export function mapRwaBootstrap(
     oracleSnapshots: (bootstrap.oracle_snapshots ?? []).map((snapshot) =>
       mapMarketSnapshot(snapshot) as OracleSnapshotBackend,
     ),
+    demoScenarios: (bootstrap.demo_scenarios ?? []).map(mapDemoScenario),
   }
 }
 
@@ -1623,27 +2221,9 @@ export function mapBackendSession(session: BackendSession): AnalysisSession {
     searchTasks: session.search_tasks.map((task) =>
       mapBackendSearchTask(task, session.session_id),
     ),
-    evidence: session.evidence_items.map((item) => ({
-      id: item.evidence_id,
-      sessionId: session.session_id,
-      sourceType: item.source_type ?? 'internal',
-      sourceUrl: item.source_url,
-      sourceName: item.source_name,
-      title: item.title,
-      summary: item.summary,
-      extractedFacts: item.extracted_facts,
-      fetchedAt: item.fetched_at,
-      confidence: item.confidence,
-      sourceTag:
-        item.source_tag === 'onchain_verified' ||
-        item.source_tag === 'oracle_fed' ||
-        item.source_tag === 'issuer_disclosed' ||
-        item.source_tag === 'third_party_source' ||
-        item.source_tag === 'model_inference' ||
-        item.source_tag === 'user_assumption'
-          ? item.source_tag
-          : undefined,
-    })),
+    evidence: session.evidence_items.map((item) =>
+      mapEvidenceItem(item, session.session_id),
+    ),
     conclusions: session.major_conclusions.map((item) => ({
       id: item.conclusion_id,
       sessionId: session.session_id,
@@ -1810,6 +2390,8 @@ export function mapBackendReport(session: BackendSession): AnalysisReport {
     charts: mappedSession.chartArtifacts ?? [],
     evidence: mappedSession.evidence,
     assumptions: report?.assumptions ?? [],
+    unknowns: report?.unknowns ?? [],
+    warnings: report?.warnings ?? [],
     disclaimers: [
       isChineseLocale()
         ? '预算、成本和方案评分都依赖当前输入与证据，若关键假设变化，结论也会同步变化。'
@@ -1836,6 +2418,11 @@ export function mapBackendReport(session: BackendSession): AnalysisReport {
     assetCards: (report?.asset_cards ?? []).map(mapAssetAnalysisCard),
     simulations: (report?.simulations ?? []).map(mapSimulation),
     recommendedAllocations: (report?.recommended_allocations ?? []).map(mapAllocation),
+    comparisonMatrix: mapComparisonMatrix(report?.comparison_matrix),
+    recommendationReason: mapRecommendationReason(report?.recommendation_reason),
+    actionIntents: (report?.action_intents ?? []).map(mapActionIntent),
+    evidenceGovernance: mapEvidenceGovernance(report?.evidence_governance),
+    reanalysisDiff: mapReanalysisDiff(report?.reanalysis_diff),
     methodologyReferences: (report?.methodology_references ?? []).map(mapMethodologyReference),
     txDraft: mapTxDraft(report?.tx_draft),
     attestationDraft: mapAttestationDraft(report?.attestation_draft),

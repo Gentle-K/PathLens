@@ -80,7 +80,7 @@ export function ProblemInputPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" data-testid="problem-input-page">
       <PageHeader
         eyebrow={t('common.nextStep')}
         title={t('analysis.intakeTitle')}
@@ -127,6 +127,10 @@ export function ProblemInputPage() {
                   walletAddress: '',
                   wantsOnchainAttestation: true,
                   additionalConstraints: '',
+                  includeNonProductionAssets: false,
+                  demoMode: false,
+                  demoScenarioId: '',
+                  analysisSeed: undefined,
                 },
               })
             }}
@@ -144,6 +148,7 @@ export function ProblemInputPage() {
                     onChange={handleChange}
                     placeholder={t('analysis.problemStatementPlaceholder')}
                     className="min-h-44 text-base"
+                    data-testid="problem-statement-input"
                   />
                 </div>
 
@@ -171,7 +176,11 @@ export function ProblemInputPage() {
                   </div>
                 </div>
 
-                <Button type="submit" disabled={createMutation.isPending || isSubmitting}>
+                <Button
+                  type="submit"
+                  data-testid="problem-input-submit"
+                  disabled={createMutation.isPending || isSubmitting}
+                >
                   <WandSparkles className="size-4" />
                   {t('analysis.startAnalysis')}
                 </Button>

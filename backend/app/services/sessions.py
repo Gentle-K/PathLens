@@ -3,6 +3,7 @@ from app.domain.rwa import RwaIntakeContext
 from app.i18n import normalize_locale
 from app.persistence.base import SessionRepository
 from app.rwa.catalog import build_chain_config
+from app.rwa.diff import build_comparable_snapshot
 from app.rwa.explorer_service import address_url, tx_url
 from app.services.calculation_tasks import sanitize_calculation_tasks
 from app.config import Settings
@@ -127,6 +128,13 @@ class SessionService:
         if session is None:
             return None
 
+        if session.report is not None and session.status == SessionStatus.COMPLETED:
+            session.report_snapshots.append(
+                build_comparable_snapshot(
+                    session.report,
+                    intake_context=session.intake_context,
+                )
+            )
         session.follow_up_rounds_used = 0
         session.follow_up_extensions_used += 1
         session.follow_up_budget_exhausted = False

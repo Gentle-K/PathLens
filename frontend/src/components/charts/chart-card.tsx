@@ -39,7 +39,7 @@ export function ChartCard({ chart }: ChartCardProps) {
   const isZh = i18n.language.startsWith('zh')
 
   return (
-    <Card className="overflow-hidden p-5">
+    <Card className="overflow-hidden p-5" data-testid={`chart-card-${chart.id}`}>
       <div className="mb-4 flex items-start justify-between gap-4">
         <div>
           <h3 className="text-lg font-semibold text-text-primary">{chart.title}</h3>

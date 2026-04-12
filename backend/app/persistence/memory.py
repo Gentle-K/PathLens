@@ -2,13 +2,14 @@ from __future__ import annotations
 
 from copy import deepcopy
 
-from app.domain.models import AnalysisSession
+from app.domain.models import AnalysisSession, AuditLogEntry
 from app.persistence.base import SessionRepository
 
 
 class InMemorySessionRepository(SessionRepository):
     def __init__(self) -> None:
         self._sessions: dict[str, AnalysisSession] = {}
+        self._audit_logs: dict[str, AuditLogEntry] = {}
 
     def save(self, session: AnalysisSession) -> AnalysisSession:
         session.touch()
@@ -52,3 +53,21 @@ class InMemorySessionRepository(SessionRepository):
         for session_id in session_ids:
             del self._sessions[session_id]
         return len(session_ids)
+
+    def save_audit_log(self, entry: AuditLogEntry) -> AuditLogEntry:
+        self._audit_logs[entry.log_id] = deepcopy(entry)
+        return deepcopy(entry)
+
+    def list_audit_logs(self, limit: int = 200) -> list[AuditLogEntry]:
+        return [
+            deepcopy(entry)
+            for entry in sorted(
+                self._audit_logs.values(),
+                key=lambda item: item.created_at,
+                reverse=True,
+            )[:limit]
+        ]
+
+    def get_audit_log(self, log_id: str) -> AuditLogEntry | None:
+        entry = self._audit_logs.get(log_id)
+        return deepcopy(entry) if entry else None

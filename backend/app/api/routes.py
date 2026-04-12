@@ -25,6 +25,7 @@ from app.domain.schemas import (
 )
 from app.i18n import normalize_locale
 from app.rwa.catalog import build_asset_library, build_chain_config
+from app.rwa.demo import build_demo_scenarios
 from app.rwa.kyc_service import read_kyc_from_chain
 from app.rwa.oracle_service import fetch_oracle_snapshots
 
@@ -113,10 +114,16 @@ def frontend_bootstrap(request: Request, response: Response) -> FrontendBootstra
     services = get_app_services()
     settings = Settings.from_env()
     chain_config = build_chain_config(settings)
+    locale = normalize_locale(
+        request.headers.get("x-app-locale")
+        or request.headers.get("accept-language")
+        or "zh"
+    )
     asset_library = build_asset_library(
         chain_config,
-        locale=resolve_request_locale(request),
+        locale=locale,
     )
+    demo_scenarios = build_demo_scenarios(locale=locale)
     oracle_snapshots = fetch_oracle_snapshots(
         chain_config,
         network=chain_config.default_execution_network or "testnet",
@@ -142,6 +149,7 @@ def frontend_bootstrap(request: Request, response: Response) -> FrontendBootstra
         supported_asset_types=sorted({asset.asset_type.value for asset in asset_library}),
         holding_period_presets=[7, 30, 90, 180],
         oracle_snapshots=oracle_snapshots,
+        demo_scenarios=demo_scenarios,
     )
 
 

@@ -3,9 +3,11 @@ import { describe, expect, it } from 'vitest'
 import {
   mapBackendProgress,
   mapBackendReport,
+  mapRwaBootstrap,
   mapBackendSession,
   toBackendIntakeContext,
   toBackendAnswers,
+  type BackendBootstrapResponse,
   type BackendSession,
 } from '@/lib/api/adapters/genius-backend'
 
@@ -26,6 +28,9 @@ function buildBackendSession(overrides: Partial<BackendSession> = {}): BackendSe
       wallet_address: '',
       wants_onchain_attestation: true,
       additional_constraints: '',
+      include_non_production_assets: false,
+      demo_mode: false,
+      demo_scenario_id: '',
     },
     status: 'COMPLETED',
     analysis_rounds_completed: 1,
@@ -131,10 +136,131 @@ function buildBackendSession(overrides: Partial<BackendSession> = {}): BackendSe
     report: {
       summary: 'The exchange option is attractive but sensitive to scholarship outcome.',
       assumptions: ['Scholarship outcome is still pending.'],
+      unknowns: ['Issuer terms may still change.'],
+      warnings: ['This is not financial advice.'],
       recommendations: ['Confirm scholarship timeline before committing.'],
       open_questions: ['What is the visa processing lead time?'],
       chart_refs: ['chart-1'],
       markdown: '# Report\n\nExchange remains attractive under the right funding conditions.',
+      comparison_matrix: {
+        title: 'Comparison matrix',
+        metrics: [{ key: 'expected_return', label: 'Expected return' }],
+        rows: [
+          {
+            asset_id: 'hsk-usdc',
+            asset_name: 'HashKey USDC',
+            asset_symbol: 'USDC',
+            statuses: ['production', 'verified'],
+            truth_level: 'onchain_verified',
+            live_readiness: 'ready',
+            default_rank_eligible: true,
+            cells: [
+              {
+                metric_key: 'expected_return',
+                label: 'Expected return',
+                display_value: '4.90%',
+                tone: 'success',
+                badges: ['Verified'],
+                rationale: 'Low-volatility liquidity anchor.',
+                tooltip: 'Tooltip',
+                is_blocked: false,
+              },
+            ],
+          },
+        ],
+        notes: ['Normalized for the current user profile.'],
+      },
+      recommendation_reason: {
+        summary: 'USDC wins on liquidity and access.',
+        top_drivers: [
+          {
+            title: 'Liquidity fit',
+            detail: 'T+0 liquidity fits the profile.',
+            impact: 'high',
+            asset_id: 'hsk-usdc',
+          },
+        ],
+        excluded_reasons: [
+          {
+            asset_id: 'tokenized-real-estate-demo',
+            asset_name: 'Tokenized Real Estate Demo',
+            category: 'blocked',
+            reason: 'Demo assets are excluded by default.',
+          },
+        ],
+        constraint_impacts: [
+          {
+            constraint_key: 'liquidity_need',
+            label: 'Liquidity',
+            impact_level: 'high',
+            detail: 'T+0 removes slower assets.',
+          },
+        ],
+        sensitivity_summary: [
+          {
+            scenario_key: 'changed_kyc',
+            label: 'Changed KYC',
+            impact_summary: 'A higher KYC tier would widen the universe.',
+            changed_assets: ['CPIC Estable MMF'],
+            recommended_shift: 'Revisit gated assets.',
+          },
+        ],
+      },
+      action_intents: [
+        {
+          asset_id: 'hsk-usdc',
+          asset_name: 'HashKey USDC',
+          action_type: 'hold',
+          action_readiness: 'ready',
+          summary: 'Execution-ready onchain.',
+          action_links: [{ kind: 'contract', label: 'Contract', url: 'https://example.com/contract' }],
+          action_blockers: [],
+          execution_notes: ['Verify route before execution.'],
+          checklist: ['Connect wallet', 'Review allowance', 'Execute'],
+        },
+      ],
+      evidence_governance: {
+        overall_score: 0.74,
+        weak_evidence_warning: '',
+        conflicts: [],
+        coverage: [
+          {
+            asset_id: 'hsk-usdc',
+            asset_name: 'HashKey USDC',
+            coverage_score: 0.8,
+            completeness_score: 0.8,
+            strengths: ['Contains onchain-verifiable facts.'],
+            gaps: [],
+            missing_fields: [],
+          },
+        ],
+      },
+      reanalysis_diff: {
+        summary: 'Liquidity changed the ranking.',
+        changed_constraints: [
+          {
+            label: 'Liquidity',
+            before: 't_plus_3',
+            after: 'instant',
+            detail: 'The user tightened the exit requirement.',
+          },
+        ],
+        changed_weights: [
+          {
+            asset_id: 'hsk-usdc',
+            asset_name: 'HashKey USDC',
+            before_weight_pct: 40,
+            after_weight_pct: 60,
+            delta_weight_pct: 20,
+            reason: 'Liquidity fit improved.',
+          },
+        ],
+        changed_risk: [],
+        changed_evidence: [],
+        previous_recommendation: ['CPIC Estable MMF 40.0%'],
+        current_recommendation: ['HashKey USDC 60.0%'],
+        why_changed: ['The liquidity constraint became stricter.'],
+      },
       methodology_references: [
         {
           key: 'markowitz-1952',
@@ -178,6 +304,11 @@ describe('genius backend contract mapping', () => {
     expect(report.charts[0]?.kind).toBe('bar')
     expect(report.calculations[0]?.result).toBe('23000')
     expect(report.disclaimers[1]).toContain('图表')
+    expect(report.comparisonMatrix?.rows[0]?.cells[0]?.displayValue).toBe('4.90%')
+    expect(report.recommendationReason?.topDrivers[0]?.title).toContain('Liquidity')
+    expect(report.actionIntents?.[0]?.actionReadiness).toBe('ready')
+    expect(report.evidenceGovernance?.overallScore).toBe(0.74)
+    expect(report.reanalysisDiff?.changedConstraints[0]?.label).toBe('Liquidity')
   })
 
   it('translates progress and outgoing answers for the backend step route', () => {
@@ -215,12 +346,75 @@ describe('genius backend contract mapping', () => {
       walletKycVerified: true,
       wantsOnchainAttestation: true,
       additionalConstraints: 'Prefer assets with onchain proof.',
+      includeNonProductionAssets: true,
+      demoMode: true,
+      demoScenarioId: 'conservative-10000-usdt',
+      analysisSeed: 101,
     })
 
     expect(payload.wallet_address).toBe('0x1234567890abcdef1234567890abcdef12345678')
     expect(payload.wallet_network).toBe('testnet')
     expect(payload.wallet_kyc_level_onchain).toBe(2)
     expect(payload.wallet_kyc_verified).toBe(true)
+    expect(payload.include_non_production_assets).toBe(true)
+    expect(payload.demo_mode).toBe(true)
+    expect(payload.demo_scenario_id).toBe('conservative-10000-usdt')
+    expect(payload.analysis_seed).toBe(101)
+  })
+
+  it('maps demo scenarios from bootstrap metadata', () => {
+    const bootstrap: BackendBootstrapResponse = {
+      app_name: 'Genius Actuary',
+      supported_modes: ['single_decision', 'multi_option'],
+      session_statuses: ['COMPLETED'],
+      next_actions: ['complete'],
+      notes: [],
+      chain_config: {
+        ecosystem_name: 'HashKey Chain',
+        native_token_symbol: 'HSK',
+        default_execution_network: 'testnet',
+        testnet_chain_id: 133,
+        testnet_rpc_url: 'https://testnet.hsk.xyz',
+        testnet_explorer_url: 'https://testnet-explorer.hsk.xyz',
+        mainnet_chain_id: 177,
+        mainnet_rpc_url: 'https://mainnet.hsk.xyz',
+        mainnet_explorer_url: 'https://hashkey.blockscout.com',
+        docs_urls: [],
+      },
+      asset_library: [],
+      supported_asset_types: [],
+      holding_period_presets: [30, 90],
+      demo_scenarios: [
+        {
+          scenario_id: 'conservative-10000-usdt',
+          title: '10,000 USDT conservative allocation',
+          description: 'Stable judging scenario.',
+          problem_statement: 'I have 10,000 USDT.',
+          intake_context: {
+            investment_amount: 10000,
+            base_currency: 'USDT',
+            preferred_asset_ids: ['hsk-usdc'],
+            holding_period_days: 90,
+            risk_tolerance: 'conservative',
+            liquidity_need: 't_plus_3',
+            minimum_kyc_level: 1,
+            wants_onchain_attestation: true,
+            include_non_production_assets: false,
+            demo_mode: true,
+            demo_scenario_id: 'conservative-10000-usdt',
+            analysis_seed: 101,
+          },
+          featured_asset_ids: ['hsk-usdc'],
+          analysis_seed: 101,
+          demo_label: 'Official Demo',
+          notes: ['Stable scenario'],
+        },
+      ],
+    }
+
+    const mapped = mapRwaBootstrap(bootstrap)
+    expect(mapped.demoScenarios?.[0]?.scenarioId).toBe('conservative-10000-usdt')
+    expect(mapped.demoScenarios?.[0]?.intakeContext.demoMode).toBe(true)
   })
 
   it('maps chain proof metadata and attestation receipts into the report view model', () => {

@@ -195,6 +195,15 @@ class BuildReportTests(unittest.TestCase):
         self.assertEqual("testnet", report.market_snapshots[0].network if report.market_snapshots else "testnet")
         self.assertGreater(len(evidence), 0)
         self.assertGreater(len(report.methodology_references), 0)
+        self.assertIsNotNone(report.comparison_matrix)
+        self.assertGreater(len(report.comparison_matrix.rows), 0)
+        self.assertIsNotNone(report.recommendation_reason)
+        self.assertGreater(len(report.recommendation_reason.top_drivers), 0)
+        self.assertEqual(3, len(report.recommendation_reason.sensitivity_summary))
+        self.assertGreater(len(report.action_intents), 0)
+        self.assertGreater(len(report.unknowns), 0)
+        self.assertGreater(len(report.warnings), 0)
+        self.assertIsNotNone(report.evidence_governance)
 
     def test_build_rwa_report_includes_structured_kyc_snapshot(self):
         library = _asset_library()
@@ -258,6 +267,59 @@ class BuildReportTests(unittest.TestCase):
                 item.source_tag,
                 [t.value for t in DataSourceTag],
             )
+
+    def test_demo_and_benchmark_assets_are_excluded_by_default_ranking(self):
+        library = _asset_library()
+        context = _context(
+            investment_amount=100_000,
+            holding_period_days=365,
+            liquidity_need=LiquidityNeed.LOCKED,
+            minimum_kyc_level=2,
+            preferred_asset_ids=[
+                "hsk-usdc",
+                "tokenized-real-estate-demo",
+                "hsk-wbtc-benchmark",
+            ],
+            include_non_production_assets=False,
+        )
+        assets = resolve_selected_assets(
+            AnalysisMode.MULTI_OPTION,
+            "Compare USDC with demo real estate and benchmark WBTC.",
+            context,
+            library,
+        )
+        cards = build_asset_cards(assets, context, locale="en")
+        allocations = recommend_allocations(context, cards, locale="en")
+        blocked_map = {item.asset_id: item.blocked_reason for item in allocations}
+        self.assertIn("default ranking", blocked_map["tokenized-real-estate-demo"].lower())
+        self.assertIn("benchmark", blocked_map["hsk-wbtc-benchmark"].lower())
+
+    def test_demo_and_benchmark_assets_can_be_opted_in(self):
+        library = _asset_library()
+        context = _context(
+            investment_amount=100_000,
+            holding_period_days=365,
+            liquidity_need=LiquidityNeed.LOCKED,
+            minimum_kyc_level=2,
+            preferred_asset_ids=[
+                "hsk-usdc",
+                "tokenized-real-estate-demo",
+                "hsk-wbtc-benchmark",
+            ],
+            include_non_production_assets=True,
+        )
+        assets = resolve_selected_assets(
+            AnalysisMode.MULTI_OPTION,
+            "Compare USDC with demo real estate and benchmark WBTC.",
+            context,
+            library,
+        )
+        cards = build_asset_cards(assets, context, locale="en")
+        allocations = recommend_allocations(context, cards, locale="en")
+        allocation_map = {item.asset_id: item for item in allocations}
+        self.assertEqual("", allocation_map["tokenized-real-estate-demo"].blocked_reason)
+        self.assertEqual("", allocation_map["hsk-wbtc-benchmark"].blocked_reason)
+        self.assertGreaterEqual(allocation_map["hsk-wbtc-benchmark"].target_weight_pct, 0)
 
 
 class ClassifyEvidenceSourceTests(unittest.TestCase):

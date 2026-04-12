@@ -29,6 +29,59 @@ class DataSourceTag(str, Enum):
     USER_ASSUMPTION = "user_assumption"
 
 
+class AssetStatus(str, Enum):
+    PRODUCTION = "production"
+    VERIFIED = "verified"
+    ISSUER_DISCLOSED = "issuer_disclosed"
+    BENCHMARK = "benchmark"
+    DEMO = "demo"
+    EXPERIMENTAL = "experimental"
+
+
+class TruthLevel(str, Enum):
+    ONCHAIN_VERIFIED = "onchain_verified"
+    ISSUER_DISCLOSED = "issuer_disclosed"
+    BENCHMARK_REFERENCE = "benchmark_reference"
+    DEMO_ONLY = "demo_only"
+
+
+class LiveReadiness(str, Enum):
+    READY = "ready"
+    PARTIAL = "partial"
+    UNAVAILABLE = "unavailable"
+    DEMO_ONLY = "demo_only"
+
+
+class ActionType(str, Enum):
+    SUBSCRIBE = "subscribe"
+    MINT = "mint"
+    REDEEM = "redeem"
+    HOLD = "hold"
+    LEARN_MORE = "learn_more"
+    EXTERNAL_ONLY = "external_only"
+
+
+class ActionReadiness(str, Enum):
+    READY = "ready"
+    PARTIAL = "partial"
+    UNAVAILABLE = "unavailable"
+
+
+class EvidenceFactType(str, Enum):
+    ONCHAIN_VERIFIED_FACT = "onchain_verified_fact"
+    OFFCHAIN_DISCLOSED_FACT = "offchain_disclosed_fact"
+    ORACLE_FACT = "oracle_fact"
+    THIRD_PARTY_FACT = "third_party_fact"
+    INFERRED_FACT = "inferred_fact"
+
+
+class EvidenceFreshnessBucket(str, Enum):
+    FRESH = "fresh"
+    AGING = "aging"
+    STALE = "stale"
+    UNDATED = "undated"
+
+
 class RiskTolerance(str, Enum):
     CONSERVATIVE = "conservative"
     BALANCED = "balanced"
@@ -109,6 +162,35 @@ class RwaIntakeContext(BaseModel):
     wallet_kyc_verified: bool | None = None
     wants_onchain_attestation: bool = True
     additional_constraints: str = ""
+    include_non_production_assets: bool = False
+    demo_mode: bool = False
+    demo_scenario_id: str = ""
+    analysis_seed: int | None = None
+
+
+class ActionLink(BaseModel):
+    kind: str
+    label: str
+    url: str
+
+
+class ActionBlocker(BaseModel):
+    code: str
+    label: str
+    detail: str
+    severity: str = "warning"
+
+
+class ActionIntent(BaseModel):
+    asset_id: str
+    asset_name: str
+    action_type: ActionType = ActionType.LEARN_MORE
+    action_readiness: ActionReadiness = ActionReadiness.UNAVAILABLE
+    summary: str = ""
+    action_blockers: list[ActionBlocker] = Field(default_factory=list)
+    action_links: list[ActionLink] = Field(default_factory=list)
+    execution_notes: list[str] = Field(default_factory=list)
+    checklist: list[str] = Field(default_factory=list)
 
 
 class AssetTemplate(BaseModel):
@@ -155,6 +237,17 @@ class AssetTemplate(BaseModel):
     onchain_verified: bool = False
     issuer_disclosed: bool = False
     featured: bool = False
+    statuses: list[AssetStatus] = Field(default_factory=list)
+    truth_level: TruthLevel = TruthLevel.ISSUER_DISCLOSED
+    live_readiness: LiveReadiness = LiveReadiness.PARTIAL
+    default_rank_eligible: bool = True
+    status_explanation: str = ""
+    truth_level_explanation: str = ""
+    action_type: ActionType = ActionType.LEARN_MORE
+    action_readiness: ActionReadiness = ActionReadiness.UNAVAILABLE
+    action_links: list[ActionLink] = Field(default_factory=list)
+    action_blocker_reasons: list[str] = Field(default_factory=list)
+    execution_notes: list[str] = Field(default_factory=list)
     # ERC-3643 compliance reference fields (informational only)
     issuer_model: str = ""
     holder_eligibility_note: str = ""
@@ -280,6 +373,80 @@ class PortfolioAllocation(BaseModel):
     blocked_reason: str = ""
 
 
+class ComparisonMatrixMetric(BaseModel):
+    key: str
+    label: str
+    description: str = ""
+    unit: str = ""
+
+
+class ComparisonMatrixCell(BaseModel):
+    metric_key: str
+    label: str
+    display_value: str
+    raw_value: float | str | bool | None = None
+    tone: str = "neutral"
+    badges: list[str] = Field(default_factory=list)
+    rationale: str = ""
+    tooltip: str = ""
+    is_blocked: bool = False
+
+
+class ComparisonMatrixRow(BaseModel):
+    asset_id: str
+    asset_name: str
+    asset_symbol: str
+    statuses: list[AssetStatus] = Field(default_factory=list)
+    truth_level: TruthLevel = TruthLevel.ISSUER_DISCLOSED
+    live_readiness: LiveReadiness = LiveReadiness.PARTIAL
+    default_rank_eligible: bool = True
+    cells: list[ComparisonMatrixCell] = Field(default_factory=list)
+
+
+class ComparisonMatrix(BaseModel):
+    title: str
+    metrics: list[ComparisonMatrixMetric] = Field(default_factory=list)
+    rows: list[ComparisonMatrixRow] = Field(default_factory=list)
+    notes: list[str] = Field(default_factory=list)
+
+
+class RecommendationDriver(BaseModel):
+    title: str
+    detail: str
+    impact: str = "medium"
+    asset_id: str = ""
+
+
+class ExcludedAssetReason(BaseModel):
+    asset_id: str
+    asset_name: str
+    category: str = ""
+    reason: str
+
+
+class ConstraintImpact(BaseModel):
+    constraint_key: str
+    label: str
+    impact_level: str = "medium"
+    detail: str
+
+
+class SensitivitySummary(BaseModel):
+    scenario_key: str
+    label: str
+    impact_summary: str
+    changed_assets: list[str] = Field(default_factory=list)
+    recommended_shift: str = ""
+
+
+class RecommendationReason(BaseModel):
+    summary: str = ""
+    top_drivers: list[RecommendationDriver] = Field(default_factory=list)
+    excluded_reasons: list[ExcludedAssetReason] = Field(default_factory=list)
+    constraint_impacts: list[ConstraintImpact] = Field(default_factory=list)
+    sensitivity_summary: list[SensitivitySummary] = Field(default_factory=list)
+
+
 class TxDraftStep(BaseModel):
     step: int
     title: str
@@ -341,11 +508,134 @@ class AssetAnalysisCard(BaseModel):
     primary_source_url: str = ""
     onchain_verified: bool = False
     issuer_disclosed: bool = False
+    statuses: list[AssetStatus] = Field(default_factory=list)
+    truth_level: TruthLevel = TruthLevel.ISSUER_DISCLOSED
+    live_readiness: LiveReadiness = LiveReadiness.PARTIAL
+    default_rank_eligible: bool = True
+    status_explanation: str = ""
+    truth_level_explanation: str = ""
     risk_vector: RiskVector
     risk_breakdown: list[RiskBreakdownItem] = Field(default_factory=list)
     risk_data_quality: float = 1.0
     metadata: dict[str, Any] = Field(default_factory=dict)
     evidence_refs: list[str] = Field(default_factory=list)
+
+
+class EvidenceFreshness(BaseModel):
+    bucket: EvidenceFreshnessBucket = EvidenceFreshnessBucket.UNDATED
+    label: str = ""
+    age_hours: float | None = None
+    stale_warning: str = ""
+
+
+class EvidenceConflict(BaseModel):
+    asset_id: str = ""
+    field_key: str
+    severity: str = "warning"
+    summary: str
+    evidence_ids: list[str] = Field(default_factory=list)
+
+
+class EvidenceCoverage(BaseModel):
+    asset_id: str
+    asset_name: str = ""
+    coverage_score: float = 0.0
+    completeness_score: float = 0.0
+    strengths: list[str] = Field(default_factory=list)
+    gaps: list[str] = Field(default_factory=list)
+    missing_fields: list[str] = Field(default_factory=list)
+
+
+class EvidenceGovernance(BaseModel):
+    overall_score: float = 0.0
+    weak_evidence_warning: str = ""
+    conflicts: list[EvidenceConflict] = Field(default_factory=list)
+    coverage: list[EvidenceCoverage] = Field(default_factory=list)
+
+
+class DemoScenarioDefinition(BaseModel):
+    scenario_id: str
+    title: str
+    description: str
+    problem_statement: str
+    intake_context: RwaIntakeContext = Field(default_factory=RwaIntakeContext)
+    featured_asset_ids: list[str] = Field(default_factory=list)
+    analysis_seed: int
+    demo_label: str = "Official Demo"
+    notes: list[str] = Field(default_factory=list)
+
+
+class ComparableAllocationSnapshot(BaseModel):
+    asset_id: str
+    asset_name: str
+    target_weight_pct: float
+
+
+class ComparableAssetSnapshot(BaseModel):
+    asset_id: str
+    asset_name: str
+    overall_risk: float
+    data_quality: float
+
+
+class ComparableReportSnapshot(BaseModel):
+    snapshot_id: str = Field(default_factory=lambda: str(__import__("uuid").uuid4()))
+    created_at: datetime = Field(default_factory=utcnow)
+    summary: str = ""
+    intake_context: RwaIntakeContext = Field(default_factory=RwaIntakeContext)
+    recommended_allocations: list[ComparableAllocationSnapshot] = Field(default_factory=list)
+    asset_snapshots: list[ComparableAssetSnapshot] = Field(default_factory=list)
+    evidence_count: int = 0
+    evidence_conflict_count: int = 0
+    coverage_score: float = 0.0
+    warnings: list[str] = Field(default_factory=list)
+
+
+class DiffFieldChange(BaseModel):
+    label: str
+    before: str
+    after: str
+    detail: str = ""
+
+
+class AllocationDiffItem(BaseModel):
+    asset_id: str
+    asset_name: str
+    before_weight_pct: float
+    after_weight_pct: float
+    delta_weight_pct: float
+    reason: str = ""
+
+
+class RiskDiffItem(BaseModel):
+    asset_id: str
+    asset_name: str
+    before_overall: float
+    after_overall: float
+    delta_overall: float
+
+
+class EvidenceDiffItem(BaseModel):
+    asset_id: str = ""
+    asset_name: str = ""
+    before_coverage_score: float = 0.0
+    after_coverage_score: float = 0.0
+    before_conflict_count: int = 0
+    after_conflict_count: int = 0
+    summary: str = ""
+
+
+class ReanalysisDiff(BaseModel):
+    previous_snapshot_at: datetime | None = None
+    current_generated_at: datetime = Field(default_factory=utcnow)
+    summary: str = ""
+    changed_constraints: list[DiffFieldChange] = Field(default_factory=list)
+    changed_weights: list[AllocationDiffItem] = Field(default_factory=list)
+    changed_risk: list[RiskDiffItem] = Field(default_factory=list)
+    changed_evidence: list[EvidenceDiffItem] = Field(default_factory=list)
+    previous_recommendation: list[str] = Field(default_factory=list)
+    current_recommendation: list[str] = Field(default_factory=list)
+    why_changed: list[str] = Field(default_factory=list)
 
 
 class OracleSnapshot(BaseModel):
@@ -389,3 +679,6 @@ class EvidencePanelItem(BaseModel):
     summary: str
     extracted_facts: list[str] = Field(default_factory=list)
     confidence: float = 0.5
+    fact_type: EvidenceFactType = EvidenceFactType.OFFCHAIN_DISCLOSED_FACT
+    freshness: EvidenceFreshness = Field(default_factory=EvidenceFreshness)
+    conflict_keys: list[str] = Field(default_factory=list)

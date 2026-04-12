@@ -197,7 +197,7 @@ export function ClarificationPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" data-testid="clarification-page">
       <PageHeader
         eyebrow={t('common.nextStep')}
         title={t('analysis.clarifyTitle')}
@@ -352,6 +352,15 @@ export function ClarificationPage() {
                           onClick={() => setFieldValue(`${question.id}__status`, 'uncertain')}
                         >
                           {t('analysis.uncertain')}
+                        </Button>
+                        <Button
+                          type="button"
+                          variant={currentStatus === 'declined' ? 'secondary' : 'ghost'}
+                          size="sm"
+                          className={currentStatus === 'declined' ? 'border border-border-strong' : ''}
+                          onClick={() => setFieldValue(`${question.id}__status`, 'declined')}
+                        >
+                          {t('analysis.decline')}
                         </Button>
                       </div>
                     </div>
@@ -512,7 +521,11 @@ export function ClarificationPage() {
 
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <p className="text-sm text-text-muted">{t('analysis.modeActionHint')}</p>
-                <Button type="submit" disabled={isSubmitting || submitMutation.isPending}>
+                <Button
+                  type="submit"
+                  data-testid="clarification-submit"
+                  disabled={isSubmitting || submitMutation.isPending}
+                >
                   {t('common.continue')}
                 </Button>
               </div>

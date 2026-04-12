@@ -37,7 +37,20 @@ def _strip_quotes(value: str) -> str:
 
 def load_local_env(env_path: Path | None = None) -> None:
     protected_keys = set(os.environ)
+    app_env = os.getenv("APP_ENV", "").strip().lower()
+    env_specific_candidates: list[Path] = []
+    if app_env:
+        env_specific_candidates.extend(
+            [
+                REPO_ROOT / f".env.{app_env}",
+                PROJECT_ROOT / f".env.{app_env}",
+                REPO_ROOT / f".env.{app_env}.local",
+                PROJECT_ROOT / f".env.{app_env}.local",
+            ]
+        )
+
     candidates = [env_path] if env_path else [
+        *env_specific_candidates,
         REPO_ROOT / ".env",
         PROJECT_ROOT / ".env",
         PROJECT_ROOT / ".env.local",

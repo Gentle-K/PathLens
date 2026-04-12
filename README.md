@@ -117,6 +117,53 @@ npm run dev
 
 Open `http://localhost:5173`.
 
+## User guide
+
+### Quick start for local users
+
+1. Start the backend and frontend with the commands above.
+2. Open `http://localhost:5173`.
+3. Choose a demo scenario for a fixed walkthrough, or create a custom RWA session.
+4. Fill in capital, holding period, liquidity need, risk tolerance, wallet, and KYC constraints.
+5. Answer the clarification questions until the report page appears.
+6. Review the report, then open the execution console if you want to record an attestation on HashKey testnet or mainnet.
+
+### How to use the report page
+
+- `Highlights`: the main recommendation, top metrics, and the current execution posture.
+- `Actuarial Signals`: confidence band, oracle stress score, and reserve-backing summary layered on top of the deterministic RWA engine.
+- `Source Provenance`: evidence anchors with source tier, freshness date, and direct links for manual verification.
+- `Stress Scenarios`: baseline and adverse cases such as depeg, oracle deviation, reserve deterioration, or liquidity squeeze.
+- `Comparison Matrix` and `Asset Cards`: side-by-side ranking, access blockers, risk decomposition, and fit summaries for each asset.
+- `Wallet and Execution`: current wallet connection, network, live KYC snapshot, and attestation entrypoint.
+
+### Recommended operating modes
+
+- `Mock mode`: set `ANALYSIS_ADAPTER=mock` for local product testing without an external LLM.
+- `Expert shadow mode`: set `ACTUARY_EXPERT_MODE=shadow` and point `ACTUARY_STUDENT_MODEL_PATH` to a student manifest to enrich RWA reports while keeping deterministic rules authoritative.
+- `Demo mode`: use built-in scenarios when you want deterministic screenshots, testing, or onboarding.
+
+### Training and refresh workflow
+
+Use these when you want to refresh the actuarial corpus or train the student path:
+
+```bash
+python training/scripts/refresh_public_corpus.py
+python training/scripts/extract_supervised_samples.py --db-path backend/data/genius_actuary.db
+python training/scripts/generate_synthetic_cases.py --locale zh
+python training/scripts/evaluate_predictions.py training/eval/gold_eval_cases.jsonl --prediction-key target_output
+```
+
+The shared source registry lives in `training/sources/public_sources.json`, and the repo-local skill under `.codex/skills/actuary-rwa/` reads from the same assets.
+
+### Troubleshooting
+
+- If the report stops at clarification, answer every pending question before expecting the backend to continue.
+- If live KYC or oracle data is unavailable, the report falls back to the latest deterministic snapshot instead of pretending the data exists.
+- If `Plan Registry` is not configured, the app still generates an attestation draft but disables the live on-chain write.
+- If expert mode is enabled but the student manifest path is missing or invalid, switch back to `ACTUARY_EXPERT_MODE=off` or fix `ACTUARY_STUDENT_MODEL_PATH`.
+- If you are preparing training data, refresh the public corpus before extracting repo samples so provenance dates stay current.
+
 ## Main local flow
 
 1. Start the backend.
@@ -189,8 +236,9 @@ python -m unittest discover -s tests
 
 cd ../frontend
 npm run lint
-npm run test:run
+npm run test:unit
 npm run build
+npm run test:e2e
 ```
 
 Training helpers:
@@ -208,8 +256,9 @@ The current codebase was verified with:
 
 - `python -m unittest discover -s tests` in `backend/`
 - `npm run lint` in `frontend/`
-- `npm run test:run` in `frontend/`
+- `npm run test:unit` in `frontend/`
 - `npm run build` in `frontend/`
+- `npm run test:e2e` in `frontend/`
 - `python scripts/test_smoke.py`
 - `python scripts/test_full.py`
 

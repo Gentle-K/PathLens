@@ -16,7 +16,14 @@ from app.domain.models import (
     SessionStatus,
     UserAnswer,
 )
-from app.domain.rwa import AssetTemplate, HashKeyChainConfig, KycOnchainResult, OracleSnapshot, RwaIntakeContext
+from app.domain.rwa import (
+    AssetTemplate,
+    DemoScenarioDefinition,
+    HashKeyChainConfig,
+    KycOnchainResult,
+    OracleSnapshot,
+    RwaIntakeContext,
+)
 
 
 class SessionCreateRequest(BaseModel):
@@ -138,6 +145,7 @@ class FrontendBootstrapResponse(BaseModel):
     supported_asset_types: list[str]
     holding_period_presets: list[int]
     oracle_snapshots: list[OracleSnapshot] = Field(default_factory=list)
+    demo_scenarios: list[DemoScenarioDefinition] = Field(default_factory=list)
 
 
 # ---------------------------------------------------------------------------
@@ -148,6 +156,7 @@ class RwaCatalogResponse(BaseModel):
     assets: list[AssetTemplate]
     asset_types: list[str]
     chain_config: HashKeyChainConfig
+    demo_scenarios: list[DemoScenarioDefinition] = Field(default_factory=list)
 
 
 class RwaComparisonRequest(BaseModel):
@@ -164,6 +173,10 @@ class RwaComparisonRequest(BaseModel):
     locale: str = "zh"
     include_multi_horizon: bool = True
     include_defi_llama_evidence: bool = True
+    include_non_production_assets: bool = False
+    demo_mode: bool = False
+    demo_scenario_id: str = ""
+    analysis_seed: int | None = None
 
 
 class RwaAnalyzeResponse(BaseModel):
@@ -179,4 +192,3 @@ class RwaClarifyRequest(BaseModel):
 
 class RwaClarifyResponse(BaseModel):
     questions: list[ClarificationQuestion]
-

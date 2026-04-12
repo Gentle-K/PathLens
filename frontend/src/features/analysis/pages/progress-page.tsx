@@ -57,7 +57,7 @@ export function ProgressPage() {
     (isZh ? 'LLM 连续重试后仍然失败，请检查模型配置或稍后重试。' : 'The LLM failed after all retry attempts.')
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" data-testid="progress-page">
       <PageHeader
         eyebrow={t('common.nextStep')}
         title={t('analysis.progressTitle')}
@@ -71,6 +71,30 @@ export function ProgressPage() {
         }
       />
 
+      {progressQuery.isLoading && !progress ? (
+        <Card className="p-6 text-sm text-text-secondary">
+          {isZh ? '正在读取分析进度...' : 'Loading analysis progress...'}
+        </Card>
+      ) : null}
+
+      {progressQuery.error ? (
+        <Card className="space-y-3 border-[rgba(197,109,99,0.35)] bg-[rgba(197,109,99,0.08)] p-6">
+          <h2 className="text-base font-semibold text-[#f7d4cf]">
+            {isZh ? '分析进度读取失败' : 'Failed to load analysis progress'}
+          </h2>
+          <p className="text-sm leading-7 text-[#f1cbc6]">
+            {isZh
+              ? '当前无法获取后端进度快照，请稍后重试。'
+              : 'The backend progress snapshot is unavailable right now. Please retry.'}
+          </p>
+          <div>
+            <Button type="button" onClick={() => void progressQuery.refetch()}>
+              {isZh ? '重试加载' : 'Retry'}
+            </Button>
+          </div>
+        </Card>
+      ) : null}
+
       <div className="grid gap-4 xl:grid-cols-[1fr_0.95fr]">
         <GoldenSandLoader
           label={
@@ -82,44 +106,72 @@ export function ProgressPage() {
           }
         />
 
-        <Card className="space-y-4 p-6">
-          <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-text-primary">{t('analysis.progressStageTitle')}</h2>
-            <Badge tone={progress?.status === 'COMPLETED' ? 'success' : progress?.status === 'FAILED' ? 'warning' : 'gold'}>
-              {progress?.overallProgress ?? 0}%
-            </Badge>
-          </div>
-
-          {progress?.status === 'FAILED' ? (
-            <div className="rounded-[20px] border border-[rgba(197,109,99,0.35)] bg-[rgba(197,109,99,0.08)] p-4 text-sm leading-7 text-[#f1cbc6]">
-              {failureMessage}
+        <div className="space-y-4">
+          <Card className="space-y-4 p-6">
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-semibold text-text-primary">{t('analysis.progressStageTitle')}</h2>
+              <Badge tone={progress?.status === 'COMPLETED' ? 'success' : progress?.status === 'FAILED' ? 'warning' : 'gold'}>
+                {progress?.overallProgress ?? 0}%
+              </Badge>
             </div>
-          ) : null}
 
-          <div className="space-y-3">
-            {progress?.stages.map((stage) => {
-              const localizedStage = stageText[stage.id as keyof typeof stageText]
+            {progress?.status === 'FAILED' ? (
+              <div className="rounded-[20px] border border-[rgba(197,109,99,0.35)] bg-[rgba(197,109,99,0.08)] p-4 text-sm leading-7 text-[#f1cbc6]">
+                {failureMessage}
+              </div>
+            ) : null}
 
-              return (
-                <div key={stage.id} className="rounded-[20px] border border-border-subtle bg-app-bg-elevated p-4">
-                  <div className="flex items-center justify-between gap-3">
-                    <div>
-                      <p className="font-medium text-text-primary">{localizedStage?.title ?? stage.title}</p>
-                      <p className="mt-1 text-sm text-text-secondary">
-                        {localizedStage?.description ?? stage.description}
-                      </p>
+            <div className="space-y-3">
+              {progress?.stages.map((stage) => {
+                const localizedStage = stageText[stage.id as keyof typeof stageText]
+
+                return (
+                  <div key={stage.id} className="rounded-[20px] border border-border-subtle bg-app-bg-elevated p-4">
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <p className="font-medium text-text-primary">{localizedStage?.title ?? stage.title}</p>
+                        <p className="mt-1 text-sm text-text-secondary">
+                          {localizedStage?.description ?? stage.description}
+                        </p>
+                      </div>
+                      {stage.status === 'completed' ? (
+                        <CheckCircle2 className="size-5 text-[#ccebd7]" />
+                      ) : (
+                        <Hourglass className="size-5 text-gold-primary" />
+                      )}
                     </div>
-                    {stage.status === 'completed' ? (
-                      <CheckCircle2 className="size-5 text-[#ccebd7]" />
-                    ) : (
-                      <Hourglass className="size-5 text-gold-primary" />
-                    )}
                   </div>
+                )
+              })}
+            </div>
+          </Card>
+
+          {progress ? (
+            <Card className="space-y-3 p-6">
+              <h2 className="text-lg font-semibold text-text-primary">
+                {isZh ? '当前状态摘要' : 'Current status summary'}
+              </h2>
+              <div className="grid gap-3 md:grid-cols-3">
+                <div className="rounded-[20px] border border-border-subtle bg-app-bg-elevated p-4">
+                  <p className="text-xs text-text-muted">{isZh ? '状态' : 'Status'}</p>
+                  <p className="mt-2 text-sm text-text-primary">{progress.status}</p>
                 </div>
-              )
-            })}
-          </div>
-        </Card>
+                <div className="rounded-[20px] border border-border-subtle bg-app-bg-elevated p-4 md:col-span-2">
+                  <p className="text-xs text-text-muted">{isZh ? '当前焦点' : 'Current focus'}</p>
+                  <p className="mt-2 text-sm leading-7 text-text-primary">
+                    {progress.currentFocus ?? (isZh ? '等待后端推进下一步。' : 'Waiting for the backend to advance.')}
+                  </p>
+                </div>
+              </div>
+              <div className="rounded-[20px] border border-border-subtle bg-app-bg-elevated p-4">
+                <p className="text-xs text-text-muted">{isZh ? '最近停顿原因' : 'Latest pause reason'}</p>
+                <p className="mt-2 text-sm leading-7 text-text-primary">
+                  {progress.lastStopReason ?? (isZh ? '当前没有额外停顿原因。' : 'There is no extra pause reason at the moment.')}
+                </p>
+              </div>
+            </Card>
+          ) : null}
+        </div>
       </div>
     </div>
   )

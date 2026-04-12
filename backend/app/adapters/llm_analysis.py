@@ -31,6 +31,7 @@ from app.prompts import (
 from app.services.calculation_tasks import calculation_semantic_signature, validate_calculation_task
 from app.i18n import text_for_locale
 from app.rwa.catalog import build_asset_library, build_chain_config
+from app.rwa.diff import build_reanalysis_diff
 from app.rwa.engine import build_rwa_report, resolve_selected_assets
 
 
@@ -953,12 +954,23 @@ class MockAnalysisAdapter:
             locale=session.locale,
         )
 
-        existing_urls = {item.source_url for item in session.evidence_items}
+        merged_context = _merged_rwa_context(session)
+        report.reanalysis_diff = build_reanalysis_diff(
+            session.report_snapshots[-1] if session.report_snapshots else None,
+            report,
+            current_context=merged_context,
+        )
+
+        existing_keys = {
+            (item.asset_id, item.source_url, item.title)
+            for item in session.evidence_items
+        }
         for item in evidence:
-            if item.source_url in existing_urls:
+            key = (item.asset_id, item.source_url, item.title)
+            if key in existing_keys:
                 continue
             session.evidence_items.append(item)
-            existing_urls.add(item.source_url)
+            existing_keys.add(key)
 
         return report
 

@@ -30,3 +30,30 @@ if (!window.ResizeObserver) {
 }
 
 window.HTMLElement.prototype.scrollIntoView = vi.fn()
+
+Object.defineProperty(HTMLCanvasElement.prototype, 'getContext', {
+  configurable: true,
+  value: vi.fn(
+    () =>
+      ({
+        canvas: document.createElement('canvas'),
+        clearRect: () => {},
+        fillRect: () => {},
+        beginPath: () => {},
+        moveTo: () => {},
+        lineTo: () => {},
+        closePath: () => {},
+        stroke: () => {},
+        fill: () => {},
+        arc: () => {},
+        measureText: () => ({ width: 0 }),
+        save: () => {},
+        restore: () => {},
+        setTransform: () => {},
+        scale: () => {},
+        translate: () => {},
+        createLinearGradient: () => ({ addColorStop: () => {} }),
+        createRadialGradient: () => ({ addColorStop: () => {} }),
+      }) as unknown as CanvasRenderingContext2D,
+  ),
+})

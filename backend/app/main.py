@@ -1,5 +1,8 @@
+import sqlite3
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
 from app.api.routes import router
 from app.api.rwa_routes import rwa_router
@@ -24,6 +27,21 @@ def create_app() -> FastAPI:
 
     app.include_router(router)
     app.include_router(rwa_router)
+
+    @app.exception_handler(sqlite3.Error)
+    async def sqlite_error_handler(_request, _exc):  # pragma: no cover - exercised via integration tests
+        return JSONResponse(
+            status_code=503,
+            content={"detail": "The session store is temporarily unavailable."},
+        )
+
+    @app.exception_handler(OSError)
+    async def os_error_handler(_request, _exc):  # pragma: no cover - exercised via integration tests
+        return JSONResponse(
+            status_code=503,
+            content={"detail": "The local backend storage is temporarily unavailable."},
+        )
+
     return app
 
 

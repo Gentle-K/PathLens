@@ -18,6 +18,7 @@ import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Input, Textarea } from '@/components/ui/field'
 import { AnalysisPendingView } from '@/features/analysis/components/analysis-pending-view'
+import { DemoScenarioSelector } from '@/features/analysis/components/DemoScenarioSelector'
 import { useApiAdapter } from '@/lib/api/use-api-adapter'
 import { useAppStore } from '@/lib/store/app-store'
 import { useHashKeyWallet } from '@/lib/web3/use-hashkey-wallet'
@@ -42,6 +43,10 @@ const defaultIntakeContext: RwaIntakeContext = {
   walletKycVerified: undefined,
   wantsOnchainAttestation: true,
   additionalConstraints: '',
+  includeNonProductionAssets: false,
+  demoMode: false,
+  demoScenarioId: '',
+  analysisSeed: undefined,
 }
 
 function formatPercent(value: number) {
@@ -344,6 +349,10 @@ export function ModeSelectionPage() {
     () => bootstrapQuery.data?.assetLibrary ?? [],
     [bootstrapQuery.data?.assetLibrary],
   )
+  const demoScenarios = useMemo(
+    () => bootstrapQuery.data?.demoScenarios ?? [],
+    [bootstrapQuery.data?.demoScenarios],
+  )
   const filteredAssets = useMemo(() => {
     const normalized = assetQuery.trim().toLowerCase()
     if (!normalized) {
@@ -396,6 +405,25 @@ export function ModeSelectionPage() {
     })
   }
 
+  const applyDemoScenario = (
+    scenario: NonNullable<(typeof demoScenarios)[number]> | null,
+  ) => {
+    if (!scenario) {
+      setIntakeContext((current) => ({
+        ...current,
+        demoMode: false,
+        demoScenarioId: '',
+        analysisSeed: undefined,
+      }))
+      return
+    }
+
+    setProblemStatement(scenario.problemStatement)
+    setIntakeContext({
+      ...scenario.intakeContext,
+    })
+  }
+
   if (createMutation.isPending) {
     return (
       <AnalysisPendingView
@@ -412,7 +440,7 @@ export function ModeSelectionPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" data-testid="mode-selection-page">
       <PageHeader
         eyebrow={text.eyebrow}
         title={text.title}
@@ -554,6 +582,7 @@ export function ModeSelectionPage() {
           return (
             <Card
               key={mode.id}
+              data-testid={`mode-card-${mode.id}`}
               role="button"
               tabIndex={0}
               aria-pressed={isSelected}
@@ -630,7 +659,19 @@ export function ModeSelectionPage() {
             <Badge tone="neutral">
               {text.selectedAssetCount(intakeContext.preferredAssetIds.length)}
             </Badge>
+            {intakeContext.demoMode ? (
+              <Badge tone="warning">
+                {isZh ? `Demo: ${intakeContext.demoScenarioId || 'enabled'}` : `Demo: ${intakeContext.demoScenarioId || 'enabled'}`}
+              </Badge>
+            ) : null}
           </div>
+
+          <DemoScenarioSelector
+            scenarios={demoScenarios}
+            selectedScenarioId={intakeContext.demoScenarioId}
+            locale={locale}
+            onSelect={applyDemoScenario}
+          />
 
           <div className="space-y-2">
             <label htmlFor="problemStatement" className="text-sm text-text-secondary">
@@ -638,6 +679,7 @@ export function ModeSelectionPage() {
             </label>
             <Textarea
               id="problemStatement"
+              data-testid="analysis-problem-input"
               value={problemStatement}
               onChange={(event) => setProblemStatement(event.target.value)}
               placeholder={text.questionPlaceholder}
@@ -865,6 +907,37 @@ export function ModeSelectionPage() {
 
           <div className="space-y-2">
             <label className="text-sm text-text-secondary">
+              {isZh ? '是否纳入 demo / benchmark' : 'Include demo / benchmark assets'}
+            </label>
+            <button
+              type="button"
+              onClick={() =>
+                setIntakeContext((current) => ({
+                  ...current,
+                  includeNonProductionAssets: !current.includeNonProductionAssets,
+                }))
+              }
+              className={`rounded-[18px] border px-4 py-3 text-left ${
+                intakeContext.includeNonProductionAssets
+                  ? 'border-border-strong bg-[rgba(212,175,55,0.14)] text-text-primary'
+                  : 'border-border-subtle bg-app-bg-elevated text-text-secondary'
+              }`}
+            >
+              <p className="font-medium">
+                {intakeContext.includeNonProductionAssets
+                  ? isZh ? '已纳入非生产资产' : 'Including non-production assets'
+                  : isZh ? '默认排除非生产资产' : 'Default-exclude non-production assets'}
+              </p>
+              <p className="mt-2 text-xs leading-6 text-text-muted">
+                {isZh
+                  ? '默认仍会展示 demo 和 benchmark，但不会让它们和生产资产同权竞争。'
+                  : 'Demo and benchmark assets stay visible either way, but by default they do not compete with production assets.'}
+              </p>
+            </button>
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-sm text-text-secondary">
               {text.additionalConstraints}
             </label>
             <Textarea
@@ -881,6 +954,7 @@ export function ModeSelectionPage() {
           </div>
 
           <Button
+            data-testid="start-rwa-analysis"
             onClick={() =>
               void createMutation.mutateAsync({
                 mode: selectedMode,
@@ -954,6 +1028,11 @@ export function ModeSelectionPage() {
                           <Badge tone={isEligible ? 'success' : 'warning'}>
                             {isEligible ? text.eligible : text.needsKyc(requiredLevel)}
                           </Badge>
+                          {(asset.statuses ?? []).map((status) => (
+                            <Badge key={`${asset.id}-${status}`} tone={status === 'verified' ? 'success' : status === 'demo' ? 'warning' : 'neutral'}>
+                              {status}
+                            </Badge>
+                          ))}
                           {asset.onchainVerified ? (
                             <Badge tone="neutral">{text.onchainBadge}</Badge>
                           ) : null}
@@ -964,6 +1043,11 @@ export function ModeSelectionPage() {
                         <p className="mt-2 text-sm leading-7 text-text-secondary">
                           {asset.description}
                         </p>
+                        {asset.statusExplanation ? (
+                          <p className="mt-2 text-xs leading-6 text-text-muted">
+                            {asset.statusExplanation}
+                          </p>
+                        ) : null}
                       </div>
                       {isSelected ? (
                         <CheckCircle2 className="mt-1 size-5 text-gold-primary" />
@@ -994,6 +1078,8 @@ export function ModeSelectionPage() {
                     {asset.primarySourceUrl ? (
                       <p className="mt-3 text-xs text-text-muted">
                         {text.sourceLabel}: {asset.primarySourceUrl}
+                        {asset.truthLevel ? ` · ${asset.truthLevel}` : ''}
+                        {asset.liveReadiness ? ` · ${asset.liveReadiness}` : ''}
                       </p>
                     ) : null}
                   </button>

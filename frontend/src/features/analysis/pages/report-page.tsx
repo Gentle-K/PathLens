@@ -1,11 +1,9 @@
-import { useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery } from '@tanstack/react-query'
 import { Blocks, Cable, ExternalLink, Radio, ScrollText, ShieldCheck, WalletCards } from 'lucide-react'
-import { useEffect, useMemo, useState } from 'react'
+import { Suspense, lazy, useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 
-import { ChartCard } from '@/components/charts/chart-card'
 import { PageHeader } from '@/components/layout/page-header'
-import { ReportMarkdown } from '@/components/markdown/report-markdown'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
@@ -19,6 +17,48 @@ import { formatDateTime, formatMoney } from '@/lib/utils/format'
 import { errorMessage } from '@/lib/web3/transaction-errors'
 import { useHashKeyWallet, useLiveMarketSnapshots } from '@/lib/web3/use-hashkey-wallet'
 import type { AnalysisReport, AssetAnalysisCard, LanguageCode, TxReceipt } from '@/types'
+
+const ChartCard = lazy(() =>
+  import('@/components/charts/chart-card').then((module) => ({
+    default: module.ChartCard,
+  })),
+)
+
+const ReportMarkdown = lazy(() =>
+  import('@/components/markdown/report-markdown').then((module) => ({
+    default: module.ReportMarkdown,
+  })),
+)
+
+const AssumptionsAndUnknownsPanel = lazy(() =>
+  import('@/features/analysis/components/AssumptionsAndUnknownsPanel').then((module) => ({
+    default: module.AssumptionsAndUnknownsPanel,
+  })),
+)
+
+const ComparisonMatrix = lazy(() =>
+  import('@/features/analysis/components/ComparisonMatrix').then((module) => ({
+    default: module.ComparisonMatrix,
+  })),
+)
+
+const NextStepPanel = lazy(() =>
+  import('@/features/analysis/components/NextStepPanel').then((module) => ({
+    default: module.NextStepPanel,
+  })),
+)
+
+const RecommendationDrivers = lazy(() =>
+  import('@/features/analysis/components/RecommendationDrivers').then((module) => ({
+    default: module.RecommendationDrivers,
+  })),
+)
+
+const ReanalysisDiffCard = lazy(() =>
+  import('@/features/analysis/components/ReanalysisDiffCard').then((module) => ({
+    default: module.ReanalysisDiffCard,
+  })),
+)
 
 function money(value: number | undefined, currency = 'USD', locale: LanguageCode = 'zh') {
   return formatMoney(value, currency, locale, { maximumFractionDigits: 2 })
@@ -69,6 +109,19 @@ function txReceiptFromReport(report: AnalysisReport): TxReceipt | undefined {
   }
 }
 
+function InlineSectionFallback({ lines = 3 }: { lines?: number }) {
+  return (
+    <Card className="space-y-3 p-6">
+      {Array.from({ length: lines }).map((_, index) => (
+        <div
+          key={index}
+          className="h-5 animate-pulse rounded-full bg-white/6"
+        />
+      ))}
+    </Card>
+  )
+}
+
 export function ReportPage() {
   const navigate = useNavigate()
   const { sessionId = '' } = useParams()
@@ -79,6 +132,12 @@ export function ReportPage() {
 
   const sessionQuery = useQuery({ queryKey: ['analysis', sessionId], queryFn: () => adapter.analysis.getById(sessionId) })
   const reportQuery = useQuery({ queryKey: ['analysis', sessionId, 'report'], queryFn: () => adapter.analysis.getReport(sessionId) })
+  const reanalysisMutation = useMutation({
+    mutationFn: () => adapter.analysis.requestMoreFollowUp(sessionId),
+    onSuccess: async () => {
+      await navigate(`/analysis/session/${sessionId}`)
+    },
+  })
 
   const session = sessionQuery.data
   const report = reportQuery.data
@@ -137,7 +196,7 @@ export function ReportPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" data-testid="report-page">
       <PageHeader
         eyebrow={isZh ? '页面 3 / RWA 报告' : 'Page 3 / RWA Report'}
         title={report.summaryTitle}
@@ -145,12 +204,21 @@ export function ReportPage() {
         actions={
           <>
             <Button variant="secondary" onClick={() => void navigate(`/analysis/session/${sessionId}`)}>{isZh ? '返回分析页' : 'Back to Analysis'}</Button>
+            <Button variant="secondary" onClick={() => void reanalysisMutation.mutateAsync()} disabled={reanalysisMutation.isPending}>
+              {isZh ? '重新分析并看差异' : 'Re-analyze and diff'}
+            </Button>
             <Button variant="secondary" onClick={() => void handleExport('csv')} disabled={exporting !== null}>{isZh ? '导出 CSV' : 'Export CSV'}</Button>
             <Button variant="secondary" onClick={() => void handleExport('pdf')} disabled={exporting !== null}>{isZh ? '导出 PDF' : 'Export PDF'}</Button>
             {report.attestationDraft ? <Button onClick={() => void navigate(`/analysis/session/${sessionId}/execute`)}>{isZh ? '打开执行控制台' : 'Open Execution Console'}</Button> : null}
           </>
         }
       />
+
+      {reanalysisMutation.isError ? (
+        <Card className="p-4 text-sm text-[#f7d4cf]">
+          {errorMessage(reanalysisMutation.error)}
+        </Card>
+      ) : null}
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         {report.highlights.map((highlight) => (
@@ -161,6 +229,10 @@ export function ReportPage() {
           </Card>
         ))}
       </div>
+
+      <Suspense fallback={<InlineSectionFallback lines={3} />}>
+        <ReanalysisDiffCard diff={report.reanalysisDiff} locale={locale} />
+      </Suspense>
 
       {report.confidenceBand || report.reserveBackingSummary || typeof report.oracleStressScore === 'number' || (report.sourceProvenanceRefs ?? []).length ? (
         <div className="grid gap-4 xl:grid-cols-[1.02fr_0.98fr]">
@@ -318,21 +390,37 @@ export function ReportPage() {
         </div>
       </div>
 
-      {report.assetCards.length ? <div className="space-y-4"><div className="flex items-center gap-3"><ShieldCheck className="size-5 text-gold-primary" /><h2 className="text-xl font-semibold text-text-primary">{isZh ? '资产卡片' : 'Asset Cards'}</h2></div><div className="grid gap-4 xl:grid-cols-3">{report.assetCards.map((asset) => { const topRisk = [...asset.riskBreakdown].sort((left, right) => right.normalizedScore * right.weight - left.normalizedScore * left.weight)[0]; return <Card key={asset.assetId} className="space-y-4 p-5"><div className="flex items-start justify-between gap-3"><div><div className="flex flex-wrap items-center gap-2"><h3 className="text-lg font-semibold text-text-primary">{asset.name}</h3><Badge tone="neutral">{asset.symbol}</Badge></div><p className="mt-2 text-sm leading-7 text-text-secondary">{asset.fitSummary}</p></div><Badge tone="gold">{assetTypeLabel(asset.assetType, isZh)}</Badge></div><div className="grid gap-3 md:grid-cols-2"><div className="rounded-xl border border-border-subtle bg-app-bg-elevated p-4"><p className="text-xs text-text-muted">{isZh ? '基准年化' : 'Base annualized'}</p><p className="mt-2 text-text-primary">{pct(asset.expectedReturnBase * 100, locale)}%</p></div><div className="rounded-xl border border-border-subtle bg-app-bg-elevated p-4"><p className="text-xs text-text-muted">{isZh ? '综合风险' : 'Overall risk'}</p><p className="mt-2 text-text-primary">{asset.riskVector.overall.toFixed(1)} / 100</p></div><div className="rounded-xl border border-border-subtle bg-app-bg-elevated p-4"><p className="text-xs text-text-muted">{isZh ? '最早退出' : 'Earliest exit'}</p><p className="mt-2 text-text-primary">{asset.exitDays === 0 ? 'T+0' : `T+${asset.exitDays}`}</p></div><div className="rounded-xl border border-border-subtle bg-app-bg-elevated p-4"><p className="text-xs text-text-muted">{isZh ? '数据质量' : 'Data quality'}</p><p className="mt-2 text-text-primary">{asset.riskDataQuality.toFixed(2)}</p></div></div>{topRisk ? <div className="rounded-xl border border-border-subtle bg-app-bg-elevated p-4 text-sm text-text-secondary"><div className="flex items-center justify-between gap-3 text-text-primary"><span>{topRisk.dimension}</span><span>{topRisk.normalizedScore.toFixed(1)} / 100</span></div><p className="mt-2 text-xs text-text-muted">{isZh ? '权重' : 'Weight'} {(topRisk.weight * 100).toFixed(1)}%{topRisk.note ? ` · ${topRisk.note}` : ''}</p></div> : null}</Card> })}</div></div> : null}
+      {report.assetCards.length ? <div className="space-y-4"><div className="flex items-center gap-3"><ShieldCheck className="size-5 text-gold-primary" /><h2 className="text-xl font-semibold text-text-primary">{isZh ? '资产卡片' : 'Asset Cards'}</h2></div><div className="grid gap-4 xl:grid-cols-3">{report.assetCards.map((asset) => { const topRisk = [...asset.riskBreakdown].sort((left, right) => right.normalizedScore * right.weight - left.normalizedScore * left.weight)[0]; return <Card key={asset.assetId} className="space-y-4 p-5"><div className="flex items-start justify-between gap-3"><div><div className="flex flex-wrap items-center gap-2"><h3 className="text-lg font-semibold text-text-primary">{asset.name}</h3><Badge tone="neutral">{asset.symbol}</Badge>{(asset.statuses ?? []).map((status) => <Badge key={`${asset.assetId}-${status}`} tone={status === 'verified' ? 'success' : status === 'demo' ? 'warning' : 'neutral'}>{status}</Badge>)}</div><p className="mt-2 text-sm leading-7 text-text-secondary">{asset.fitSummary}</p>{asset.statusExplanation ? <p className="mt-2 text-xs leading-6 text-text-muted">{asset.statusExplanation}</p> : null}</div><div className="flex flex-col items-end gap-2"><Badge tone="gold">{assetTypeLabel(asset.assetType, isZh)}</Badge>{asset.truthLevel ? <Badge tone={asset.truthLevel === 'onchain_verified' ? 'success' : asset.truthLevel === 'demo_only' ? 'warning' : 'neutral'}>{asset.truthLevel}</Badge> : null}{asset.liveReadiness ? <Badge tone={asset.liveReadiness === 'ready' ? 'success' : asset.liveReadiness === 'partial' ? 'warning' : 'danger'}>{asset.liveReadiness}</Badge> : null}</div></div><div className="grid gap-3 md:grid-cols-2"><div className="rounded-xl border border-border-subtle bg-app-bg-elevated p-4"><p className="text-xs text-text-muted">{isZh ? '基准年化' : 'Base annualized'}</p><p className="mt-2 text-text-primary">{pct(asset.expectedReturnBase * 100, locale)}%</p></div><div className="rounded-xl border border-border-subtle bg-app-bg-elevated p-4"><p className="text-xs text-text-muted">{isZh ? '综合风险' : 'Overall risk'}</p><p className="mt-2 text-text-primary">{asset.riskVector.overall.toFixed(1)} / 100</p></div><div className="rounded-xl border border-border-subtle bg-app-bg-elevated p-4"><p className="text-xs text-text-muted">{isZh ? '最早退出' : 'Earliest exit'}</p><p className="mt-2 text-text-primary">{asset.exitDays === 0 ? 'T+0' : `T+${asset.exitDays}`}</p></div><div className="rounded-xl border border-border-subtle bg-app-bg-elevated p-4"><p className="text-xs text-text-muted">{isZh ? '数据质量' : 'Data quality'}</p><p className="mt-2 text-text-primary">{asset.riskDataQuality.toFixed(2)}</p></div></div>{topRisk ? <div className="rounded-xl border border-border-subtle bg-app-bg-elevated p-4 text-sm text-text-secondary"><div className="flex items-center justify-between gap-3 text-text-primary"><span>{topRisk.dimension}</span><span>{topRisk.normalizedScore.toFixed(1)} / 100</span></div><p className="mt-2 text-xs text-text-muted">{isZh ? '权重' : 'Weight'} {(topRisk.weight * 100).toFixed(1)}%{topRisk.note ? ` · ${topRisk.note}` : ''}</p></div> : null}</Card> })}</div></div> : null}
+
+      <Suspense fallback={<InlineSectionFallback lines={3} />}>
+        <ComparisonMatrix matrix={report.comparisonMatrix} locale={locale} />
+      </Suspense>
 
       {report.tables?.map((table) => <ReportTableCard key={table.id} table={table} />)}
-      {report.charts.map((chart) => <ChartCard key={chart.id} chart={chart} />)}
+      {report.charts.length ? (
+        <Suspense fallback={<InlineSectionFallback lines={4} />}>
+          {report.charts.map((chart) => <ChartCard key={chart.id} chart={chart} />)}
+        </Suspense>
+      ) : null}
 
       <div className="grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
         <div className="space-y-4">
-          <Card className="space-y-4 p-6"><div className="flex items-center gap-3"><ScrollText className="size-5 text-gold-primary" /><h2 className="text-xl font-semibold text-text-primary">{isZh ? '完整分析' : 'Full Analysis'}</h2></div><ReportMarkdown markdown={report.markdown} /></Card>
-          <Card className="space-y-3 p-6"><h2 className="text-lg font-semibold text-text-primary">{isZh ? '假设与限制' : 'Assumptions and Constraints'}</h2>{report.assumptions.concat(report.disclaimers).map((item) => <div key={item} className="rounded-xl border border-border-subtle bg-app-bg-elevated p-4 text-sm leading-7 text-text-secondary">{item}</div>)}</Card>
+          <Card className="space-y-4 p-6"><div className="flex items-center gap-3"><ScrollText className="size-5 text-gold-primary" /><h2 className="text-xl font-semibold text-text-primary">{isZh ? '完整分析' : 'Full Analysis'}</h2></div><Suspense fallback={<InlineSectionFallback lines={6} />}><ReportMarkdown markdown={report.markdown} /></Suspense></Card>
+          <Suspense fallback={<InlineSectionFallback lines={4} />}>
+            <AssumptionsAndUnknownsPanel assumptions={[...(report.assumptions ?? []), ...(report.disclaimers ?? [])]} unknowns={report.unknowns ?? []} warnings={report.warnings ?? []} locale={locale} />
+          </Suspense>
           {(report.methodologyReferences ?? []).length ? <Card className="space-y-4 p-6"><h2 className="text-lg font-semibold text-text-primary">{isZh ? '风险方法学' : 'Risk Methodology'}</h2>{(report.methodologyReferences ?? []).map((item) => <div key={item.key} className="rounded-xl border border-border-subtle bg-app-bg-elevated p-4"><div className="flex items-start justify-between gap-3"><div><p className="font-medium text-text-primary">{item.title}</p><p className="mt-2 text-sm leading-7 text-text-secondary">{item.summary}</p></div><a href={item.url} target="_blank" rel="noreferrer" className="inline-flex shrink-0 items-center gap-1 text-xs text-gold-ink underline-offset-4 hover:underline"><ExternalLink className="size-3.5" />{isZh ? '文献' : 'Source'}</a></div></div>)}</Card> : null}
         </div>
 
         <div className="space-y-4">
           {report.recommendedAllocations.length ? <Card className="space-y-4 p-6"><div className="flex items-center gap-3"><WalletCards className="size-5 text-gold-primary" /><h2 className="text-lg font-semibold text-text-primary">{isZh ? '建议权重' : 'Suggested Weights'}</h2></div>{report.recommendedAllocations.map((allocation) => <div key={allocation.assetId} className="rounded-xl border border-border-subtle bg-app-bg-elevated p-4"><div className="flex items-center justify-between gap-3"><p className="font-medium text-text-primary">{allocation.assetName}</p><Badge tone={allocation.blockedReason ? 'warning' : 'gold'}>{allocation.targetWeightPct.toFixed(1)}%</Badge></div><p className="mt-2 text-sm leading-7 text-text-secondary">{allocation.rationale}</p><p className="mt-2 text-xs text-text-muted">{isZh ? '建议金额' : 'Suggested amount'}: {money(allocation.suggestedAmount, session.intakeContext.baseCurrency, locale)}</p>{allocation.blockedReason ? <p className="mt-2 text-xs text-[#f3ddbb]">{allocation.blockedReason}</p> : null}</div>)}</Card> : null}
-          <Card className="space-y-4 p-6"><h2 className="text-lg font-semibold text-text-primary">{isZh ? '证据面板' : 'Evidence Panel'}</h2><EvidencePanelEnhanced evidence={report.evidence} locale={locale} /></Card>
+          <Suspense fallback={<InlineSectionFallback lines={3} />}>
+            <RecommendationDrivers reason={report.recommendationReason} locale={locale} />
+          </Suspense>
+          <Suspense fallback={<InlineSectionFallback lines={3} />}>
+            <NextStepPanel intents={report.actionIntents ?? []} locale={locale} />
+          </Suspense>
+          <Card className="space-y-4 p-6"><h2 className="text-lg font-semibold text-text-primary">{isZh ? '证据面板' : 'Evidence Panel'}</h2><EvidencePanelEnhanced evidence={report.evidence} governance={report.evidenceGovernance} locale={locale} /></Card>
           <div className="grid gap-4 xl:grid-cols-2">
             <Card className="space-y-4 p-6"><h2 className="text-lg font-semibold text-text-primary">{isZh ? '有效计算' : 'Validated Calculations'}</h2>{report.calculations.length ? report.calculations.map((calculation) => <div key={calculation.id} className="rounded-xl border border-border-subtle bg-app-bg-elevated p-4"><div className="flex items-center justify-between gap-3"><p className="font-medium text-text-primary">{calculation.taskType}</p><Badge tone="neutral">{calculation.validationState || 'validated'}</Badge></div><p className="mt-2 text-sm text-gold-ink">{calculation.result} {calculation.units}</p><p className="mt-2 break-all text-sm leading-7 text-text-secondary">{calculation.formulaExpression}</p></div>) : <p className="text-sm text-text-secondary">{isZh ? '当前报告没有可展示的有效计算。' : 'No validated calculations are visible for this report.'}</p>}</Card>
             <Card className="space-y-4 p-6"><h2 className="text-lg font-semibold text-text-primary">{isZh ? '失败 / 拒绝计算' : 'Failed / Rejected Calculations'}</h2>{hiddenCalculations.length ? <details className="rounded-xl border border-border-subtle bg-app-bg-elevated p-4"><summary className="cursor-pointer text-sm text-text-primary">{isZh ? `展开查看 ${hiddenCalculations.length} 条被隔离的旧任务` : `Show ${hiddenCalculations.length} isolated legacy tasks`}</summary><div className="mt-4 space-y-3">{hiddenCalculations.map((calculation) => <div key={calculation.id} className="rounded-xl border border-border-subtle bg-app-bg p-4"><div className="flex items-center justify-between gap-3"><p className="font-medium text-text-primary">{calculation.taskType}</p><Badge tone="warning">{calculation.status || calculation.validationState || 'failed'}</Badge></div><p className="mt-2 break-all text-sm text-text-secondary">{calculation.formulaExpression}</p><p className="mt-2 text-xs leading-6 text-[#f3ddbb]">{calculation.failureReason || calculation.notes || (isZh ? '该任务未通过校验。' : 'This task did not pass validation.')}</p></div>)}</div></details> : <p className="text-sm text-text-secondary">{isZh ? '当前没有需要隔离展示的失败计算。' : 'There are no isolated failed calculations in this session.'}</p>}</Card>

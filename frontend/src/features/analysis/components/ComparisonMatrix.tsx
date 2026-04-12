@@ -1,103 +1,139 @@
-interface AssetRow {
-  assetName: string
-  assetType: string
-  expectedReturn: string
-  holdingReturn: string
-  exitSpeed: string
-  totalCostBps: number
-  kycLevel: number
-  overallRisk: number
-}
+import { Info } from 'lucide-react'
+
+import { Badge } from '@/components/ui/badge'
+import { Card } from '@/components/ui/card'
+import type { ComparisonMatrix as ComparisonMatrixData, LanguageCode } from '@/types'
 
 interface ComparisonMatrixProps {
-  assets: AssetRow[]
-  title?: string
-  className?: string
+  matrix?: ComparisonMatrixData
+  locale?: LanguageCode
+}
+
+function badgeTone(tone: string) {
+  switch (tone) {
+    case 'success':
+      return 'success' as const
+    case 'gold':
+      return 'gold' as const
+    case 'warning':
+      return 'warning' as const
+    case 'danger':
+      return 'danger' as const
+    default:
+      return 'neutral' as const
+  }
 }
 
 export function ComparisonMatrix({
-  assets,
-  title = 'RWA Comparison Matrix',
-  className = '',
+  matrix,
+  locale = 'en',
 }: ComparisonMatrixProps) {
-  if (!assets.length) {
+  const isZh = locale === 'zh'
+
+  if (!matrix?.rows?.length || !matrix.metrics.length) {
     return null
   }
 
   return (
-    <div className={`overflow-x-auto ${className}`}>
-      {title && (
-        <h3 className="mb-3 text-sm font-semibold text-neutral-200">
-          {title}
-        </h3>
-      )}
-      <table className="w-full border-collapse text-sm">
-        <thead>
-          <tr className="border-b border-neutral-700/50 text-left text-xs uppercase tracking-wider text-neutral-500">
-            <th className="px-3 py-2">Asset</th>
-            <th className="px-3 py-2">Type</th>
-            <th className="px-3 py-2 text-right">Expected Return</th>
-            <th className="px-3 py-2 text-right">Holding Return</th>
-            <th className="px-3 py-2 text-center">Exit</th>
-            <th className="px-3 py-2 text-right">Cost (bps)</th>
-            <th className="px-3 py-2 text-center">KYC</th>
-            <th className="px-3 py-2 text-right">Risk</th>
-          </tr>
-        </thead>
-        <tbody>
-          {assets.map((asset, idx) => (
-            <tr
-              key={idx}
-              className="border-b border-neutral-800/50 transition-colors hover:bg-neutral-800/30"
-            >
-              <td className="px-3 py-2.5 font-medium text-neutral-200">
-                {asset.assetName}
-              </td>
-              <td className="px-3 py-2.5">
-                <span className="rounded-md bg-neutral-800 px-2 py-0.5 text-xs text-neutral-400">
-                  {asset.assetType}
-                </span>
-              </td>
-              <td className="px-3 py-2.5 text-right font-mono text-neutral-300">
-                {asset.expectedReturn}
-              </td>
-              <td className="px-3 py-2.5 text-right font-mono text-neutral-300">
-                {asset.holdingReturn}
-              </td>
-              <td className="px-3 py-2.5 text-center text-neutral-400">
-                {asset.exitSpeed}
-              </td>
-              <td className="px-3 py-2.5 text-right font-mono text-neutral-400">
-                {asset.totalCostBps}
-              </td>
-              <td className="px-3 py-2.5 text-center">
-                <span
-                  className={`inline-block rounded-full px-2 py-0.5 text-xs font-medium ${
-                    asset.kycLevel === 0
-                      ? 'bg-emerald-900/30 text-emerald-400'
-                      : 'bg-amber-900/30 text-amber-400'
-                  }`}
+    <Card className="space-y-4 p-6" data-testid="comparison-matrix">
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <h2 className="text-lg font-semibold text-text-primary">{matrix.title}</h2>
+          {matrix.notes?.length ? (
+            <p className="mt-2 text-sm leading-7 text-text-secondary">
+              {matrix.notes[0]}
+            </p>
+          ) : null}
+        </div>
+        <Badge tone="neutral">{matrix.rows.length}</Badge>
+      </div>
+
+      <div className="overflow-x-auto">
+        <table className="min-w-[980px] border-collapse text-sm">
+          <thead>
+            <tr className="border-b border-border-subtle text-left align-bottom">
+              <th className="sticky left-0 z-10 bg-app-panel px-3 py-3 text-xs font-medium uppercase tracking-[0.08em] text-text-muted">
+                {isZh ? '资产' : 'Asset'}
+              </th>
+              {matrix.metrics.map((metric) => (
+                <th
+                  key={metric.key}
+                  className="px-3 py-3 text-xs font-medium uppercase tracking-[0.08em] text-text-muted"
                 >
-                  L{asset.kycLevel}
-                </span>
-              </td>
-              <td className="px-3 py-2.5 text-right">
-                <span
-                  className={`font-mono text-sm ${
-                    asset.overallRisk < 30
-                      ? 'text-emerald-400'
-                      : asset.overallRisk < 55
-                        ? 'text-amber-400'
-                        : 'text-red-400'
-                  }`}
-                >
-                  {asset.overallRisk.toFixed(1)}
-                </span>
-              </td>
+                  <div className="flex items-center gap-1">
+                    <span>{metric.label}</span>
+                    {metric.description ? (
+                      <span title={metric.description}>
+                        <Info className="size-3.5 text-text-muted" />
+                      </span>
+                    ) : null}
+                  </div>
+                </th>
+              ))}
             </tr>
+          </thead>
+          <tbody>
+            {matrix.rows.map((row) => (
+              <tr key={row.assetId} className="border-b border-border-subtle align-top">
+                <td className="sticky left-0 z-10 min-w-56 bg-app-panel px-3 py-4">
+                  <div className="space-y-2">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="font-medium text-text-primary">{row.assetName}</p>
+                      <Badge tone="neutral">{row.assetSymbol}</Badge>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {(row.statuses ?? []).map((status) => (
+                        <Badge key={`${row.assetId}-${status}`} tone={status === 'demo' ? 'warning' : status === 'verified' ? 'success' : 'neutral'}>
+                          {status}
+                        </Badge>
+                      ))}
+                      {!row.defaultRankEligible ? (
+                        <Badge tone="warning">
+                          {isZh ? '默认排除' : 'Default-excluded'}
+                        </Badge>
+                      ) : null}
+                    </div>
+                  </div>
+                </td>
+                {row.cells.map((cell) => (
+                  <td key={`${row.assetId}-${cell.metricKey}`} className="min-w-40 px-3 py-4">
+                    <div
+                      className="rounded-lg border border-border-subtle bg-app-bg-elevated p-3"
+                      title={cell.tooltip}
+                    >
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <p className="font-medium text-text-primary">{cell.displayValue}</p>
+                        <div className="flex flex-wrap gap-1">
+                          {(cell.badges ?? []).slice(0, 2).map((badge) => (
+                            <Badge key={`${row.assetId}-${cell.metricKey}-${badge}`} tone={badgeTone(cell.tone)}>
+                              {badge}
+                            </Badge>
+                          ))}
+                        </div>
+                      </div>
+                      {cell.rationale ? (
+                        <p className="mt-2 text-xs leading-6 text-text-muted">
+                          {cell.rationale}
+                        </p>
+                      ) : null}
+                    </div>
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {matrix.notes?.length > 1 ? (
+        <div className="space-y-2">
+          {matrix.notes.slice(1).map((note) => (
+            <p key={note} className="text-xs leading-6 text-text-muted">
+              {note}
+            </p>
           ))}
-        </tbody>
-      </table>
-    </div>
+        </div>
+      ) : null}
+    </Card>
   )
 }

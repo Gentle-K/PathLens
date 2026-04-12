@@ -230,13 +230,42 @@ class AnalysisOrchestrator:
         self.repository.save(session)
 
         if pending_search_tasks:
-            session.evidence_items.extend(self.search_adapter.run(pending_search_tasks))
+            session.evidence_items.extend(
+                self._run_adapter_tasks_safely(
+                    session,
+                    pending_search_tasks,
+                    adapter_call=lambda: self.search_adapter.run(pending_search_tasks),
+                    failure_kind="search_adapter_failed",
+                    failure_action="SEARCH_ADAPTER_FAILED",
+                    failure_summary="The search adapter failed, but the session continued.",
+                    failure_note_prefix="Search adapter failure",
+                    empty_result=[],
+                )
+            )
         if pending_calculation_tasks:
-            self.calculation_adapter.run(pending_calculation_tasks)
+            self._run_adapter_tasks_safely(
+                session,
+                pending_calculation_tasks,
+                adapter_call=lambda: self.calculation_adapter.run(pending_calculation_tasks),
+                failure_kind="calculation_adapter_failed",
+                failure_action="CALCULATION_ADAPTER_FAILED",
+                failure_summary="The calculation adapter failed, but the session continued.",
+                failure_note_prefix="Calculation adapter failure",
+                empty_result=[],
+            )
 
         new_chart_artifacts: list[ChartArtifact] = []
         if pending_chart_tasks:
-            new_chart_artifacts = self.chart_adapter.build_preview(session)
+            new_chart_artifacts = self._run_adapter_tasks_safely(
+                session,
+                pending_chart_tasks,
+                adapter_call=lambda: self.chart_adapter.build_preview(session),
+                failure_kind="chart_adapter_failed",
+                failure_action="CHART_ADAPTER_FAILED",
+                failure_summary="The chart adapter failed, but the session continued.",
+                failure_note_prefix="Chart adapter failure",
+                empty_result=[],
+            )
         added_charts = self._merge_chart_artifacts(session, new_chart_artifacts)
 
         session.events.append(
@@ -271,7 +300,16 @@ class AnalysisOrchestrator:
         self.repository.save(session)
 
         session.report = self.analysis_adapter.build_report(session)
-        final_chart_artifacts = self.chart_adapter.build_preview(session)
+        final_chart_artifacts = self._run_adapter_tasks_safely(
+            session,
+            session.chart_tasks,
+            adapter_call=lambda: self.chart_adapter.build_preview(session),
+            failure_kind="final_chart_adapter_failed",
+            failure_action="FINAL_CHART_ADAPTER_FAILED",
+            failure_summary="Final chart generation failed, but the report remained available.",
+            failure_note_prefix="Final chart generation failure",
+            empty_result=[],
+        )
         if final_chart_artifacts:
             session.chart_artifacts = final_chart_artifacts
             session.report.chart_refs = [artifact.chart_id for artifact in session.chart_artifacts]
@@ -496,6 +534,60 @@ class AnalysisOrchestrator:
             metadata={key: str(value) for key, value in payload.items()},
         )
         return self._build_response(session.session_id, NextAction.COMPLETE, prompt_to_user)
+
+    def _run_adapter_tasks_safely(
+        self,
+        session: AnalysisSession,
+        tasks: list[SearchTask] | list[CalculationTask] | list[ChartTask],
+        *,
+        adapter_call,
+        failure_kind: str,
+        failure_action: str,
+        failure_summary: str,
+        failure_note_prefix: str,
+        empty_result,
+    ):
+        try:
+            return adapter_call()
+        except Exception as error:
+            self._mark_tasks_failed(
+                tasks,
+                note=f"{failure_note_prefix}: {type(error).__name__}: {error}",
+            )
+            session.events.append(
+                SessionEvent(
+                    kind=failure_kind,
+                    payload={
+                        "task_ids": [getattr(task, "task_id", "") for task in tasks],
+                        "error_type": type(error).__name__,
+                        "error": str(error),
+                    },
+                )
+            )
+            self.repository.save(session)
+            self._write_log(
+                session,
+                action=failure_action,
+                summary=failure_summary,
+                status="error",
+                metadata={
+                    "error_type": type(error).__name__,
+                    "task_count": str(len(tasks)),
+                },
+            )
+            return empty_result
+
+    @staticmethod
+    def _mark_tasks_failed(
+        tasks: list[SearchTask] | list[CalculationTask] | list[ChartTask],
+        *,
+        note: str,
+    ) -> None:
+        for task in tasks:
+            task.status = "failed"
+            existing_notes = getattr(task, "notes", "")
+            merged = f"{existing_notes}\n{note}".strip() if existing_notes else note
+            task.notes = merged
 
     def _write_log(
         self,

@@ -27,6 +27,7 @@ from app.domain.schemas import (
 )
 from app.i18n import normalize_locale
 from app.rwa.catalog import build_asset_library, build_chain_config
+from app.rwa.demo import build_demo_scenarios
 from app.rwa.engine import (
     build_rwa_report,
     estimate_net_return_after_fees,
@@ -67,10 +68,12 @@ def get_rwa_catalog(request: Request) -> RwaCatalogResponse:
     chain_config = build_chain_config(settings)
     locale = _resolve_locale(request)
     assets = build_asset_library(chain_config, locale=locale)
+    demo_scenarios = build_demo_scenarios(locale=locale)
     return RwaCatalogResponse(
         assets=assets,
         asset_types=sorted({a.asset_type.value for a in assets}),
         chain_config=chain_config,
+        demo_scenarios=demo_scenarios,
     )
 
 
@@ -99,6 +102,10 @@ def analyze_rwa(
         minimum_kyc_level=payload.minimum_kyc_level,
         wallet_address=payload.wallet_address,
         wallet_network=payload.wallet_network,
+        include_non_production_assets=payload.include_non_production_assets,
+        demo_mode=payload.demo_mode,
+        demo_scenario_id=payload.demo_scenario_id,
+        analysis_seed=payload.analysis_seed,
     )
 
     report, evidence = build_rwa_report(
@@ -113,13 +120,18 @@ def analyze_rwa(
     # Collect additional external evidence if requested
     evidence_items = [
         EvidenceItem(
+            asset_id=e.asset_id,
             title=e.title,
             source_url=e.source_url,
             source_name=e.source_name,
             source_tag=e.source_tag if hasattr(e, "source_tag") else "",
+            fetched_at=e.fetched_at,
             summary=e.summary,
             extracted_facts=e.extracted_facts,
             confidence=e.confidence,
+            fact_type=e.fact_type,
+            freshness=e.freshness,
+            conflict_keys=e.conflict_keys,
         )
         for e in evidence
     ]
@@ -135,6 +147,7 @@ def analyze_rwa(
                         source_url=item.source_url,
                         source_name=item.source_name,
                         source_tag=item.source_tag.value if item.source_tag else "",
+                        fetched_at=item.fetched_at,
                         summary=item.summary,
                         extracted_facts=item.extracted_facts,
                         confidence=item.confidence,
@@ -154,6 +167,7 @@ def analyze_rwa(
                     asset,
                     payload.investment_amount,
                     locale=locale,
+                    analysis_seed=payload.analysis_seed,
                 )
                 multi_horizon[card.asset_id] = [
                     sim.model_dump(mode="json") for sim in sims

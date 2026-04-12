@@ -58,7 +58,7 @@ export interface OracleSnapshotBackend {
   updatedAt?: string
   roundId?: number
   note?: string
-  status: 'live' | 'unavailable'
+  status: 'live' | 'unavailable' | 'demo' | string
 }
 
 export interface KycOnchainResult {
@@ -200,7 +200,7 @@ export interface MarketDataSnapshot {
   updatedAt?: string
   roundId?: number
   note?: string
-  status: 'live' | 'unavailable'
+  status: 'live' | 'unavailable' | 'demo' | string
 }
 
 export interface WalletKycSnapshot {
@@ -216,6 +216,41 @@ export interface WalletKycSnapshot {
   note?: string
 }
 
+export type AssetStatus =
+  | 'production'
+  | 'verified'
+  | 'issuer_disclosed'
+  | 'benchmark'
+  | 'demo'
+  | 'experimental'
+
+export type TruthLevel =
+  | 'onchain_verified'
+  | 'issuer_disclosed'
+  | 'benchmark_reference'
+  | 'demo_only'
+
+export type LiveReadiness = 'ready' | 'partial' | 'unavailable' | 'demo_only'
+
+export type ActionType =
+  | 'subscribe'
+  | 'mint'
+  | 'redeem'
+  | 'hold'
+  | 'learn_more'
+  | 'external_only'
+
+export type ActionReadiness = 'ready' | 'partial' | 'unavailable'
+
+export type EvidenceFactType =
+  | 'onchain_verified_fact'
+  | 'offchain_disclosed_fact'
+  | 'oracle_fact'
+  | 'third_party_fact'
+  | 'inferred_fact'
+
+export type EvidenceFreshnessBucket = 'fresh' | 'aging' | 'stale' | 'undated'
+
 export interface RwaIntakeContext {
   investmentAmount: number
   baseCurrency: string
@@ -230,6 +265,16 @@ export interface RwaIntakeContext {
   walletKycVerified?: boolean
   wantsOnchainAttestation: boolean
   additionalConstraints?: string
+  includeNonProductionAssets?: boolean
+  demoMode?: boolean
+  demoScenarioId?: string
+  analysisSeed?: number
+}
+
+export interface ActionLink {
+  kind: string
+  label: string
+  url: string
 }
 
 export interface RwaAssetTemplate {
@@ -276,6 +321,17 @@ export interface RwaAssetTemplate {
   onchainVerified?: boolean
   issuerDisclosed?: boolean
   featured: boolean
+  statuses?: AssetStatus[]
+  truthLevel?: TruthLevel
+  liveReadiness?: LiveReadiness
+  defaultRankEligible?: boolean
+  statusExplanation?: string
+  truthLevelExplanation?: string
+  actionType?: ActionType
+  actionReadiness?: ActionReadiness
+  actionLinks?: ActionLink[]
+  actionBlockerReasons?: string[]
+  executionNotes?: string[]
 }
 
 export interface ClarificationOption {
@@ -338,6 +394,7 @@ export interface SearchTask {
 export interface EvidenceItem {
   id: string
   sessionId: string
+  assetId?: string
   sourceType: EvidenceSourceType
   sourceUrl: string
   sourceName: string
@@ -347,6 +404,14 @@ export interface EvidenceItem {
   fetchedAt: string
   confidence: number
   sourceTag?: DataSourceTag
+  factType?: EvidenceFactType
+  freshness?: {
+    bucket: EvidenceFreshnessBucket
+    label: string
+    ageHours?: number
+    staleWarning?: string
+  }
+  conflictKeys?: string[]
 }
 
 export interface CalculationTask {
@@ -597,11 +662,194 @@ export interface AssetAnalysisCard {
   primarySourceUrl?: string
   onchainVerified?: boolean
   issuerDisclosed?: boolean
+  statuses?: AssetStatus[]
+  truthLevel?: TruthLevel
+  liveReadiness?: LiveReadiness
+  defaultRankEligible?: boolean
+  statusExplanation?: string
+  truthLevelExplanation?: string
   riskVector: RiskVector
   riskBreakdown: RiskBreakdownItem[]
   riskDataQuality: number
   metadata: Record<string, unknown>
   evidenceRefs: string[]
+}
+
+export interface ComparisonMatrixMetric {
+  key: string
+  label: string
+  description?: string
+  unit?: string
+}
+
+export interface ComparisonMatrixCell {
+  metricKey: string
+  label: string
+  displayValue: string
+  rawValue?: string | number | boolean | null
+  tone: 'neutral' | 'success' | 'gold' | 'warning' | 'danger' | string
+  badges: string[]
+  rationale: string
+  tooltip: string
+  isBlocked: boolean
+}
+
+export interface ComparisonMatrixRow {
+  assetId: string
+  assetName: string
+  assetSymbol: string
+  statuses: AssetStatus[]
+  truthLevel: TruthLevel
+  liveReadiness: LiveReadiness
+  defaultRankEligible: boolean
+  cells: ComparisonMatrixCell[]
+}
+
+export interface ComparisonMatrix {
+  title: string
+  metrics: ComparisonMatrixMetric[]
+  rows: ComparisonMatrixRow[]
+  notes: string[]
+}
+
+export interface RecommendationDriver {
+  title: string
+  detail: string
+  impact: string
+  assetId?: string
+}
+
+export interface ExcludedAssetReason {
+  assetId: string
+  assetName: string
+  category?: string
+  reason: string
+}
+
+export interface ConstraintImpact {
+  constraintKey: string
+  label: string
+  impactLevel: string
+  detail: string
+}
+
+export interface SensitivitySummary {
+  scenarioKey: string
+  label: string
+  impactSummary: string
+  changedAssets: string[]
+  recommendedShift: string
+}
+
+export interface RecommendationReason {
+  summary: string
+  topDrivers: RecommendationDriver[]
+  excludedReasons: ExcludedAssetReason[]
+  constraintImpacts: ConstraintImpact[]
+  sensitivitySummary: SensitivitySummary[]
+}
+
+export interface ActionBlocker {
+  code: string
+  label: string
+  detail: string
+  severity: string
+}
+
+export interface ActionIntent {
+  assetId: string
+  assetName: string
+  actionType: ActionType
+  actionReadiness: ActionReadiness
+  summary: string
+  actionBlockers: ActionBlocker[]
+  actionLinks: ActionLink[]
+  executionNotes: string[]
+  checklist: string[]
+}
+
+export interface EvidenceConflict {
+  assetId?: string
+  fieldKey: string
+  severity: string
+  summary: string
+  evidenceIds: string[]
+}
+
+export interface EvidenceCoverage {
+  assetId: string
+  assetName?: string
+  coverageScore: number
+  completenessScore: number
+  strengths: string[]
+  gaps: string[]
+  missingFields: string[]
+}
+
+export interface EvidenceGovernance {
+  overallScore: number
+  weakEvidenceWarning: string
+  conflicts: EvidenceConflict[]
+  coverage: EvidenceCoverage[]
+}
+
+export interface DemoScenarioDefinition {
+  scenarioId: string
+  title: string
+  description: string
+  problemStatement: string
+  intakeContext: RwaIntakeContext
+  featuredAssetIds: string[]
+  analysisSeed: number
+  demoLabel: string
+  notes: string[]
+}
+
+export interface DiffFieldChange {
+  label: string
+  before: string
+  after: string
+  detail?: string
+}
+
+export interface AllocationDiffItem {
+  assetId: string
+  assetName: string
+  beforeWeightPct: number
+  afterWeightPct: number
+  deltaWeightPct: number
+  reason?: string
+}
+
+export interface RiskDiffItem {
+  assetId: string
+  assetName: string
+  beforeOverall: number
+  afterOverall: number
+  deltaOverall: number
+}
+
+export interface EvidenceDiffItem {
+  assetId?: string
+  assetName?: string
+  beforeCoverageScore: number
+  afterCoverageScore: number
+  beforeConflictCount: number
+  afterConflictCount: number
+  summary: string
+}
+
+export interface ReanalysisDiff {
+  previousSnapshotAt?: string
+  currentGeneratedAt?: string
+  summary: string
+  changedConstraints: DiffFieldChange[]
+  changedWeights: AllocationDiffItem[]
+  changedRisk: RiskDiffItem[]
+  changedEvidence: EvidenceDiffItem[]
+  previousRecommendation: string[]
+  currentRecommendation: string[]
+  whyChanged: string[]
 }
 
 export interface MethodologyReference {
@@ -661,6 +909,7 @@ export interface RwaBootstrap {
   holdingPeriodPresets: number[]
   notes: string[]
   oracleSnapshots?: OracleSnapshotBackend[]
+  demoScenarios?: DemoScenarioDefinition[]
 }
 
 export interface ReportTable {
@@ -682,6 +931,8 @@ export interface AnalysisReport {
   charts: ChartArtifact[]
   evidence: EvidenceItem[]
   assumptions: string[]
+  unknowns?: string[]
+  warnings?: string[]
   disclaimers: string[]
   budgetSummary?: BudgetSummary
   budgetItems?: BudgetLineItem[]
@@ -698,6 +949,11 @@ export interface AnalysisReport {
   assetCards: AssetAnalysisCard[]
   simulations: HoldingPeriodSimulation[]
   recommendedAllocations: PortfolioAllocation[]
+  comparisonMatrix?: ComparisonMatrix
+  recommendationReason?: RecommendationReason
+  actionIntents?: ActionIntent[]
+  evidenceGovernance?: EvidenceGovernance
+  reanalysisDiff?: ReanalysisDiff
   methodologyReferences?: MethodologyReference[]
   txDraft?: TxDraft
   attestationDraft?: AttestationDraft
