@@ -12,15 +12,14 @@ import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
 
-import { PageHeader } from '@/components/layout/page-header'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Card } from '@/components/ui/card'
 import { Input, Textarea } from '@/components/ui/field'
 import { AnalysisPendingView } from '@/features/analysis/components/analysis-pending-view'
 import { DemoScenarioSelector } from '@/features/analysis/components/DemoScenarioSelector'
 import { useApiAdapter } from '@/lib/api/use-api-adapter'
 import { useAppStore } from '@/lib/store/app-store'
+import { cn } from '@/lib/utils/cn'
 import { useHashKeyWallet } from '@/lib/web3/use-hashkey-wallet'
 import type {
   AnalysisMode,
@@ -51,6 +50,44 @@ const defaultIntakeContext: RwaIntakeContext = {
 
 function formatPercent(value: number) {
   return `${(value * 100).toFixed(1)}%`
+}
+
+function modeCardClass(active: boolean) {
+  return cn(
+    'interactive-lift rounded-[28px] border p-5 text-left transition',
+    active
+      ? 'border-[rgba(41,151,255,0.32)] bg-white/[0.08] shadow-[0_18px_44px_rgba(0,0,0,0.22)]'
+      : 'border-white/10 bg-white/[0.04] hover:border-white/18 hover:bg-white/[0.06]',
+  )
+}
+
+function pillToggleClass(active: boolean, disabled = false) {
+  return cn(
+    'interactive-lift rounded-full border px-4 py-2.5 text-sm transition',
+    active
+      ? 'border-border-strong bg-[rgba(0,113,227,0.08)] text-text-primary'
+      : 'border-border-subtle bg-panel text-text-secondary hover:border-border-strong hover:text-text-primary',
+    disabled && 'cursor-not-allowed opacity-70',
+  )
+}
+
+function tileToggleClass(active: boolean, disabled = false) {
+  return cn(
+    'interactive-lift rounded-[24px] border px-4 py-4 text-left transition',
+    active
+      ? 'border-border-strong bg-panel shadow-[0_10px_24px_rgba(0,113,227,0.12)] text-text-primary'
+      : 'border-border-subtle bg-panel text-text-secondary hover:border-border-strong hover:text-text-primary',
+    disabled && 'cursor-not-allowed opacity-70',
+  )
+}
+
+function assetCardClass(active: boolean) {
+  return cn(
+    'interactive-lift w-full rounded-[26px] border p-5 text-left transition',
+    active
+      ? 'border-border-strong bg-panel shadow-[0_14px_32px_rgba(0,113,227,0.12)]'
+      : 'border-border-subtle bg-panel hover:border-border-strong',
+  )
 }
 
 function buildModeCopy(
@@ -363,6 +400,13 @@ export function ModeSelectionPage() {
       `${asset.name} ${asset.symbol} ${asset.description} ${asset.tags.join(' ')}`.toLowerCase().includes(normalized),
     )
   }, [assetLibrary, assetQuery])
+  const selectedAssetsPreview = useMemo(
+    () =>
+      assetLibrary.filter((asset) =>
+        intakeContext.preferredAssetIds.includes(asset.id),
+      ),
+    [assetLibrary, intakeContext.preferredAssetIds],
+  )
   const sessionIntakeContext = useMemo<RwaIntakeContext>(
     () => ({
       ...intakeContext,
@@ -440,653 +484,765 @@ export function ModeSelectionPage() {
   }
 
   return (
-    <div className="space-y-6" data-testid="mode-selection-page">
-      <PageHeader
-        eyebrow={text.eyebrow}
-        title={text.title}
-        description={text.description}
-      />
-
-      <Card className="p-5">
-        <div className="flex flex-wrap items-center gap-3 text-sm text-text-secondary">
-          <Badge tone="gold">{text.intakeBadge}</Badge>
-          <span>{text.intakeLead}</span>
-          <span>{text.intakeAnalysis}</span>
-          <span>{text.intakeReport}</span>
-        </div>
-
-        {bootstrapQuery.data ? (
-          <div className="mt-4 grid gap-3 xl:grid-cols-4">
-            <div className="rounded-[18px] border border-border-subtle bg-app-bg-elevated px-4 py-3">
-              <p className="text-xs text-text-muted">{text.mainnet}</p>
-              <p className="mt-2 font-medium text-text-primary">
-                {bootstrapQuery.data.chainConfig.mainnetChainId}
-              </p>
-            </div>
-            <div className="rounded-[18px] border border-border-subtle bg-app-bg-elevated px-4 py-3">
-              <p className="text-xs text-text-muted">{text.testnet}</p>
-              <p className="mt-2 font-medium text-text-primary">
-                {bootstrapQuery.data.chainConfig.testnetChainId}
-              </p>
-            </div>
-            <div className="rounded-[18px] border border-border-subtle bg-app-bg-elevated px-4 py-3">
-              <p className="text-xs text-text-muted">{text.defaultExecutionNetwork}</p>
-              <p className="mt-2 font-medium text-text-primary">
-                {bootstrapQuery.data.chainConfig.defaultExecutionNetwork}
-              </p>
-            </div>
-            <div className="rounded-[18px] border border-border-subtle bg-app-bg-elevated px-4 py-3">
-              <p className="text-xs text-text-muted">{text.planRegistry}</p>
-              <p className="mt-2 break-all text-sm text-text-primary">
-                {bootstrapQuery.data.chainConfig.planRegistryAddress || text.notConfigured}
-              </p>
-            </div>
-          </div>
-        ) : null}
-      </Card>
-
-      <Card className="space-y-4 p-5">
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div className="space-y-2">
-            <div className="flex items-center gap-3">
-              <div className="rounded-full border border-border-subtle bg-app-bg-elevated p-3 text-gold-primary">
-                <WalletCards className="size-5" />
-              </div>
-              <div>
-                <h2 className="text-lg font-semibold text-text-primary">
-                  {text.walletPanelTitle}
-                </h2>
-                <p className="text-sm leading-7 text-text-secondary">
-                  {text.walletPanelDescription}
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <div className="flex flex-wrap gap-2">
-            {wallet.isConnected ? (
-              <Button
-                variant="secondary"
-                onClick={() => wallet.disconnectWallet()}
-              >
-                {text.disconnectWallet}
-              </Button>
-            ) : (
-              <Button
-                onClick={() => void wallet.connectWallet()}
-                disabled={!wallet.hasProvider || wallet.isWalletBusy}
-              >
-                <Cable className="size-4" />
-                {text.connectWallet}
-              </Button>
-            )}
-            <Button
-              variant="secondary"
-              onClick={() => void wallet.switchNetwork('testnet')}
-              disabled={!wallet.hasProvider || wallet.isWalletBusy}
-            >
-              {text.switchTestnet}
-            </Button>
-            <Button
-              variant="secondary"
-              onClick={() => void wallet.switchNetwork('mainnet')}
-              disabled={!wallet.hasProvider || wallet.isWalletBusy}
-            >
-              {text.switchMainnet}
-            </Button>
-          </div>
-        </div>
-
-        {!wallet.hasProvider ? (
-          <div className="rounded-[18px] border border-[rgba(197,109,99,0.35)] bg-[rgba(197,109,99,0.1)] px-4 py-3 text-sm text-[#f7d4cf]">
-            {text.walletUnavailable}
-          </div>
-        ) : null}
-
-        <div className="grid gap-3 md:grid-cols-3">
-          <div className="rounded-[18px] border border-border-subtle bg-app-bg-elevated px-4 py-3">
-            <p className="text-xs text-text-muted">{text.connectedAddress}</p>
-            <p className="mt-2 break-all text-sm text-text-primary">
-              {wallet.walletAddress || text.notConfigured}
-            </p>
-          </div>
-          <div className="rounded-[18px] border border-border-subtle bg-app-bg-elevated px-4 py-3">
-            <p className="text-xs text-text-muted">{text.connectedNetwork}</p>
-            <p className="mt-2 font-medium text-text-primary">
-              {wallet.networkLabel}
-            </p>
-          </div>
-          <div className="rounded-[18px] border border-border-subtle bg-app-bg-elevated px-4 py-3">
-            <div className="flex items-center gap-2">
-              <p className="text-xs text-text-muted">{text.onchainKyc}</p>
-              <Badge tone={wallet.walletAddress ? 'gold' : 'neutral'}>
-                {wallet.walletAddress ? text.onchainDerived : text.manualFallback}
+    <div className="space-y-6 pb-10" data-testid="mode-selection-page">
+      <section className="apple-section-dark px-6 py-7 md:px-8 md:py-9">
+        <div className="grid gap-6 xl:grid-cols-[1.08fr_0.92fr]">
+          <div className="space-y-6">
+            <div className="flex flex-wrap items-center gap-2.5">
+              <Badge tone="neutral" className="border-white/10 bg-white/6 text-white/72">
+                {text.intakeBadge}
+              </Badge>
+              <p className="apple-kicker">{text.eyebrow}</p>
+              <Badge tone="gold">
+                {isZh
+                  ? `范围内 ${intakeContext.preferredAssetIds.length} 个资产`
+                  : `${intakeContext.preferredAssetIds.length} assets in scope`}
               </Badge>
             </div>
-            <p className="mt-2 font-medium text-text-primary">
-              {wallet.kycLoading
-                ? '...'
-                : `L${wallet.kycSnapshot?.isHuman ? wallet.kycSnapshot.level : effectiveKycLevel}`}
-            </p>
-            <p className="mt-2 text-xs leading-6 text-text-muted">
-              {wallet.kycSnapshot?.note || text.onchainKycHint}
-            </p>
+
+            <div className="space-y-3">
+              <h1 className="apple-display max-w-[11.5ch] text-text-primary">{text.title}</h1>
+              <p className="apple-subhead max-w-[40rem]">{text.description}</p>
+            </div>
+
+            <div className="grid gap-3 md:grid-cols-3">
+              {[text.intakeLead, text.intakeAnalysis, text.intakeReport].map((item, index) => (
+                <div
+                  key={item}
+                  className="rounded-[24px] border border-white/10 bg-white/[0.04] px-4 py-4"
+                >
+                  <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-white/48">
+                    {isZh ? `步骤 ${index + 1}` : `Step ${index + 1}`}
+                  </p>
+                  <p className="mt-2 text-sm leading-6 text-white/78">{item}</p>
+                </div>
+              ))}
+            </div>
+
+            <div className="grid gap-3 md:grid-cols-2">
+              {(availableModes ?? []).map((mode) => {
+                const isSelected = selectedMode === mode.id
+
+                return (
+                  <button
+                    key={mode.id}
+                    data-testid={`mode-card-${mode.id}`}
+                    type="button"
+                    role="button"
+                    tabIndex={0}
+                    aria-pressed={isSelected}
+                    onClick={() => {
+                      setSelectedMode(mode.id)
+                      setProblemStatement(modeCopy[mode.id].examples[0])
+                    }}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter' || event.key === ' ') {
+                        event.preventDefault()
+                        setSelectedMode(mode.id)
+                        setProblemStatement(modeCopy[mode.id].examples[0])
+                      }
+                    }}
+                    className={modeCardClass(isSelected)}
+                  >
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="space-y-3">
+                        <div className="flex size-11 items-center justify-center rounded-[18px] border border-white/10 bg-white/8 text-white">
+                          {mode.id === 'single-option' ? (
+                            <ShieldCheck className="size-5" />
+                          ) : (
+                            <Coins className="size-5" />
+                          )}
+                        </div>
+                        <div>
+                          <h2 className="text-2xl font-semibold tracking-[-0.04em] text-white">
+                            {modeCopy[mode.id].title}
+                          </h2>
+                          <p className="mt-2 text-sm leading-7 text-white/72">
+                            {modeCopy[mode.id].subtitle}
+                          </p>
+                        </div>
+                      </div>
+                      {isSelected ? (
+                        <Badge
+                          tone="gold"
+                          className="border-[rgba(41,151,255,0.22)] bg-[rgba(0,113,227,0.16)] text-[#8ecaff]"
+                        >
+                          {text.selectedLabel}
+                        </Badge>
+                      ) : null}
+                    </div>
+
+                    <div className="mt-5 grid gap-2">
+                      {modeCopy[mode.id].outputs.map((item) => (
+                        <div
+                          key={item}
+                          className={cn(
+                            'rounded-[20px] border px-4 py-3 text-sm',
+                            isSelected
+                              ? 'border-[rgba(41,151,255,0.22)] bg-[rgba(0,113,227,0.12)] text-white'
+                              : 'border-white/10 bg-black/10 text-white/72',
+                          )}
+                        >
+                          {item}
+                        </div>
+                      ))}
+                    </div>
+                  </button>
+                )
+              })}
+            </div>
           </div>
-        </div>
-      </Card>
 
-      <div className="grid gap-4 xl:grid-cols-2">
-        {(availableModes ?? []).map((mode) => {
-          const isSelected = selectedMode === mode.id
+          <div className="space-y-4">
+            <div className="rounded-[32px] border border-white/10 bg-white/[0.04] p-6">
+              <div className="flex items-start gap-4">
+                <div className="flex size-12 shrink-0 items-center justify-center rounded-[20px] border border-white/10 bg-white/8 text-white">
+                  <WalletCards className="size-5" />
+                </div>
+                <div className="space-y-2">
+                  <h2 className="text-xl font-semibold tracking-[-0.04em] text-white">
+                    {text.walletPanelTitle}
+                  </h2>
+                  <p className="text-sm leading-7 text-white/72">
+                    {text.walletPanelDescription}
+                  </p>
+                </div>
+              </div>
 
-          return (
-            <Card
-              key={mode.id}
-              data-testid={`mode-card-${mode.id}`}
-              role="button"
-              tabIndex={0}
-              aria-pressed={isSelected}
-              onClick={() => {
-                setSelectedMode(mode.id)
-                setProblemStatement(modeCopy[mode.id].examples[0])
-              }}
-              onKeyDown={(event) => {
-                if (event.key === 'Enter' || event.key === ' ') {
-                  event.preventDefault()
-                  setSelectedMode(mode.id)
-                  setProblemStatement(modeCopy[mode.id].examples[0])
-                }
-              }}
-              className={`interactive-lift relative overflow-hidden p-6 ${
-                isSelected
-                  ? 'border-border-strong bg-[linear-gradient(180deg,rgba(249,228,159,0.08),transparent_100%),var(--panel)] shadow-[0_0_0_1px_rgba(249,228,159,0.18),0_24px_72px_rgba(212,175,55,0.16)]'
-                  : ''
-              }`}
-            >
-              {isSelected ? (
-                <div className="absolute inset-y-6 left-0 w-1 rounded-full bg-[var(--gold-primary)]" />
+              <div className="mt-5 flex flex-wrap gap-2">
+                {wallet.isConnected ? (
+                  <Button
+                    variant="secondary"
+                    className="border-white/10 bg-white/6 text-white hover:border-white/15 hover:bg-white/10"
+                    onClick={() => wallet.disconnectWallet()}
+                  >
+                    {text.disconnectWallet}
+                  </Button>
+                ) : (
+                  <Button
+                    onClick={() => void wallet.connectWallet()}
+                    disabled={!wallet.hasProvider || wallet.isWalletBusy}
+                  >
+                    <Cable className="size-4" />
+                    {text.connectWallet}
+                  </Button>
+                )}
+                <Button
+                  variant="secondary"
+                  className="border-white/10 bg-white/6 text-white hover:border-white/15 hover:bg-white/10"
+                  onClick={() => void wallet.switchNetwork('testnet')}
+                  disabled={!wallet.hasProvider || wallet.isWalletBusy}
+                >
+                  {text.switchTestnet}
+                </Button>
+                <Button
+                  variant="secondary"
+                  className="border-white/10 bg-white/6 text-white hover:border-white/15 hover:bg-white/10"
+                  onClick={() => void wallet.switchNetwork('mainnet')}
+                  disabled={!wallet.hasProvider || wallet.isWalletBusy}
+                >
+                  {text.switchMainnet}
+                </Button>
+              </div>
+
+              {!wallet.hasProvider ? (
+                <div className="mt-4 rounded-[22px] border border-[rgba(255,69,58,0.18)] bg-[rgba(255,69,58,0.12)] px-4 py-3 text-sm text-[#ffc7c2]">
+                  {text.walletUnavailable}
+                </div>
               ) : null}
 
-              <div className="flex items-start justify-between gap-4">
-                <div className="space-y-3">
-                  <div className="inline-flex rounded-full border border-border-subtle bg-app-bg-elevated p-3 text-gold-primary">
-                    {mode.id === 'single-option' ? (
-                      <ShieldCheck className="size-5" />
-                    ) : (
-                      <Coins className="size-5" />
-                    )}
-                  </div>
-                  <div>
-                    <h2 className="text-2xl font-semibold tracking-[-0.03em] text-text-primary">
-                      {modeCopy[mode.id].title}
-                    </h2>
-                    <p className="mt-2 text-sm leading-7 text-text-secondary">
-                      {modeCopy[mode.id].subtitle}
-                    </p>
-                  </div>
+              <div className="mt-5 grid gap-3 sm:grid-cols-2">
+                <div className="rounded-[22px] border border-white/10 bg-black/20 px-4 py-4">
+                  <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-white/48">
+                    {text.connectedAddress}
+                  </p>
+                  <p className="mt-2 break-all text-sm text-white">
+                    {wallet.walletAddress || text.notConfigured}
+                  </p>
                 </div>
-                {isSelected ? (
-                  <Badge tone="gold" className="gap-1 px-3 py-1.5">
-                    <CheckCircle2 className="size-3.5" />
-                    {text.selectedLabel}
+                <div className="rounded-[22px] border border-white/10 bg-black/20 px-4 py-4">
+                  <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-white/48">
+                    {text.connectedNetwork}
+                  </p>
+                  <p className="mt-2 text-sm text-white">{wallet.networkLabel}</p>
+                </div>
+                <div className="rounded-[22px] border border-white/10 bg-black/20 px-4 py-4">
+                  <div className="flex items-center gap-2">
+                    <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-white/48">
+                      {text.onchainKyc}
+                    </p>
+                    <Badge
+                      tone={wallet.walletAddress ? 'gold' : 'neutral'}
+                      className={
+                        wallet.walletAddress
+                          ? ''
+                          : 'border-white/10 bg-white/6 text-white/72'
+                      }
+                    >
+                      {wallet.walletAddress ? text.onchainDerived : text.manualFallback}
+                    </Badge>
+                  </div>
+                  <p className="mt-2 text-sm text-white">
+                    {wallet.kycLoading
+                      ? '...'
+                      : `L${wallet.kycSnapshot?.isHuman ? wallet.kycSnapshot.level : effectiveKycLevel}`}
+                  </p>
+                  <p className="mt-2 text-xs leading-6 text-white/54">
+                    {wallet.kycSnapshot?.note || text.onchainKycHint}
+                  </p>
+                </div>
+                <div className="rounded-[22px] border border-white/10 bg-black/20 px-4 py-4">
+                  <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-white/48">
+                    {text.defaultExecutionNetwork}
+                  </p>
+                  <p className="mt-2 text-sm text-white">
+                    {bootstrapQuery.data?.chainConfig.defaultExecutionNetwork || text.notConfigured}
+                  </p>
+                  <p className="mt-2 text-xs leading-6 text-white/54">
+                    {bootstrapQuery.data?.chainConfig.planRegistryAddress || text.notConfigured}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="rounded-[32px] border border-white/10 bg-white/[0.04] p-6">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-white/48">
+                    {isZh ? '输出轮廓' : 'Output shape'}
+                  </p>
+                  <p className="mt-2 text-2xl font-semibold tracking-[-0.04em] text-white">
+                    {selectedPreset.title}
+                  </p>
+                </div>
+                {intakeContext.demoMode ? (
+                  <Badge
+                    tone="warning"
+                    className="border-[rgba(255,159,10,0.18)] bg-[rgba(255,159,10,0.14)] text-[#ffd39a]"
+                  >
+                    {isZh ? 'Demo 已启用' : 'Demo enabled'}
                   </Badge>
                 ) : null}
               </div>
 
-              <div className="mt-6 grid gap-2">
-                {modeCopy[mode.id].outputs.map((item) => (
+              <div className="mt-4 grid gap-2 sm:grid-cols-2">
+                {selectedPreset.outputs.map((item) => (
                   <div
                     key={item}
-                    className={`rounded-[18px] border px-4 py-3 text-sm ${
-                      isSelected
-                        ? 'border-border-strong bg-[rgba(212,175,55,0.12)] text-text-primary'
-                        : 'border-border-subtle bg-app-bg-elevated text-text-secondary'
-                    }`}
+                    className="rounded-[20px] border border-white/10 bg-black/20 px-4 py-3 text-sm text-white/78"
                   >
                     {item}
                   </div>
                 ))}
               </div>
-            </Card>
-          )
-        })}
-      </div>
 
-      <div className="grid gap-4 xl:grid-cols-[1.08fr_0.92fr]">
-        <Card className="space-y-5 p-6">
-          <div className="flex flex-wrap items-center gap-3">
-            <Badge tone="gold">{selectedPreset.title}</Badge>
-            <Badge tone="neutral">
-              {text.selectedAssetCount(intakeContext.preferredAssetIds.length)}
-            </Badge>
-            {intakeContext.demoMode ? (
-              <Badge tone="warning">
-                {isZh ? `Demo: ${intakeContext.demoScenarioId || 'enabled'}` : `Demo: ${intakeContext.demoScenarioId || 'enabled'}`}
-              </Badge>
-            ) : null}
-          </div>
-
-          <DemoScenarioSelector
-            scenarios={demoScenarios}
-            selectedScenarioId={intakeContext.demoScenarioId}
-            locale={locale}
-            onSelect={applyDemoScenario}
-          />
-
-          <div className="space-y-2">
-            <label htmlFor="problemStatement" className="text-sm text-text-secondary">
-              {text.yourQuestion}
-            </label>
-            <Textarea
-              id="problemStatement"
-              data-testid="analysis-problem-input"
-              value={problemStatement}
-              onChange={(event) => setProblemStatement(event.target.value)}
-              placeholder={text.questionPlaceholder}
-              className="min-h-32 text-base"
-            />
-          </div>
-
-          <div className="space-y-2">
-            <p className="text-xs text-text-muted">{text.exampleLabel}</p>
-            <div className="flex flex-wrap gap-2">
-              {selectedPreset.examples.map((example) => {
-                const isActive = problemStatement === example
-                return (
-                  <button
-                    key={example}
-                    type="button"
-                    onClick={() => setProblemStatement(example)}
-                    className={`interactive-lift rounded-full border px-4 py-2 text-sm transition ${
-                      isActive
-                        ? 'border-border-strong bg-[rgba(212,175,55,0.14)] text-text-primary'
-                        : 'border-border-subtle bg-app-bg-elevated text-text-secondary hover:border-border-strong hover:text-text-primary'
-                    }`}
-                  >
-                    {example}
-                  </button>
-                )
-              })}
-            </div>
-          </div>
-
-          <div className="grid gap-4 md:grid-cols-2">
-            <div className="space-y-2">
-              <label className="text-sm text-text-secondary">{text.principal}</label>
-              <Input
-                type="number"
-                min={100}
-                value={String(intakeContext.investmentAmount)}
-                onChange={(event) =>
-                  setIntakeContext((current) => ({
-                    ...current,
-                    investmentAmount: Number(event.target.value || 0),
-                  }))
-                }
-              />
-            </div>
-            <div className="space-y-2">
-              <label className="text-sm text-text-secondary">
-                {text.settlementCurrency}
-              </label>
-              <Input
-                value={intakeContext.baseCurrency}
-                onChange={(event) =>
-                  setIntakeContext((current) => ({
-                    ...current,
-                    baseCurrency: event.target.value.toUpperCase(),
-                  }))
-                }
-              />
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <p className="text-sm text-text-secondary">{text.holdingPeriod}</p>
-            <div className="flex flex-wrap gap-2">
-              {(bootstrapQuery.data?.holdingPeriodPresets ?? [7, 30, 90, 180]).map((days) => {
-                const isActive = intakeContext.holdingPeriodDays === days
-                return (
-                  <button
-                    key={days}
-                    type="button"
-                    onClick={() =>
-                      setIntakeContext((current) => ({
-                        ...current,
-                        holdingPeriodDays: days,
-                      }))
-                    }
-                    className={`rounded-full border px-4 py-2 text-sm ${
-                      isActive
-                        ? 'border-border-strong bg-[rgba(212,175,55,0.14)] text-text-primary'
-                        : 'border-border-subtle bg-app-bg-elevated text-text-secondary'
-                    }`}
-                  >
-                    {days} {text.daySuffix}
-                  </button>
-                )
-              })}
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <p className="text-sm text-text-secondary">{text.riskTolerance}</p>
-            <div className="grid gap-2 md:grid-cols-3">
-              {riskOptions.map((option) => {
-                const isActive = intakeContext.riskTolerance === option.value
-                return (
-                  <button
-                    key={option.value}
-                    type="button"
-                    onClick={() =>
-                      setIntakeContext((current) => ({
-                        ...current,
-                        riskTolerance: option.value,
-                      }))
-                    }
-                    className={`rounded-[18px] border px-4 py-4 text-left ${
-                      isActive
-                        ? 'border-border-strong bg-[rgba(212,175,55,0.14)] text-text-primary'
-                        : 'border-border-subtle bg-app-bg-elevated text-text-secondary'
-                    }`}
-                  >
-                    <p className="font-medium">{option.label}</p>
-                    <p className="mt-2 text-xs leading-6 text-text-muted">
-                      {option.detail}
+              {bootstrapQuery.data ? (
+                <div className="mt-5 grid gap-3 sm:grid-cols-2">
+                  <div className="rounded-[22px] border border-white/10 bg-black/20 px-4 py-4">
+                    <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-white/48">
+                      {text.mainnet}
                     </p>
-                  </button>
-                )
-              })}
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <p className="text-sm text-text-secondary">{text.liquidityNeed}</p>
-            <div className="grid gap-2 md:grid-cols-3">
-              {liquidityOptions.map((option) => {
-                const isActive = intakeContext.liquidityNeed === option.value
-                return (
-                  <button
-                    key={option.value}
-                    type="button"
-                    onClick={() =>
-                      setIntakeContext((current) => ({
-                        ...current,
-                        liquidityNeed: option.value,
-                      }))
-                    }
-                    className={`rounded-[18px] border px-4 py-4 text-left ${
-                      isActive
-                        ? 'border-border-strong bg-[rgba(212,175,55,0.14)] text-text-primary'
-                        : 'border-border-subtle bg-app-bg-elevated text-text-secondary'
-                    }`}
-                  >
-                    <p className="font-medium">{option.label}</p>
-                    <p className="mt-2 text-xs leading-6 text-text-muted">
-                      {option.detail}
+                    <p className="mt-2 text-sm text-white">
+                      {bootstrapQuery.data.chainConfig.mainnetChainId}
                     </p>
-                  </button>
-                )
-              })}
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <div className="flex flex-wrap items-center gap-2">
-              <p className="text-sm text-text-secondary">{text.kycCapability}</p>
-              <Badge tone={wallet.walletAddress ? 'gold' : 'neutral'}>
-                {wallet.walletAddress ? text.onchainDerived : text.manualFallback}
-              </Badge>
-            </div>
-            <div className="grid gap-2 md:grid-cols-3">
-              {kycOptions.map((option) => {
-                const isActive = effectiveKycLevel === option.value
-                return (
-                  <button
-                    key={option.value}
-                    type="button"
-                    disabled={Boolean(wallet.walletAddress)}
-                    onClick={() =>
-                      setIntakeContext((current) => ({
-                        ...current,
-                        minimumKycLevel: option.value,
-                      }))
-                    }
-                    className={`rounded-[18px] border px-4 py-4 text-left ${
-                      isActive
-                        ? 'border-border-strong bg-[rgba(212,175,55,0.14)] text-text-primary'
-                        : 'border-border-subtle bg-app-bg-elevated text-text-secondary'
-                    } ${wallet.walletAddress ? 'cursor-not-allowed opacity-70' : ''}`}
-                  >
-                    <p className="font-medium">{option.label}</p>
-                    <p className="mt-2 text-xs leading-6 text-text-muted">
-                      {option.detail}
+                  </div>
+                  <div className="rounded-[22px] border border-white/10 bg-black/20 px-4 py-4">
+                    <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-white/48">
+                      {text.testnet}
                     </p>
-                  </button>
-                )
-              })}
+                    <p className="mt-2 text-sm text-white">
+                      {bootstrapQuery.data.chainConfig.testnetChainId}
+                    </p>
+                  </div>
+                </div>
+              ) : null}
+
+              <div className="mt-5 flex flex-wrap gap-2">
+                {selectedAssetsPreview.length ? (
+                  selectedAssetsPreview.slice(0, 4).map((asset) => (
+                    <Badge
+                      key={asset.id}
+                      tone="neutral"
+                      className="border-white/10 bg-white/6 text-white/72"
+                    >
+                      {asset.symbol}
+                    </Badge>
+                  ))
+                ) : (
+                  <p className="text-sm text-white/54">
+                    {isZh ? '尚未选择资产模板。' : 'No asset templates selected yet.'}
+                  </p>
+                )}
+              </div>
             </div>
           </div>
+        </div>
+      </section>
 
-          <div className="grid gap-4 md:grid-cols-2">
-            <div className="space-y-2">
-              <label className="text-sm text-text-secondary">{text.walletAddress}</label>
-              <Input
-                value={sessionIntakeContext.walletAddress ?? ''}
-                readOnly
-                placeholder="0x..."
-              />
-            </div>
-            <div className="space-y-2">
-              <label className="text-sm text-text-secondary">{text.attestation}</label>
-              <button
-                type="button"
-                onClick={() =>
-                  setIntakeContext((current) => ({
-                    ...current,
-                    wantsOnchainAttestation: !current.wantsOnchainAttestation,
-                  }))
-                }
-                className={`rounded-[18px] border px-4 py-3 text-left ${
-                  intakeContext.wantsOnchainAttestation
-                    ? 'border-border-strong bg-[rgba(212,175,55,0.14)] text-text-primary'
-                    : 'border-border-subtle bg-app-bg-elevated text-text-secondary'
-                }`}
-              >
-                <p className="font-medium">
-                  {intakeContext.wantsOnchainAttestation
-                    ? text.attestationEnabled
-                    : text.attestationDisabled}
-                </p>
-                <p className="mt-2 text-xs leading-6 text-text-muted">
-                  {text.attestationDetail}
-                </p>
-              </button>
-            </div>
-          </div>
+      <div className="grid gap-6 xl:grid-cols-[1.06fr_0.94fr]">
+        <div className="space-y-6">
+          <section className="apple-section-light px-6 py-6 md:px-8 md:py-8">
+            <div className="space-y-5">
+              <div className="flex flex-wrap items-center gap-2.5">
+                <Badge tone="gold">{selectedPreset.title}</Badge>
+                <Badge tone="neutral">
+                  {text.selectedAssetCount(intakeContext.preferredAssetIds.length)}
+                </Badge>
+                {intakeContext.demoMode ? (
+                  <Badge tone="warning">
+                    {`Demo: ${intakeContext.demoScenarioId || 'enabled'}`}
+                  </Badge>
+                ) : null}
+              </div>
 
-          <div className="space-y-2">
-            <label className="text-sm text-text-secondary">
-              {isZh ? '是否纳入 demo / benchmark' : 'Include demo / benchmark assets'}
-            </label>
-            <button
-              type="button"
-              onClick={() =>
-                setIntakeContext((current) => ({
-                  ...current,
-                  includeNonProductionAssets: !current.includeNonProductionAssets,
-                }))
-              }
-              className={`rounded-[18px] border px-4 py-3 text-left ${
-                intakeContext.includeNonProductionAssets
-                  ? 'border-border-strong bg-[rgba(212,175,55,0.14)] text-text-primary'
-                  : 'border-border-subtle bg-app-bg-elevated text-text-secondary'
-              }`}
-            >
-              <p className="font-medium">
-                {intakeContext.includeNonProductionAssets
-                  ? isZh ? '已纳入非生产资产' : 'Including non-production assets'
-                  : isZh ? '默认排除非生产资产' : 'Default-exclude non-production assets'}
-              </p>
-              <p className="mt-2 text-xs leading-6 text-text-muted">
-                {isZh
-                  ? '默认仍会展示 demo 和 benchmark，但不会让它们和生产资产同权竞争。'
-                  : 'Demo and benchmark assets stay visible either way, but by default they do not compete with production assets.'}
-              </p>
-            </button>
-          </div>
-
-          <div className="space-y-2">
-            <label className="text-sm text-text-secondary">
-              {text.additionalConstraints}
-            </label>
-            <Textarea
-              value={intakeContext.additionalConstraints ?? ''}
-              onChange={(event) =>
-                setIntakeContext((current) => ({
-                  ...current,
-                  additionalConstraints: event.target.value,
-                }))
-              }
-              placeholder={text.additionalConstraintsPlaceholder}
-              className="min-h-24"
-            />
-          </div>
-
-          <Button
-            data-testid="start-rwa-analysis"
-            onClick={() =>
-              void createMutation.mutateAsync({
-                mode: selectedMode,
-                locale,
-                problemStatement,
-                intakeContext: sessionIntakeContext,
-              })
-            }
-            disabled={
-              !problemStatement.trim() ||
-              intakeContext.preferredAssetIds.length === 0 ||
-              createMutation.isPending
-            }
-          >
-            <Sparkles className="size-4" />
-            {text.startAnalysis}
-            <ArrowRight className="size-4" />
-          </Button>
-
-          {createMutation.isError ? (
-            <div className="rounded-2xl border border-[rgba(197,109,99,0.35)] bg-[rgba(197,109,99,0.12)] px-4 py-3 text-sm text-[#f7d4cf]">
-              {text.createError}
-            </div>
-          ) : null}
-        </Card>
-
-        <div className="space-y-4">
-          <Card className="space-y-4 p-6">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <h2 className="text-lg font-semibold text-text-primary">
-                  {text.assetLibrary}
+              <div className="space-y-2">
+                <p className="apple-kicker">{isZh ? '问题输入' : 'Question framing'}</p>
+                <h2 className="text-3xl font-semibold tracking-[-0.05em] text-text-primary md:text-4xl">
+                  {isZh ? '定义这次 RWA 分析' : 'Define this RWA analysis'}
                 </h2>
-                <p className="text-sm leading-7 text-text-secondary">
-                  {text.assetLibraryDescription}
+                <p className="max-w-3xl text-[17px] leading-[1.47] text-text-secondary">
+                  {selectedPreset.subtitle}
                 </p>
               </div>
-              <Badge tone="gold">{filteredAssets.length}</Badge>
+
+              <DemoScenarioSelector
+                scenarios={demoScenarios}
+                selectedScenarioId={intakeContext.demoScenarioId}
+                locale={locale}
+                onSelect={applyDemoScenario}
+              />
+
+              <div className="space-y-2">
+                <label htmlFor="problemStatement" className="text-sm text-text-secondary">
+                  {text.yourQuestion}
+                </label>
+                <Textarea
+                  id="problemStatement"
+                  data-testid="analysis-problem-input"
+                  value={problemStatement}
+                  onChange={(event) => setProblemStatement(event.target.value)}
+                  placeholder={text.questionPlaceholder}
+                  className="min-h-40 text-base leading-7"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-text-muted">
+                  {text.exampleLabel}
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {selectedPreset.examples.map((example) => {
+                    const isActive = problemStatement === example
+                    return (
+                      <button
+                        key={example}
+                        type="button"
+                        onClick={() => setProblemStatement(example)}
+                        className={pillToggleClass(isActive)}
+                      >
+                        {example}
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
             </div>
+          </section>
 
-            <Input
-              value={assetQuery}
-              onChange={(event) => setAssetQuery(event.target.value)}
-              placeholder={text.assetSearchPlaceholder}
-            />
+          <section className="apple-section-light px-6 py-6 md:px-8 md:py-8">
+            <div className="space-y-6">
+              <div className="space-y-2">
+                <p className="apple-kicker">{isZh ? '约束设置' : 'Constraints'}</p>
+                <h2 className="text-3xl font-semibold tracking-[-0.05em] text-text-primary md:text-4xl">
+                  {isZh ? '锁定资金、流动性和准入条件' : 'Lock funding, liquidity, and access'}
+                </h2>
+              </div>
 
-            <div className="space-y-3">
-              {filteredAssets.map((asset) => {
-                const isSelected = intakeContext.preferredAssetIds.includes(asset.id)
-                const requiredLevel = asset.requiresKycLevel ?? 0
-                const isEligible = requiredLevel <= effectiveKycLevel
-                return (
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="space-y-2">
+                  <label className="text-sm text-text-secondary">{text.principal}</label>
+                  <Input
+                    type="number"
+                    min={100}
+                    value={String(intakeContext.investmentAmount)}
+                    onChange={(event) =>
+                      setIntakeContext((current) => ({
+                        ...current,
+                        investmentAmount: Number(event.target.value || 0),
+                      }))
+                    }
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm text-text-secondary">
+                    {text.settlementCurrency}
+                  </label>
+                  <Input
+                    value={intakeContext.baseCurrency}
+                    onChange={(event) =>
+                      setIntakeContext((current) => ({
+                        ...current,
+                        baseCurrency: event.target.value.toUpperCase(),
+                      }))
+                    }
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <p className="text-sm text-text-secondary">{text.holdingPeriod}</p>
+                <div className="flex flex-wrap gap-2">
+                  {(bootstrapQuery.data?.holdingPeriodPresets ?? [7, 30, 90, 180]).map((days) => {
+                    const isActive = intakeContext.holdingPeriodDays === days
+                    return (
+                      <button
+                        key={days}
+                        type="button"
+                        onClick={() =>
+                          setIntakeContext((current) => ({
+                            ...current,
+                            holdingPeriodDays: days,
+                          }))
+                        }
+                        className={pillToggleClass(isActive)}
+                      >
+                        {days} {text.daySuffix}
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <p className="text-sm text-text-secondary">{text.riskTolerance}</p>
+                <div className="grid gap-2 md:grid-cols-3">
+                  {riskOptions.map((option) => {
+                    const isActive = intakeContext.riskTolerance === option.value
+                    return (
+                      <button
+                        key={option.value}
+                        type="button"
+                        onClick={() =>
+                          setIntakeContext((current) => ({
+                            ...current,
+                            riskTolerance: option.value,
+                          }))
+                        }
+                        className={tileToggleClass(isActive)}
+                      >
+                        <p className="font-medium text-text-primary">{option.label}</p>
+                        <p className="mt-2 text-xs leading-6 text-text-muted">
+                          {option.detail}
+                        </p>
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <p className="text-sm text-text-secondary">{text.liquidityNeed}</p>
+                <div className="grid gap-2 md:grid-cols-3">
+                  {liquidityOptions.map((option) => {
+                    const isActive = intakeContext.liquidityNeed === option.value
+                    return (
+                      <button
+                        key={option.value}
+                        type="button"
+                        onClick={() =>
+                          setIntakeContext((current) => ({
+                            ...current,
+                            liquidityNeed: option.value,
+                          }))
+                        }
+                        className={tileToggleClass(isActive)}
+                      >
+                        <p className="font-medium text-text-primary">{option.label}</p>
+                        <p className="mt-2 text-xs leading-6 text-text-muted">
+                          {option.detail}
+                        </p>
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <div className="flex flex-wrap items-center gap-2">
+                  <p className="text-sm text-text-secondary">{text.kycCapability}</p>
+                  <Badge tone={wallet.walletAddress ? 'gold' : 'neutral'}>
+                    {wallet.walletAddress ? text.onchainDerived : text.manualFallback}
+                  </Badge>
+                </div>
+                <div className="grid gap-2 md:grid-cols-3">
+                  {kycOptions.map((option) => {
+                    const isActive = effectiveKycLevel === option.value
+                    return (
+                      <button
+                        key={option.value}
+                        type="button"
+                        disabled={Boolean(wallet.walletAddress)}
+                        onClick={() =>
+                          setIntakeContext((current) => ({
+                            ...current,
+                            minimumKycLevel: option.value,
+                          }))
+                        }
+                        className={tileToggleClass(isActive, Boolean(wallet.walletAddress))}
+                      >
+                        <p className="font-medium text-text-primary">{option.label}</p>
+                        <p className="mt-2 text-xs leading-6 text-text-muted">
+                          {option.detail}
+                        </p>
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="space-y-2">
+                  <label className="text-sm text-text-secondary">{text.walletAddress}</label>
+                  <Input
+                    value={sessionIntakeContext.walletAddress ?? ''}
+                    readOnly
+                    placeholder="0x..."
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm text-text-secondary">{text.attestation}</label>
                   <button
-                    key={asset.id}
                     type="button"
-                    onClick={() => toggleAsset(asset.id)}
-                    className={`w-full rounded-[22px] border p-4 text-left ${
-                      isSelected
-                        ? 'border-border-strong bg-[rgba(212,175,55,0.12)]'
-                        : 'border-border-subtle bg-app-bg-elevated hover:border-border-strong'
-                    }`}
+                    onClick={() =>
+                      setIntakeContext((current) => ({
+                        ...current,
+                        wantsOnchainAttestation: !current.wantsOnchainAttestation,
+                      }))
+                    }
+                    className={tileToggleClass(intakeContext.wantsOnchainAttestation)}
                   >
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <div className="flex flex-wrap items-center gap-2">
-                          <p className="font-medium text-text-primary">{asset.name}</p>
-                          <Badge tone="neutral">{asset.symbol}</Badge>
-                          <Badge tone={asset.featured ? 'gold' : 'neutral'}>
-                            {asset.assetType}
-                          </Badge>
-                          <Badge tone={isEligible ? 'success' : 'warning'}>
-                            {isEligible ? text.eligible : text.needsKyc(requiredLevel)}
-                          </Badge>
-                          {(asset.statuses ?? []).map((status) => (
-                            <Badge key={`${asset.id}-${status}`} tone={status === 'verified' ? 'success' : status === 'demo' ? 'warning' : 'neutral'}>
-                              {status}
-                            </Badge>
-                          ))}
-                          {asset.onchainVerified ? (
-                            <Badge tone="neutral">{text.onchainBadge}</Badge>
-                          ) : null}
-                          {asset.issuerDisclosed ? (
-                            <Badge tone="neutral">{text.issuerBadge}</Badge>
+                    <p className="font-medium text-text-primary">
+                      {intakeContext.wantsOnchainAttestation
+                        ? text.attestationEnabled
+                        : text.attestationDisabled}
+                    </p>
+                    <p className="mt-2 text-xs leading-6 text-text-muted">
+                      {text.attestationDetail}
+                    </p>
+                  </button>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm text-text-secondary">
+                  {isZh ? '是否纳入 demo / benchmark' : 'Include demo / benchmark assets'}
+                </label>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setIntakeContext((current) => ({
+                      ...current,
+                      includeNonProductionAssets: !current.includeNonProductionAssets,
+                    }))
+                  }
+                  className={tileToggleClass(Boolean(intakeContext.includeNonProductionAssets))}
+                >
+                  <p className="font-medium text-text-primary">
+                    {intakeContext.includeNonProductionAssets
+                      ? isZh
+                        ? '已纳入非生产资产'
+                        : 'Including non-production assets'
+                      : isZh
+                        ? '默认排除非生产资产'
+                        : 'Default-exclude non-production assets'}
+                  </p>
+                  <p className="mt-2 text-xs leading-6 text-text-muted">
+                    {isZh
+                      ? '默认仍会展示 demo 和 benchmark，但不会让它们和生产资产同权竞争。'
+                      : 'Demo and benchmark assets stay visible either way, but by default they do not compete with production assets.'}
+                  </p>
+                </button>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm text-text-secondary">
+                  {text.additionalConstraints}
+                </label>
+                <Textarea
+                  value={intakeContext.additionalConstraints ?? ''}
+                  onChange={(event) =>
+                    setIntakeContext((current) => ({
+                      ...current,
+                      additionalConstraints: event.target.value,
+                    }))
+                  }
+                  placeholder={text.additionalConstraintsPlaceholder}
+                  className="min-h-28"
+                />
+              </div>
+
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+                <Button
+                  size="lg"
+                  data-testid="start-rwa-analysis"
+                  className="w-full sm:w-auto"
+                  onClick={() =>
+                    void createMutation.mutateAsync({
+                      mode: selectedMode,
+                      locale,
+                      problemStatement,
+                      intakeContext: sessionIntakeContext,
+                    })
+                  }
+                  disabled={
+                    !problemStatement.trim() ||
+                    intakeContext.preferredAssetIds.length === 0 ||
+                    createMutation.isPending
+                  }
+                >
+                  <Sparkles className="size-4" />
+                  {text.startAnalysis}
+                  <ArrowRight className="size-4" />
+                </Button>
+                <p className="text-sm leading-6 text-text-secondary">
+                  {isZh
+                    ? '提交后会固定当前约束并进入统一分析会话。'
+                    : 'Submitting locks the current constraints and opens the analysis session.'}
+                </p>
+              </div>
+
+              {createMutation.isError ? (
+                <div className="rounded-[22px] border border-[rgba(255,69,58,0.18)] bg-[rgba(255,69,58,0.08)] px-4 py-3 text-sm text-[color:var(--danger)]">
+                  {text.createError}
+                </div>
+              ) : null}
+            </div>
+          </section>
+        </div>
+
+        <div className="space-y-6">
+          <section className="apple-section-light px-6 py-6 md:px-8 md:py-8">
+            <div className="space-y-5">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="apple-kicker">{isZh ? '资产库' : 'Asset library'}</p>
+                  <h2 className="mt-2 text-3xl font-semibold tracking-[-0.05em] text-text-primary md:text-4xl">
+                    {text.assetLibrary}
+                  </h2>
+                  <p className="mt-2 max-w-2xl text-[17px] leading-[1.47] text-text-secondary">
+                    {text.assetLibraryDescription}
+                  </p>
+                </div>
+                <Badge tone="gold">{filteredAssets.length}</Badge>
+              </div>
+
+              <Input
+                value={assetQuery}
+                onChange={(event) => setAssetQuery(event.target.value)}
+                placeholder={text.assetSearchPlaceholder}
+              />
+
+              <div className="space-y-3">
+                {filteredAssets.length ? (
+                  filteredAssets.map((asset) => {
+                    const isSelected = intakeContext.preferredAssetIds.includes(asset.id)
+                    const requiredLevel = asset.requiresKycLevel ?? 0
+                    const isEligible = requiredLevel <= effectiveKycLevel
+
+                    return (
+                      <button
+                        key={asset.id}
+                        type="button"
+                        onClick={() => toggleAsset(asset.id)}
+                        className={assetCardClass(isSelected)}
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div>
+                            <div className="flex flex-wrap items-center gap-2">
+                              <p className="font-medium text-text-primary">{asset.name}</p>
+                              <Badge tone="neutral">{asset.symbol}</Badge>
+                              <Badge tone={asset.featured ? 'gold' : 'neutral'}>
+                                {asset.assetType}
+                              </Badge>
+                              <Badge tone={isEligible ? 'success' : 'warning'}>
+                                {isEligible ? text.eligible : text.needsKyc(requiredLevel)}
+                              </Badge>
+                              {(asset.statuses ?? []).map((status) => (
+                                <Badge
+                                  key={`${asset.id}-${status}`}
+                                  tone={
+                                    status === 'verified'
+                                      ? 'success'
+                                      : status === 'demo'
+                                        ? 'warning'
+                                        : 'neutral'
+                                  }
+                                >
+                                  {status}
+                                </Badge>
+                              ))}
+                              {asset.onchainVerified ? (
+                                <Badge tone="neutral">{text.onchainBadge}</Badge>
+                              ) : null}
+                              {asset.issuerDisclosed ? (
+                                <Badge tone="neutral">{text.issuerBadge}</Badge>
+                              ) : null}
+                            </div>
+                            <p className="mt-3 text-sm leading-7 text-text-secondary">
+                              {asset.description}
+                            </p>
+                            {asset.statusExplanation ? (
+                              <p className="mt-2 text-xs leading-6 text-text-muted">
+                                {asset.statusExplanation}
+                              </p>
+                            ) : null}
+                          </div>
+                          {isSelected ? (
+                            <CheckCircle2 className="mt-1 size-5 text-gold-primary" />
                           ) : null}
                         </div>
-                        <p className="mt-2 text-sm leading-7 text-text-secondary">
-                          {asset.description}
-                        </p>
-                        {asset.statusExplanation ? (
-                          <p className="mt-2 text-xs leading-6 text-text-muted">
-                            {asset.statusExplanation}
+
+                        <div className="mt-4 grid gap-2 md:grid-cols-3">
+                          <div className="rounded-[18px] border border-border-subtle bg-app-bg px-3 py-3">
+                            <p className="text-xs text-text-muted">{text.baseReturn}</p>
+                            <p className="mt-1 font-medium text-text-primary">
+                              {formatPercent(asset.expectedReturnBase)}
+                            </p>
+                          </div>
+                          <div className="rounded-[18px] border border-border-subtle bg-app-bg px-3 py-3">
+                            <p className="text-xs text-text-muted">{text.earliestExit}</p>
+                            <p className="mt-1 font-medium text-text-primary">
+                              {asset.redemptionDays === 0 ? 'T+0' : `T+${asset.redemptionDays}`}
+                            </p>
+                          </div>
+                          <div className="rounded-[18px] border border-border-subtle bg-app-bg px-3 py-3">
+                            <p className="text-xs text-text-muted">{text.kycShort}</p>
+                            <p className="mt-1 font-medium text-text-primary">
+                              {asset.requiresKycLevel ?? 0}
+                            </p>
+                          </div>
+                        </div>
+
+                        {asset.primarySourceUrl ? (
+                          <p className="mt-3 text-xs text-text-muted">
+                            {text.sourceLabel}: {asset.primarySourceUrl}
+                            {asset.truthLevel ? ` · ${asset.truthLevel}` : ''}
+                            {asset.liveReadiness ? ` · ${asset.liveReadiness}` : ''}
                           </p>
                         ) : null}
-                      </div>
-                      {isSelected ? (
-                        <CheckCircle2 className="mt-1 size-5 text-gold-primary" />
-                      ) : null}
-                    </div>
-
-                    <div className="mt-4 grid gap-2 md:grid-cols-3">
-                      <div className="rounded-[16px] border border-border-subtle bg-app-bg px-3 py-2">
-                        <p className="text-xs text-text-muted">{text.baseReturn}</p>
-                        <p className="mt-1 font-medium text-text-primary">
-                          {formatPercent(asset.expectedReturnBase)}
-                        </p>
-                      </div>
-                      <div className="rounded-[16px] border border-border-subtle bg-app-bg px-3 py-2">
-                        <p className="text-xs text-text-muted">{text.earliestExit}</p>
-                        <p className="mt-1 font-medium text-text-primary">
-                          {asset.redemptionDays === 0 ? 'T+0' : `T+${asset.redemptionDays}`}
-                        </p>
-                      </div>
-                      <div className="rounded-[16px] border border-border-subtle bg-app-bg px-3 py-2">
-                        <p className="text-xs text-text-muted">{text.kycShort}</p>
-                        <p className="mt-1 font-medium text-text-primary">
-                          {asset.requiresKycLevel ?? 0}
-                        </p>
-                      </div>
-                    </div>
-
-                    {asset.primarySourceUrl ? (
-                      <p className="mt-3 text-xs text-text-muted">
-                        {text.sourceLabel}: {asset.primarySourceUrl}
-                        {asset.truthLevel ? ` · ${asset.truthLevel}` : ''}
-                        {asset.liveReadiness ? ` · ${asset.liveReadiness}` : ''}
-                      </p>
-                    ) : null}
-                  </button>
-                )
-              })}
+                      </button>
+                    )
+                  })
+                ) : (
+                  <div className="rounded-[26px] border border-border-subtle bg-panel px-5 py-6 text-sm text-text-secondary">
+                    {isZh
+                      ? '没有匹配的资产模板，试试更宽泛的关键词。'
+                      : 'No asset templates matched. Try a broader keyword.'}
+                  </div>
+                )}
+              </div>
             </div>
-          </Card>
+          </section>
         </div>
       </div>
     </div>

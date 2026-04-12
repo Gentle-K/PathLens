@@ -12,40 +12,28 @@ export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 
 const variantClasses: Record<ButtonVariant, string> = {
   primary:
-    'bg-cover bg-center bg-no-repeat text-[#151316] shadow-[0_14px_40px_rgba(212,175,55,0.28)] hover:brightness-105 hover:shadow-[0_18px_46px_rgba(212,175,55,0.34)]',
+    'bg-gold-primary text-white shadow-[0_10px_24px_rgba(0,113,227,0.24)] hover:bg-gold-bright hover:shadow-[0_14px_30px_rgba(0,113,227,0.28)]',
   secondary:
-    'border border-border-subtle bg-app-bg-elevated text-text-primary hover:border-border-strong hover:bg-panel-strong',
-  ghost: 'text-text-secondary hover:bg-white/5 hover:text-text-primary',
+    'border border-border-subtle bg-panel text-text-primary hover:border-border-strong hover:bg-panel-strong',
+  ghost: 'text-gold-primary hover:bg-[rgba(0,113,227,0.08)] hover:text-gold-bright',
   danger:
-    'border border-[rgba(197,109,99,0.58)] bg-[rgba(197,109,99,0.82)] text-[#1c0f0e] hover:bg-[rgba(197,109,99,0.9)]',
+    'border border-[rgba(255,69,58,0.22)] bg-[rgba(255,69,58,0.12)] text-[#ffb1ab] hover:bg-[rgba(255,69,58,0.18)]',
 }
 
 const sizeClasses: Record<ButtonSize, string> = {
-  sm: 'h-9 rounded-full px-4 text-sm',
+  sm: 'h-9 rounded-full px-4 text-[13px]',
   md: 'h-11 rounded-full px-5 text-sm',
-  lg: 'h-12 rounded-full px-6 text-base',
+  lg: 'h-12 rounded-full px-6 text-[15px]',
 }
 
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
-  function Button(
-    { className, size = 'md', style, variant = 'primary', ...props },
-    ref,
-  ) {
-    const mergedStyle =
-      variant === 'primary'
-        ? {
-            backgroundColor: 'var(--gold-primary)',
-            backgroundImage: 'var(--gradient-gold)',
-            ...style,
-          }
-        : style
-
+  function Button({ className, size = 'md', style, variant = 'primary', ...props }, ref) {
     return (
       <button
         ref={ref}
-        style={mergedStyle}
+        style={style}
         className={cn(
-          'interactive-lift inline-flex items-center justify-center gap-2 font-medium transition duration-200 disabled:pointer-events-none disabled:opacity-60 disabled:brightness-75',
+          'interactive-lift inline-flex items-center justify-center gap-2 rounded-full font-medium tracking-[-0.01em] transition duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-primary focus-visible:ring-offset-2 focus-visible:ring-offset-app-bg disabled:pointer-events-none disabled:opacity-60',
           variantClasses[variant],
           sizeClasses[size],
           className,

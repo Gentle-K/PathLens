@@ -16,7 +16,7 @@ import { Check, ChevronDown } from 'lucide-react'
 import { cn } from '@/lib/utils/cn'
 
 const baseFieldClassName =
-  'w-full rounded-[20px] border border-border-subtle bg-app-bg-elevated px-4 py-3 text-sm text-text-primary outline-none transition placeholder:text-text-muted focus:border-border-strong focus-gold'
+  'w-full rounded-[18px] border border-border-subtle bg-panel px-4 py-3.5 text-sm text-text-primary outline-none transition placeholder:text-text-muted focus:border-border-strong focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[rgba(0,113,227,0.12)]'
 
 export const Input = forwardRef<HTMLInputElement, InputHTMLAttributes<HTMLInputElement>>(
   function Input({ className, ...props }, ref) {
@@ -145,7 +145,7 @@ export const Select = forwardRef<HTMLSelectElement, CustomSelectProps>(
         </select>
 
         {open ? (
-          <div className="absolute z-50 mt-2 w-full rounded-[20px] border border-border-strong bg-panel p-2 shadow-[0_24px_60px_rgba(0,0,0,0.2),0_0_0_1px_rgba(249,228,159,0.08)]">
+          <div className="absolute z-50 mt-2 w-full rounded-[20px] border border-border-subtle bg-panel p-2 shadow-[0_18px_42px_rgba(0,0,0,0.16)]">
             <div className="space-y-1" role="listbox" aria-labelledby={id}>
               {options.map((option) => {
                 const isActive = option.value === String(value ?? '')
@@ -163,7 +163,7 @@ export const Select = forwardRef<HTMLSelectElement, CustomSelectProps>(
                       option.disabled
                         ? 'cursor-not-allowed opacity-50'
                         : isActive
-                          ? 'bg-[rgba(212,175,55,0.14)] text-text-primary shadow-[0_0_0_1px_rgba(249,228,159,0.14)]'
+                          ? 'bg-[rgba(0,113,227,0.08)] text-text-primary shadow-[0_0_0_1px_rgba(0,113,227,0.14)]'
                           : 'text-text-secondary hover:bg-app-bg-elevated hover:text-text-primary',
                     )}
                   >
