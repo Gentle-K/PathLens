@@ -15,6 +15,10 @@ contract PlanRegistry {
 
     error PlanAlreadyRegistered(bytes32 attestationHash);
     error PlanNotFound(bytes32 attestationHash);
+    error InvalidAttestationHash();
+    error InvalidReportHash();
+    error InvalidPortfolioHash();
+    error InvalidSessionId();
 
     event PlanRegistered(
         bytes32 indexed attestationHash,
@@ -33,6 +37,18 @@ contract PlanRegistry {
         string calldata sessionId,
         string calldata summaryUri
     ) external {
+        if (reportHash == bytes32(0)) {
+            revert InvalidReportHash();
+        }
+        if (portfolioHash == bytes32(0)) {
+            revert InvalidPortfolioHash();
+        }
+        if (attestationHash == bytes32(0)) {
+            revert InvalidAttestationHash();
+        }
+        if (bytes(sessionId).length == 0) {
+            revert InvalidSessionId();
+        }
         if (planRecords[attestationHash].submitter != address(0)) {
             revert PlanAlreadyRegistered(attestationHash);
         }

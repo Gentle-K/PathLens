@@ -10,6 +10,7 @@ from app.domain.schemas import (
     AuditLogListResponse,
     AuditLogResponse,
     ContinueSessionRequest,
+    DebugOperationReceiptResponse,
     DebugAuthStatusResponse,
     DebugSessionListResponse,
     FrontendBootstrapResponse,
@@ -20,6 +21,8 @@ from app.domain.schemas import (
     ReportAnchorRequest,
     ReportAnchorResponse,
     RequestMoreFollowUpResponse,
+    RwaOpsJobsResponse,
+    RwaOpsSummaryResponse,
     SessionCreateRequest,
     SessionResponse,
     SessionSummaryResponse,
@@ -525,3 +528,151 @@ def anchor_report(
     if updated is None:
         raise HTTPException(status_code=400, detail="Unable to store report anchor draft.")
     return ReportAnchorResponse(record=record)
+
+
+@router.get("/api/debug/rwa/ops/summary", response_model=RwaOpsSummaryResponse)
+def debug_rwa_ops_summary(
+    request: Request,
+    network: str = "",
+    username: str = Depends(require_debug_auth),
+) -> RwaOpsSummaryResponse:
+    services = get_app_services()
+    settings = Settings.from_env()
+    chain_config = build_chain_config(settings)
+    locale = resolve_request_locale(request)
+    asset_library = build_asset_library(chain_config, locale=locale)
+    resolved_network = (network or chain_config.default_execution_network or "testnet").strip().lower()
+    resolved_network = "mainnet" if resolved_network == "mainnet" else "testnet"
+    summary = services.rwa_ops_service.build_summary(
+        assets=asset_library,
+        chain_config=chain_config,
+        network=resolved_network,
+    )
+    services.audit_log_service.write(
+        action="DEBUG_RWA_OPS_SUMMARY_VIEWED",
+        actor=username,
+        target=resolved_network,
+        ip_address=get_request_ip(request),
+        summary="Viewed the protected RWA ops summary.",
+    )
+    return RwaOpsSummaryResponse(summary=summary)
+
+
+@router.get("/api/debug/rwa/jobs", response_model=RwaOpsJobsResponse)
+def debug_rwa_jobs(
+    request: Request,
+    username: str = Depends(require_debug_auth),
+) -> RwaOpsJobsResponse:
+    services = get_app_services()
+    services.audit_log_service.write(
+        action="DEBUG_RWA_JOBS_VIEWED",
+        actor=username,
+        target="ops_job_runs",
+        ip_address=get_request_ip(request),
+        summary="Viewed protected RWA ops job runs.",
+    )
+    return RwaOpsJobsResponse(jobs=services.ops_job_service.list_jobs(limit=20))
+
+
+@router.post("/api/debug/rwa/proofs/refresh", response_model=DebugOperationReceiptResponse)
+def debug_refresh_rwa_proofs(
+    request: Request,
+    network: str = "",
+    username: str = Depends(require_debug_auth),
+) -> DebugOperationReceiptResponse:
+    services = get_app_services()
+    settings = Settings.from_env()
+    chain_config = build_chain_config(settings)
+    locale = resolve_request_locale(request)
+    asset_library = build_asset_library(chain_config, locale=locale)
+    resolved_network = (network or chain_config.default_execution_network or "testnet").strip().lower()
+    resolved_network = "mainnet" if resolved_network == "mainnet" else "testnet"
+    receipt = services.rwa_ops_service.refresh_live_proofs(
+        assets=asset_library,
+        chain_config=chain_config,
+        network=resolved_network,
+    )
+    services.audit_log_service.write(
+        action="DEBUG_RWA_PROOFS_REFRESHED",
+        actor=username,
+        target=resolved_network,
+        ip_address=get_request_ip(request),
+        summary="Triggered protected proof refresh for live RWA assets.",
+    )
+    return DebugOperationReceiptResponse(receipt=receipt)
+
+
+@router.post("/api/debug/rwa/proofs/publish/retry", response_model=DebugOperationReceiptResponse)
+def debug_retry_rwa_publish(
+    request: Request,
+    network: str = "",
+    username: str = Depends(require_debug_auth),
+) -> DebugOperationReceiptResponse:
+    services = get_app_services()
+    settings = Settings.from_env()
+    chain_config = build_chain_config(settings)
+    resolved_network = (network or chain_config.default_execution_network or "testnet").strip().lower()
+    resolved_network = "mainnet" if resolved_network == "mainnet" else "testnet"
+    receipt = services.rwa_ops_service.retry_failed_publishes(network=resolved_network)
+    services.audit_log_service.write(
+        action="DEBUG_RWA_PROOFS_RETRY_PUBLISH",
+        actor=username,
+        target=resolved_network,
+        ip_address=get_request_ip(request),
+        summary="Retried pending or failed proof publishes from the protected ops console.",
+    )
+    return DebugOperationReceiptResponse(receipt=receipt)
+
+
+@router.post("/api/debug/rwa/proofs/{snapshot_id}/publish", response_model=DebugOperationReceiptResponse)
+def debug_publish_snapshot(
+    snapshot_id: str,
+    request: Request,
+    username: str = Depends(require_debug_auth),
+) -> DebugOperationReceiptResponse:
+    services = get_app_services()
+    receipt = services.rwa_ops_service.manual_publish_snapshot(snapshot_id=snapshot_id)
+    services.audit_log_service.write(
+        action="DEBUG_RWA_PROOF_PUBLISH_MANUAL",
+        actor=username,
+        target=snapshot_id,
+        ip_address=get_request_ip(request),
+        summary="Triggered protected manual proof publish for a single snapshot.",
+    )
+    return DebugOperationReceiptResponse(receipt=receipt)
+
+
+@router.post("/api/debug/rwa/execution/status-sync", response_model=DebugOperationReceiptResponse)
+def debug_sync_execution_status(
+    request: Request,
+    username: str = Depends(require_debug_auth),
+) -> DebugOperationReceiptResponse:
+    services = get_app_services()
+    receipt = services.rwa_ops_service.sync_execution_status()
+    services.audit_log_service.write(
+        action="DEBUG_RWA_EXECUTION_STATUS_SYNC",
+        actor=username,
+        target="execution_receipts",
+        ip_address=get_request_ip(request),
+        summary="Triggered protected execution status sync.",
+    )
+    return DebugOperationReceiptResponse(receipt=receipt)
+
+
+@router.post("/api/debug/rwa/indexer/run", response_model=DebugOperationReceiptResponse)
+def debug_run_rwa_indexer(
+    request: Request,
+    username: str = Depends(require_debug_auth),
+) -> DebugOperationReceiptResponse:
+    services = get_app_services()
+    settings = Settings.from_env()
+    chain_config = build_chain_config(settings)
+    receipt = services.rwa_ops_service.run_indexer(chain_config=chain_config)
+    services.audit_log_service.write(
+        action="DEBUG_RWA_INDEXER_RUN",
+        actor=username,
+        target="chain_indexer",
+        ip_address=get_request_ip(request),
+        summary="Triggered protected repo-local RWA chain indexer.",
+    )
+    return DebugOperationReceiptResponse(receipt=receipt)

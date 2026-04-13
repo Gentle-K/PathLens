@@ -119,12 +119,16 @@ class Settings:
     hashkey_mainnet_rpc_url: str
     hashkey_mainnet_explorer_url: str
     hashkey_default_execution_network: str
+    hashkey_indexer_finality_buffer: int
     hashkey_testnet_plan_registry_address: str | None
     hashkey_mainnet_plan_registry_address: str | None
     hashkey_testnet_kyc_sbt_address: str | None
     hashkey_mainnet_kyc_sbt_address: str | None
+    hashkey_testnet_asset_proof_registry_address: str | None
+    hashkey_mainnet_asset_proof_registry_address: str | None
     plan_registry_address: str | None
     kyc_sbt_address: str | None
+    asset_proof_registry_address: str | None
     debug_username: str
     debug_password: str
 
@@ -165,6 +169,16 @@ class Settings:
         mainnet_kyc_sbt_address = (
             os.getenv("HASHKEY_MAINNET_KYC_SBT_ADDRESS")
             or os.getenv("KYC_SBT_ADDRESS")
+            or None
+        )
+        testnet_asset_proof_registry_address = (
+            os.getenv("HASHKEY_TESTNET_ASSET_PROOF_REGISTRY_ADDRESS")
+            or os.getenv("ASSET_PROOF_REGISTRY_ADDRESS")
+            or None
+        )
+        mainnet_asset_proof_registry_address = (
+            os.getenv("HASHKEY_MAINNET_ASSET_PROOF_REGISTRY_ADDRESS")
+            or os.getenv("ASSET_PROOF_REGISTRY_ADDRESS")
             or None
         )
 
@@ -240,10 +254,16 @@ class Settings:
                 .strip()
                 .lower()
             ),
+            hashkey_indexer_finality_buffer=max(
+                0,
+                int(os.getenv("HASHKEY_INDEXER_FINALITY_BUFFER", "2")),
+            ),
             hashkey_testnet_plan_registry_address=testnet_plan_registry_address,
             hashkey_mainnet_plan_registry_address=mainnet_plan_registry_address,
             hashkey_testnet_kyc_sbt_address=testnet_kyc_sbt_address,
             hashkey_mainnet_kyc_sbt_address=mainnet_kyc_sbt_address,
+            hashkey_testnet_asset_proof_registry_address=testnet_asset_proof_registry_address,
+            hashkey_mainnet_asset_proof_registry_address=mainnet_asset_proof_registry_address,
             plan_registry_address=(
                 testnet_plan_registry_address
                 or mainnet_plan_registry_address
@@ -254,6 +274,12 @@ class Settings:
                 testnet_kyc_sbt_address
                 or mainnet_kyc_sbt_address
                 or os.getenv("KYC_SBT_ADDRESS")
+                or None
+            ),
+            asset_proof_registry_address=(
+                testnet_asset_proof_registry_address
+                or mainnet_asset_proof_registry_address
+                or os.getenv("ASSET_PROOF_REGISTRY_ADDRESS")
                 or None
             ),
             debug_username=os.getenv("DEBUG_USERNAME", "debug-admin"),

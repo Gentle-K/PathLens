@@ -333,7 +333,7 @@ class AnalysisSession(BaseModel):
     lockup_tolerance: str = ""
     target_yield: float | None = None
     max_drawdown_tolerance: float | None = None
-    execution_status: ExecutionLifecycleStatus = ExecutionLifecycleStatus.NOT_READY
+    execution_status: ExecutionLifecycleStatus = ExecutionLifecycleStatus.PREPARED
     last_onchain_sync_at: datetime | None = None
     clarification_questions: list[ClarificationQuestion] = Field(default_factory=list)
     answers: list[UserAnswer] = Field(default_factory=list)

@@ -43,6 +43,59 @@ class RwaApiContractTests(unittest.TestCase):
 
         self.assertEqual(422, response.status_code)
 
+    def test_asset_proof_contract_returns_status_cards(self):
+        response = self.client.get(
+            "/api/rwa/assets/hsk-usdt/proof",
+            headers={"X-App-Locale": "en"},
+        )
+
+        self.assertEqual(200, response.status_code)
+        payload = response.json()
+        self.assertIn("asset", payload)
+        self.assertIn("proof", payload)
+        self.assertIn("latest_proof", payload)
+        self.assertIn("onchain_anchor_status", payload)
+        self.assertIn("proof_timeline_preview", payload)
+        self.assertEqual("hsk-usdt", payload["proof"]["asset_id"])
+        self.assertGreaterEqual(len(payload["proof"]["status_cards"]), 5)
+
+    def test_asset_proof_history_contract_returns_timeline(self):
+        self.client.get(
+            "/api/rwa/assets/hsk-usdt/proof",
+            headers={"X-App-Locale": "en"},
+        )
+        response = self.client.get(
+            "/api/rwa/assets/hsk-usdt/proof/history",
+            headers={"X-App-Locale": "en"},
+        )
+
+        self.assertEqual(200, response.status_code)
+        payload = response.json()
+        self.assertEqual("hsk-usdt", payload["asset_id"])
+        self.assertIn("history", payload)
+        self.assertGreaterEqual(len(payload["history"]), 1)
+        self.assertIn("history_source", payload)
+
+    def test_indexer_status_contract_returns_structured_status(self):
+        response = self.client.get("/api/rwa/indexer/status")
+
+        self.assertEqual(200, response.status_code)
+        payload = response.json()
+        self.assertIn("status", payload)
+
+    def test_asset_readiness_contract_returns_route_summary(self):
+        response = self.client.get(
+            "/api/rwa/assets/cpic-estable-mmf/readiness?amount=10000&network=testnet",
+            headers={"X-App-Locale": "en"},
+        )
+
+        self.assertEqual(200, response.status_code)
+        payload = response.json()
+        self.assertEqual("cpic-estable-mmf", payload["asset"]["asset_id"])
+        self.assertIn("execution_adapter_kind", payload)
+        self.assertIn("execution_readiness", payload)
+        self.assertTrue(payload["route_summary"])
+
     def test_analyze_contract_returns_extended_report_payload(self):
         response = self.client.post(
             "/api/rwa/analyze",

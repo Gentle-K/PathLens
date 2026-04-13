@@ -1,12 +1,9 @@
 import { useQuery } from '@tanstack/react-query'
 import {
-  FileSearch,
-  FileText,
-  Home,
+  BadgeCheck,
   Menu,
+  Radio,
   PlusSquare,
-  Settings,
-  Sigma,
   X,
 } from 'lucide-react'
 import { NavLink } from 'react-router-dom'
@@ -19,11 +16,8 @@ import { formatRelativeTime } from '@/features/analysis/lib/view-models'
 
 const navItems = [
   { to: '/new-analysis', label: 'New Analysis', icon: PlusSquare },
-  { to: '/sessions', label: 'Sessions', icon: Home },
-  { to: '/reports', label: 'Reports', icon: FileText },
-  { to: '/evidence', label: 'Evidence', icon: FileSearch },
-  { to: '/calculations', label: 'Calculations', icon: Sigma },
-  { to: '/settings', label: 'Settings', icon: Settings },
+  { to: '/assets', label: 'Assets', icon: BadgeCheck },
+  { to: '/portfolio', label: 'Portfolio', icon: Radio },
 ] as const
 
 interface SidebarProps {
@@ -75,7 +69,7 @@ export function Sidebar({ collapsed }: SidebarProps) {
             {!collapsed ? (
               <div className="min-w-0">
                 <p className="text-sm font-semibold tracking-[-0.03em] text-text-primary">Genius Actuary</p>
-                <p className="text-xs leading-5 text-text-secondary">Decision intelligence workspace</p>
+                <p className="text-xs leading-5 text-text-secondary">Verifiable HashKey RWA hub</p>
               </div>
             ) : null}
           </div>
@@ -95,7 +89,7 @@ export function Sidebar({ collapsed }: SidebarProps) {
           <div className="rounded-[22px] border border-border-subtle bg-[linear-gradient(180deg,rgba(19,34,58,0.94),rgba(15,27,49,0.9))] px-4 py-4">
             <p className="text-xs font-semibold uppercase tracking-[0.14em] text-accent-cyan">Release Workspace</p>
             <p className="mt-2 text-sm leading-6 text-text-secondary">
-              Break decisions into explicit cost, risk, evidence, calculations, and bounded recommendations.
+              Prove asset authenticity, review execution readiness, and monitor redemption and issuer risk from one workspace.
             </p>
           </div>
         ) : null}
@@ -139,7 +133,7 @@ export function Sidebar({ collapsed }: SidebarProps) {
             <div className="grid gap-3">
               <div className="rounded-[20px] border border-border-subtle bg-app-bg-elevated px-4 py-3">
                 <p className="text-xs uppercase tracking-[0.12em] text-text-muted">
-                  Active sessions
+                  Pipeline sessions
                 </p>
                 <p className="mt-1 text-xl font-semibold text-text-primary">
                   {activeSessionsCount}
@@ -147,7 +141,7 @@ export function Sidebar({ collapsed }: SidebarProps) {
               </div>
               <div className="rounded-[20px] border border-border-subtle bg-app-bg-elevated px-4 py-3">
                 <p className="text-xs uppercase tracking-[0.12em] text-text-muted">
-                  Reports generated
+                  Closed loops
                 </p>
                 <p className="mt-1 text-xl font-semibold text-text-primary">
                   {reportCount}

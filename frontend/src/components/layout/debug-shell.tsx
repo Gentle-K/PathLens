@@ -1,4 +1,4 @@
-import { FileTerminal, ScrollText, ShieldCheck } from 'lucide-react'
+import { FileTerminal, ScrollText, ShieldCheck, ShieldEllipsis } from 'lucide-react'
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
 
 import { Button } from '@/components/ui/button'
@@ -8,6 +8,7 @@ import { cn } from '@/lib/utils/cn'
 const navItems = [
   { to: '/debug/logs', label: 'Audit Logs', icon: ScrollText },
   { to: '/debug/sessions', label: 'Session Debug', icon: FileTerminal },
+  { to: '/debug/rwa-ops', label: 'RWA Ops', icon: ShieldEllipsis },
   { to: '/debug/admin/roles', label: 'Role Management', icon: ShieldCheck },
 ]
 

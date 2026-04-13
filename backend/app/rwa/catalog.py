@@ -88,6 +88,12 @@ def build_chain_config(settings: Settings) -> HashKeyChainConfig:
     mainnet_plan_registry_address = settings.hashkey_mainnet_plan_registry_address or ""
     testnet_kyc_sbt_address = settings.hashkey_testnet_kyc_sbt_address or ""
     mainnet_kyc_sbt_address = settings.hashkey_mainnet_kyc_sbt_address or ""
+    testnet_asset_proof_registry_address = (
+        settings.hashkey_testnet_asset_proof_registry_address or ""
+    )
+    mainnet_asset_proof_registry_address = (
+        settings.hashkey_mainnet_asset_proof_registry_address or ""
+    )
 
     return HashKeyChainConfig(
         default_execution_network=(
@@ -103,10 +109,15 @@ def build_chain_config(settings: Settings) -> HashKeyChainConfig:
         mainnet_explorer_url=settings.hashkey_mainnet_explorer_url,
         plan_registry_address=testnet_plan_registry_address or mainnet_plan_registry_address,
         kyc_sbt_address=testnet_kyc_sbt_address or mainnet_kyc_sbt_address,
+        asset_proof_registry_address=(
+            testnet_asset_proof_registry_address or mainnet_asset_proof_registry_address
+        ),
         testnet_plan_registry_address=testnet_plan_registry_address,
         mainnet_plan_registry_address=mainnet_plan_registry_address,
         testnet_kyc_sbt_address=testnet_kyc_sbt_address,
         mainnet_kyc_sbt_address=mainnet_kyc_sbt_address,
+        testnet_asset_proof_registry_address=testnet_asset_proof_registry_address,
+        mainnet_asset_proof_registry_address=mainnet_asset_proof_registry_address,
         docs_urls=[
             HASHKEY_ABOUT_URL,
             HASHKEY_NETWORK_INFO_URL,
@@ -664,20 +675,20 @@ def build_asset_library(
             featured=False,
             statuses=[AssetStatus.BENCHMARK, AssetStatus.VERIFIED],
             truth_level=TruthLevel.BENCHMARK_REFERENCE,
-            live_readiness=LiveReadiness.READY,
+            live_readiness=LiveReadiness.BENCHMARK_ONLY,
             default_rank_eligible=False,
             status_explanation=text_for_locale(
                 locale,
-                "链上可执行的 benchmark，用来衡量机会成本和波动基线，不默认参与正式 RWA 推荐排名。",
-                "An executable onchain benchmark used to frame opportunity cost and volatility, not a default candidate in formal RWA rankings.",
+                "链上可核验的 benchmark，用来衡量机会成本和波动基线，但不进入正式 RWA 提交路径。",
+                "An onchain-verifiable benchmark used to frame opportunity cost and volatility, but it does not enter the live RWA submit path.",
             ),
             truth_level_explanation=text_for_locale(
                 locale,
                 "合约本身可链上核验，但该资产在系统里承担 benchmark 参考角色。",
                 "The contract itself is verifiable onchain, but the asset is treated here as a benchmark reference.",
             ),
-            action_type=ActionType.HOLD,
-            action_readiness=ActionReadiness.READY,
+            action_type=ActionType.LEARN_MORE,
+            action_readiness=ActionReadiness.UNAVAILABLE,
             action_links=_asset_action_links(
                 chain_config,
                 primary_source_url=HASHKEY_TOKEN_CONTRACTS_URL,
@@ -688,6 +699,11 @@ def build_asset_library(
                     locale,
                     "默认只作 benchmark，不与生产型 RWA 候选同权竞争。",
                     "Shown as a benchmark by default rather than competing on equal footing with production-style RWA candidates.",
+                ),
+                text_for_locale(
+                    locale,
+                    "不进入 live submit 路径；任何提交请求都应被拦截。",
+                    "It never enters the live submit path; any submit request must be blocked.",
                 ),
             ],
             execution_notes=[

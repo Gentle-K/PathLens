@@ -17,17 +17,36 @@ from app.domain.models import (
     UserAnswer,
 )
 from app.domain.rwa import (
+    AttesterRegistryStatus,
+    AssetProofHistoryItem,
+    AssetProofSnapshot,
     AssetTemplate,
+    ContractAnchorSummary,
+    DebugOperationReceipt,
+    ExecutionAdapterKind,
+    ExecutionApproval,
+    ExecutionReceipt,
+    ExecutionReadiness,
     DemoScenarioDefinition,
     EligibilityDecision,
     ExecutionPlan,
     ExecutionQuote,
     HashKeyChainConfig,
+    IndexedAssetProofEvent,
+    IndexedPlanHistoryItem,
+    IndexerStatusItem,
     KycOnchainResult,
+    OnchainAnchorStatus,
+    OpsJobRun,
     OracleSnapshot,
+    PortfolioAlert,
+    PortfolioAlertAck,
     PositionSnapshot,
     ReportAnchorRecord,
+    RwaOpsSummary,
     RwaIntakeContext,
+    SourceHealthStatus,
+    SettlementStatus,
     TransactionReceiptRecord,
     WalletBalance,
 )
@@ -254,8 +273,33 @@ class RwaExecuteRequest(RwaSimulateRequest):
 
 class RwaExecuteResponse(BaseModel):
     execution_plan: ExecutionPlan
+    prepare_summary: str = ""
+    checklist: list[str] = Field(default_factory=list)
+    blockers: list[str] = Field(default_factory=list)
+    execution_receipt: ExecutionReceipt | None = None
     tx_receipts: list[TransactionReceiptRecord] = Field(default_factory=list)
     report_anchor_records: list[ReportAnchorRecord] = Field(default_factory=list)
+
+
+class RwaExecuteSubmitRequest(RwaExecuteRequest):
+    network: str = ""
+    transaction_hash: str = ""
+    submitted_by: str = ""
+    block_number: int | None = None
+    note: str = ""
+
+
+class RwaExecuteSubmitResponse(BaseModel):
+    execution_plan: ExecutionPlan
+    receipt: ExecutionReceipt
+    allowance_steps: list[ExecutionApproval] = Field(default_factory=list)
+    issuer_request_id: str = ""
+    redirect_url: str = ""
+    tx_receipts: list[TransactionReceiptRecord] = Field(default_factory=list)
+    report_anchor_records: list[ReportAnchorRecord] = Field(default_factory=list)
+    submission_status: str = "prepared"
+    submission_message: str = ""
+    external_action_url: str = ""
 
 
 class RwaMonitorResponse(BaseModel):
@@ -265,11 +309,17 @@ class RwaMonitorResponse(BaseModel):
     latest_nav_or_price: float = 0.0
     cost_basis: float = 0.0
     unrealized_pnl: float = 0.0
+    realized_income: float = 0.0
     accrued_yield: float = 0.0
+    redemption_forecast: float = 0.0
+    allocation_mix: dict[str, float] = Field(default_factory=dict)
     next_redemption_window: str = ""
     oracle_staleness_flag: bool = False
     kyc_change_flag: bool = False
+    proof_staleness_flag: bool = False
+    issuer_disclosure_update_flag: bool = False
     alert_flags: list[str] = Field(default_factory=list)
+    portfolio_alerts: list[PortfolioAlert] = Field(default_factory=list)
 
 
 class ReportAnchorRequest(BaseModel):
@@ -291,3 +341,100 @@ class RwaClarifyRequest(BaseModel):
 
 class RwaClarifyResponse(BaseModel):
     questions: list[ClarificationQuestion]
+
+
+class RwaAssetProofResponse(BaseModel):
+    asset: AssetTemplate
+    proof: AssetProofSnapshot
+    latest_proof: AssetProofSnapshot
+    onchain_anchor_status: OnchainAnchorStatus
+    proof_timeline_preview: list[AssetProofHistoryItem] = Field(default_factory=list)
+
+
+class RwaAssetProofHistoryResponse(BaseModel):
+    asset_id: str
+    network: str
+    history: list[AssetProofHistoryItem] = Field(default_factory=list)
+    history_source: str = "repository"
+
+
+class RwaAssetProofAnchorHistoryResponse(BaseModel):
+    asset_id: str
+    network: str
+    history: list[IndexedAssetProofEvent] = Field(default_factory=list)
+
+
+class RwaAssetPlanHistoryResponse(BaseModel):
+    asset_id: str
+    network: str
+    history: list[IndexedPlanHistoryItem] = Field(default_factory=list)
+
+
+class RwaAssetReadinessResponse(BaseModel):
+    asset: AssetTemplate
+    proof: AssetProofSnapshot
+    decision: EligibilityDecision
+    execution_adapter_kind: ExecutionAdapterKind
+    execution_readiness: ExecutionReadiness
+    route_summary: str = ""
+    quote: ExecutionQuote | None = None
+    required_approvals: list[ExecutionApproval] = Field(default_factory=list)
+    possible_failure_reasons: list[str] = Field(default_factory=list)
+    compliance_blockers: list[str] = Field(default_factory=list)
+    warnings: list[str] = Field(default_factory=list)
+
+
+class RwaPortfolioResponse(BaseModel):
+    address: str
+    network: str
+    positions: list[PositionSnapshot] = Field(default_factory=list)
+    proof_snapshots: list[AssetProofSnapshot] = Field(default_factory=list)
+    alerts: list[PortfolioAlert] = Field(default_factory=list)
+    indexer_health: list[IndexerStatusItem] = Field(default_factory=list)
+    latest_anchor_summary: list[ContractAnchorSummary] = Field(default_factory=list)
+    total_value_usd: float = 0.0
+    total_cost_basis: float = 0.0
+    total_unrealized_pnl: float = 0.0
+    total_realized_income: float = 0.0
+    total_accrued_yield: float = 0.0
+    total_redemption_forecast: float = 0.0
+    allocation_mix: dict[str, float] = Field(default_factory=dict)
+    last_sync_at: str
+
+
+class RwaPortfolioAlertsResponse(BaseModel):
+    address: str
+    network: str
+    alerts: list[PortfolioAlert] = Field(default_factory=list)
+
+
+class RwaPortfolioAlertStateResponse(BaseModel):
+    state: PortfolioAlertAck
+
+
+class RwaExecutionReceiptResponse(BaseModel):
+    receipt: ExecutionReceipt
+
+
+class RwaExecutionReceiptListResponse(BaseModel):
+    receipts: list[ExecutionReceipt] = Field(default_factory=list)
+
+
+class SettlementStatusResponse(BaseModel):
+    settlement_status: SettlementStatus
+
+
+class RwaIndexerStatusResponse(BaseModel):
+    status: list[IndexerStatusItem] = Field(default_factory=list)
+
+
+class RwaOpsSummaryResponse(BaseModel):
+    summary: RwaOpsSummary
+
+
+class RwaOpsJobsResponse(BaseModel):
+    jobs: list[OpsJobRun] = Field(default_factory=list)
+
+
+class DebugOperationReceiptResponse(BaseModel):
+    receipt: DebugOperationReceipt

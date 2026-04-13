@@ -1,6 +1,6 @@
 # Genius Actuary Frontend for HashKey Chain RWA
 
-This `frontend/` directory contains the React + TypeScript + Vite front-end for Genius Actuary as a HashKey Chain RWA decision engine. It keeps the black-gold Obsidian & Champagne Gold design system and connects to the local FastAPI backend under the repository-root `backend/` directory.
+This `frontend/` directory contains the React + TypeScript + Vite front-end for Genius Actuary as a HashKey Chain RWA proof, execution, and monitoring hub. It keeps the black-gold Obsidian & Champagne Gold design system and connects to the local FastAPI backend under the repository-root `backend/` directory.
 
 - React + TypeScript + Vite + Tailwind CSS v4
 - TanStack Query for server state
@@ -17,8 +17,10 @@ This `frontend/` directory contains the React + TypeScript + Vite front-end for 
 ## What ships
 
 - Dashboard with metrics, trends, recent analyses, and activity feed
+- Asset hub with proof pages and wallet-aware readiness checks
 - RWA intake flow: asset library, structured preferences, clarification, progress pipeline, final report
 - RiskVector charts, holding-period simulation, evidence panel, tx draft, and attestation draft
+- Portfolio page with proof freshness, issuer-workflow, and redemption alerts
 - Settings, User Profile, Role Management, Notifications, Logs/Audit, File Manager, DataViz
 - Resource Registry with generic list, detail, and form generators
 - Black-gold design tokens shared across dark/light/system themes
@@ -69,6 +71,8 @@ npm run lint
 npm run test:run
 npm run build
 npm run preview
+npm run deploy:plan-registry
+npm run deploy:asset-proof-registry
 ```
 
 ## Environment variables

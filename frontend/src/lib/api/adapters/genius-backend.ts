@@ -4,6 +4,9 @@ import type {
   AnalysisReport,
   AnalysisSession,
   AssetAnalysisCard,
+  AttesterRegistryStatus,
+  AssetProofHistoryItem,
+  AssetProofSnapshot,
   AuditLogEntry,
   AttestationDraft,
   BudgetLineItem,
@@ -13,20 +16,28 @@ import type {
   ChartTask,
   ClarificationQuestion,
   ConfidenceBand,
+  ContractAnchorSummary,
+  DebugOperationReceipt,
   EligibilityDecision,
   ExecutionApproval,
   ExecutionPlan,
+  ExecutionReceipt,
   ExecutionQuote,
   ExecutionStep,
   HashKeyChainConfig,
   HoldingPeriodSimulation,
+  IndexerStatusItem,
   MarketDataSnapshot,
   MethodologyReference,
   ModeDefinition,
+  OnchainAnchorStatus,
   OptionProfile,
+  OpsJobRun,
   OracleSnapshotBackend,
   OracleFeedConfig,
   PortfolioAllocation,
+  PortfolioAlert,
+  PortfolioAlertAck,
   PositionSnapshot,
   ReportTable,
   ReportAnchorRecord,
@@ -34,10 +45,12 @@ import type {
   RiskBreakdownItem,
   RiskVector,
   ResourceRecord,
+  RwaOpsSummary,
   RwaAssetTemplate,
   RwaBootstrap,
   RwaIntakeContext,
   SearchTask,
+  SourceHealthStatus,
   SourceProvenanceRef,
   StressScenario,
   TransactionReceiptRecord,
@@ -267,10 +280,13 @@ export interface BackendHashKeyChainConfig {
   mainnet_explorer_url: string
   plan_registry_address?: string
   kyc_sbt_address?: string
+  asset_proof_registry_address?: string
   testnet_plan_registry_address?: string
   mainnet_plan_registry_address?: string
   testnet_kyc_sbt_address?: string
   mainnet_kyc_sbt_address?: string
+  testnet_asset_proof_registry_address?: string
+  mainnet_asset_proof_registry_address?: string
   docs_urls: string[]
   oracle_feeds?: BackendOracleFeedConfig[]
 }
@@ -746,8 +762,10 @@ export interface BackendExecutionApproval {
   approval_type: string
   token_symbol?: string
   spender?: string
+  approval_target?: string
   amount?: number | null
   note?: string
+  allowance_required?: boolean
 }
 
 export interface BackendExecutionQuote {
@@ -782,9 +800,12 @@ export interface BackendExecutionStep {
   requires_safe?: boolean
   compliance_blockers?: string[]
   required_approvals?: BackendExecutionApproval[]
+  checklist?: string[]
   warnings?: string[]
   tx_request?: Record<string, unknown>
   offchain_actions?: string[]
+  redirect_url?: string
+  external_request_id?: string
   status?: string
 }
 
@@ -797,7 +818,13 @@ export interface BackendExecutionPlan {
   source_chain?: string
   source_asset?: string
   target_asset?: string
+  execution_adapter_kind?: string
+  execution_readiness?: string
+  readiness_reason?: string
+  external_action_url?: string
+  external_action_label?: string
   ticket_size: number
+  receipt_id?: string
   status: string
   quote?: BackendExecutionQuote | null
   warnings?: string[]
@@ -805,6 +832,8 @@ export interface BackendExecutionPlan {
   possible_failure_reasons?: string[]
   compliance_blockers?: string[]
   required_approvals?: BackendExecutionApproval[]
+  checklist?: string[]
+  external_steps?: string[]
   steps?: BackendExecutionStep[]
   tx_bundle?: Array<Record<string, unknown>>
   eligibility?: BackendEligibilityDecision[]
@@ -857,7 +886,11 @@ export interface BackendPositionSnapshot {
   current_value: number
   cost_basis: number
   unrealized_pnl: number
+  realized_income?: number
   accrued_yield: number
+  redemption_forecast?: number
+  allocation_weight_pct?: number
+  liquidity_risk?: string
   next_redemption_window?: string
   oracle_staleness_flag: boolean
   kyc_change_flag: boolean
@@ -891,8 +924,22 @@ export interface BackendRwaSimulateResponse {
 
 export interface BackendRwaExecuteResponse {
   execution_plan: BackendExecutionPlan
+  prepare_summary?: string
+  checklist?: string[]
+  blockers?: string[]
+  execution_receipt?: BackendExecutionReceipt | null
   tx_receipts?: BackendTransactionReceiptRecord[]
   report_anchor_records?: BackendReportAnchorRecord[]
+}
+
+export interface BackendRwaExecuteSubmitResponse extends BackendRwaExecuteResponse {
+  receipt: BackendExecutionReceipt
+  allowance_steps?: BackendExecutionApproval[]
+  issuer_request_id?: string
+  redirect_url?: string
+  submission_status: string
+  submission_message: string
+  external_action_url?: string
 }
 
 export interface BackendRwaMonitorResponse {
@@ -902,11 +949,412 @@ export interface BackendRwaMonitorResponse {
   latest_nav_or_price: number
   cost_basis: number
   unrealized_pnl: number
+  realized_income?: number
   accrued_yield: number
+  redemption_forecast?: number
+  allocation_mix?: Record<string, number>
   next_redemption_window?: string
   oracle_staleness_flag: boolean
   kyc_change_flag: boolean
+  proof_staleness_flag?: boolean
+  issuer_disclosure_update_flag?: boolean
   alert_flags?: string[]
+  portfolio_alerts?: BackendPortfolioAlert[]
+}
+
+export interface BackendProofSourceRef {
+  ref_id: string
+  title: string
+  source_name: string
+  source_url: string
+  source_kind?: string
+  source_tier?: string
+  freshness_date?: string
+  summary?: string
+  status?: string
+  unavailable_reason?: string
+  is_primary?: boolean
+  confidence?: number
+}
+
+export interface BackendProofFreshnessState {
+  bucket: string
+  label: string
+  checked_at: string
+  stale_after_hours: number
+  age_hours?: number | null
+  reason?: string
+}
+
+export interface BackendRedemptionWindow {
+  label: string
+  window_type: string
+  settlement_days: number
+  detail?: string
+  next_window?: string
+  status: string
+}
+
+export interface BackendProofStatusCard {
+  key: string
+  label: string
+  status: string
+  detail: string
+}
+
+export interface BackendOnchainAnchorStatus {
+  status: string
+  proof_key?: string
+  registry_address?: string
+  transaction_hash?: string
+  block_number?: number | null
+  explorer_url?: string
+  recorded_at?: string | null
+  attester?: string
+  note?: string
+}
+
+export interface BackendAssetProofHistoryItem {
+  snapshot_id: string
+  asset_id: string
+  network: string
+  snapshot_hash: string
+  snapshot_uri: string
+  proof_type: string
+  effective_at: string
+  published_at?: string | null
+  timeline_version?: number
+  attester: string
+  publish_status?: string
+  onchain_anchor_status?: BackendOnchainAnchorStatus | null
+  oracle_freshness?: string
+  kyc_policy_summary?: string
+  source_confidence?: number
+  unavailable_reasons?: string[]
+  onchain_indexed?: boolean
+  indexed_at?: string | null
+}
+
+export interface BackendAssetProofSnapshot {
+  snapshot_id?: string
+  asset_id: string
+  asset_name: string
+  asset_symbol: string
+  network: string
+  live_asset: boolean
+  included_in_registry: boolean
+  snapshot_hash: string
+  snapshot_uri: string
+  proof_type: string
+  effective_at: string
+  published_at?: string | null
+  attester: string
+  registry_address?: string
+  registry_explorer_url?: string
+  anchor_status?: BackendOnchainAnchorStatus | null
+  indexed_anchor_status?: BackendOnchainAnchorStatus | null
+  indexed_at?: string | null
+  history_source?: string
+  timeline_version?: number
+  publish_status?: string
+  onchain_proof_key?: string
+  execution_adapter_kind: string
+  execution_readiness: string
+  truth_level: string
+  live_readiness: string
+  required_kyc_level?: number | null
+  proof_freshness: BackendProofFreshnessState
+  oracle_freshness?: string
+  kyc_policy_summary?: string
+  source_confidence?: number
+  redemption_window: BackendRedemptionWindow
+  status_cards?: BackendProofStatusCard[]
+  proof_source_refs?: BackendProofSourceRef[]
+  unavailable_reasons?: string[]
+  monitoring_notes?: string[]
+  primary_action_url?: string
+  visibility_role?: string
+  is_executable?: boolean
+}
+
+export interface BackendPortfolioAlert {
+  alert_id: string
+  address?: string
+  alert_type: string
+  severity: string
+  title: string
+  detail: string
+  asset_id?: string
+  asset_name?: string
+  source_url?: string
+  source_ref?: string
+  dedupe_key?: string
+  status?: string
+  acked?: boolean
+  acknowledged_at?: string | null
+  read?: boolean
+  read_at?: string | null
+  detected_at: string
+  resolved_at?: string | null
+}
+
+export interface BackendRwaAssetProofResponse {
+  asset: BackendAssetTemplate
+  proof: BackendAssetProofSnapshot
+  latest_proof?: BackendAssetProofSnapshot
+  onchain_anchor_status?: BackendOnchainAnchorStatus | null
+  proof_timeline_preview?: BackendAssetProofHistoryItem[]
+}
+
+export interface BackendRwaAssetProofHistoryResponse {
+  asset_id: string
+  network: string
+  history?: BackendAssetProofHistoryItem[]
+  history_source?: string
+}
+
+export interface BackendIndexerStatusItem {
+  network: string
+  contract_name: string
+  contract_address?: string
+  last_indexed_block?: number
+  last_safe_head?: number
+  chain_head?: number
+  lag?: number
+  status: string
+  last_error?: string
+  updated_at: string
+}
+
+export interface BackendIndexedAssetProofEvent {
+  event_id: string
+  asset_id: string
+  asset_name?: string
+  network: string
+  contract_address: string
+  proof_key: string
+  snapshot_hash: string
+  snapshot_uri?: string
+  proof_type?: string
+  attester?: string
+  transaction_hash: string
+  block_number: number
+  log_index: number
+  effective_at?: string | null
+  recorded_at?: string | null
+  indexed_at: string
+}
+
+export interface BackendIndexedPlanHistoryItem {
+  event_id: string
+  asset_id?: string
+  asset_name?: string
+  network: string
+  contract_address: string
+  attestation_hash: string
+  report_hash?: string
+  portfolio_hash?: string
+  submitter?: string
+  session_id?: string
+  summary_uri?: string
+  transaction_hash: string
+  block_number: number
+  log_index: number
+  recorded_at?: string | null
+  indexed_at: string
+}
+
+export interface BackendRwaAssetProofAnchorHistoryResponse {
+  asset_id: string
+  network: string
+  history?: BackendIndexedAssetProofEvent[]
+}
+
+export interface BackendRwaAssetPlanHistoryResponse {
+  asset_id: string
+  network: string
+  history?: BackendIndexedPlanHistoryItem[]
+}
+
+export interface BackendRwaAssetReadinessResponse {
+  asset: BackendAssetTemplate
+  proof: BackendAssetProofSnapshot
+  decision: BackendEligibilityDecision
+  execution_adapter_kind: string
+  execution_readiness: string
+  route_summary: string
+  quote?: BackendExecutionQuote | null
+  required_approvals?: BackendExecutionApproval[]
+  possible_failure_reasons?: string[]
+  compliance_blockers?: string[]
+  warnings?: string[]
+}
+
+export interface BackendRwaPortfolioResponse {
+  address: string
+  network: string
+  positions?: BackendPositionSnapshot[]
+  proof_snapshots?: BackendAssetProofSnapshot[]
+  alerts?: BackendPortfolioAlert[]
+  indexer_health?: BackendIndexerStatusItem[]
+  latest_anchor_summary?: BackendContractAnchorSummary[]
+  total_value_usd: number
+  total_cost_basis: number
+  total_unrealized_pnl: number
+  total_realized_income?: number
+  total_accrued_yield?: number
+  total_redemption_forecast?: number
+  allocation_mix?: Record<string, number>
+  last_sync_at: string
+}
+
+export interface BackendRwaPortfolioAlertsResponse {
+  address: string
+  network: string
+  alerts?: BackendPortfolioAlert[]
+}
+
+export interface BackendPortfolioAlertAck {
+  alert_id: string
+  address: string
+  acked: boolean
+  acknowledged_at?: string | null
+  read: boolean
+  read_at?: string | null
+}
+
+export interface BackendRwaPortfolioAlertStateResponse {
+  state: BackendPortfolioAlertAck
+}
+
+export interface BackendExecutionReceipt {
+  receipt_id: string
+  session_id?: string
+  asset_id: string
+  adapter_kind: string
+  status: string
+  settlement_status: string
+  prepared_payload?: Record<string, unknown>
+  submit_payload?: Record<string, unknown>
+  external_request_id?: string
+  redirect_url?: string
+  tx_hash?: string
+  block_number?: number | null
+  wallet_address?: string
+  safe_address?: string
+  failure_reason?: string
+  note?: string
+  submitted_at?: string | null
+  updated_at: string
+}
+
+export interface BackendRwaExecutionReceiptResponse {
+  receipt: BackendExecutionReceipt
+}
+
+export interface BackendRwaExecutionReceiptListResponse {
+  receipts?: BackendExecutionReceipt[]
+}
+
+export interface BackendOpsJobRun {
+  job_run_id: string
+  job_name: string
+  network?: string
+  status: string
+  started_at: string
+  finished_at?: string | null
+  item_count?: number
+  error_message?: string
+  metadata?: Record<string, unknown>
+}
+
+export interface BackendDebugOperationReceipt {
+  operation_id: string
+  status: string
+  started_at: string
+  finished_at?: string | null
+  error_message?: string
+  item_count?: number
+  metadata?: Record<string, unknown>
+}
+
+export interface BackendAttesterRegistryStatus {
+  network: string
+  registry_address?: string
+  owner?: string
+  pending_owner?: string
+  publisher_address?: string
+  publisher_authorized?: boolean
+  publish_enabled?: boolean
+  attesters?: string[]
+  latest_publish_status?: string
+  latest_publish_tx_hash?: string
+  latest_publish_at?: string | null
+}
+
+export interface BackendSourceHealthStatus {
+  asset_id: string
+  asset_name: string
+  network: string
+  visibility_role?: string
+  live_asset: boolean
+  proof_freshness_bucket?: string
+  proof_freshness_label?: string
+  oracle_freshness?: string
+  kyc_policy_summary?: string
+  source_confidence?: number
+  publish_status?: string
+  unavailable_reasons?: string[]
+}
+
+export interface BackendContractAnchorSummary {
+  asset_id: string
+  asset_name: string
+  network: string
+  visibility_role?: string
+  is_live: boolean
+  latest_proof_key?: string
+  latest_snapshot_hash?: string
+  latest_publish_status?: string
+  latest_tx_hash?: string
+  latest_block_number?: number | null
+  latest_indexed_at?: string | null
+  proof_history_count?: number
+  latest_plan_key?: string
+  latest_plan_session_id?: string
+  latest_plan_tx_hash?: string
+  latest_plan_block_number?: number | null
+  latest_plan_indexed_at?: string | null
+}
+
+export interface BackendRwaOpsSummary {
+  pending_publish_count?: number
+  failed_publish_count?: number
+  stale_proof_count?: number
+  max_indexer_lag?: number
+  failed_job_count?: number
+  proof_queue?: BackendAssetProofSnapshot[]
+  attester_status?: BackendAttesterRegistryStatus[]
+  source_health?: BackendSourceHealthStatus[]
+  job_health?: BackendOpsJobRun[]
+  indexer_health?: BackendIndexerStatusItem[]
+  contract_anchors?: BackendContractAnchorSummary[]
+}
+
+export interface BackendRwaOpsSummaryResponse {
+  summary: BackendRwaOpsSummary
+}
+
+export interface BackendRwaOpsJobsResponse {
+  jobs?: BackendOpsJobRun[]
+}
+
+export interface BackendDebugOperationReceiptResponse {
+  receipt: BackendDebugOperationReceipt
+}
+
+export interface BackendRwaIndexerStatusResponse {
+  status?: BackendIndexerStatusItem[]
 }
 
 export interface BackendReportAnchorResponse {
@@ -1264,10 +1712,15 @@ function mapChainConfig(config: BackendHashKeyChainConfig): HashKeyChainConfig {
     mainnetExplorerUrl: config.mainnet_explorer_url,
     planRegistryAddress: config.plan_registry_address || undefined,
     kycSbtAddress: config.kyc_sbt_address || undefined,
+    assetProofRegistryAddress: config.asset_proof_registry_address || undefined,
     testnetPlanRegistryAddress: config.testnet_plan_registry_address || undefined,
     mainnetPlanRegistryAddress: config.mainnet_plan_registry_address || undefined,
     testnetKycSbtAddress: config.testnet_kyc_sbt_address || undefined,
     mainnetKycSbtAddress: config.mainnet_kyc_sbt_address || undefined,
+    testnetAssetProofRegistryAddress:
+      config.testnet_asset_proof_registry_address || undefined,
+    mainnetAssetProofRegistryAddress:
+      config.mainnet_asset_proof_registry_address || undefined,
     docsUrls: config.docs_urls ?? [],
     oracleFeeds: (config.oracle_feeds ?? []).map(mapOracleFeed),
   }
@@ -1408,9 +1861,126 @@ function mapLiveReadiness(
     case 'partial':
     case 'unavailable':
     case 'demo_only':
+    case 'benchmark_only':
       return value
     default:
       return 'partial'
+  }
+}
+
+function mapExecutionAdapterKind(
+  value?: string,
+): 'direct_contract' | 'issuer_portal' | 'view_only' {
+  switch (value) {
+    case 'direct_contract':
+    case 'issuer_portal':
+    case 'view_only':
+      return value
+    default:
+      return 'view_only'
+  }
+}
+
+function mapExecutionReadiness(
+  value?: string,
+): 'ready' | 'requires_issuer' | 'view_only' | 'blocked' {
+  switch (value) {
+    case 'ready':
+    case 'requires_issuer':
+    case 'view_only':
+    case 'blocked':
+      return value
+    default:
+      return 'view_only'
+  }
+}
+
+function mapExecutionLifecycleStatus(
+  value?: string,
+): import('@/types').ExecutionLifecycleStatus {
+  switch (value) {
+    case 'submitted':
+    case 'redirect_required':
+    case 'pending_settlement':
+    case 'completed':
+    case 'failed':
+      return value
+    case 'prepared':
+    default:
+      return 'prepared'
+  }
+}
+
+function mapSettlementStatus(
+  value?: string,
+): import('@/types').SettlementStatus {
+  switch (value) {
+    case 'pending':
+    case 'delayed':
+    case 'completed':
+    case 'failed':
+      return value
+    case 'not_started':
+    default:
+      return 'not_started'
+  }
+}
+
+function mapProofPublishStatus(
+  value?: string,
+): import('@/types').ProofPublishStatus {
+  switch (value) {
+    case 'published':
+    case 'retry':
+    case 'failed':
+    case 'skipped':
+      return value
+    case 'pending':
+    default:
+      return 'pending'
+  }
+}
+
+function mapOnchainAnchorStatus(
+  status?: BackendOnchainAnchorStatus | null,
+): OnchainAnchorStatus {
+  return {
+    status: status?.status ?? 'unpublished',
+    proofKey: status?.proof_key ?? '',
+    registryAddress: status?.registry_address ?? '',
+    transactionHash: status?.transaction_hash ?? '',
+    blockNumber:
+      typeof status?.block_number === 'number' ? status.block_number : undefined,
+    explorerUrl: status?.explorer_url ?? '',
+    recordedAt: status?.recorded_at ?? undefined,
+    attester: status?.attester ?? '',
+    note: status?.note ?? '',
+  }
+}
+
+export function mapAssetProofHistoryItem(
+  item: BackendAssetProofHistoryItem,
+): AssetProofHistoryItem {
+  return {
+    snapshotId: item.snapshot_id,
+    assetId: item.asset_id,
+    network: item.network,
+    snapshotHash: item.snapshot_hash,
+    snapshotUri: item.snapshot_uri,
+    proofType: item.proof_type,
+    effectiveAt: item.effective_at,
+    publishedAt: item.published_at ?? undefined,
+    timelineVersion: item.timeline_version ?? 1,
+    attester: item.attester,
+    publishStatus: mapProofPublishStatus(item.publish_status),
+    onchainAnchorStatus: mapOnchainAnchorStatus(item.onchain_anchor_status),
+    oracleFreshness: item.oracle_freshness ?? '',
+    kycPolicySummary: item.kyc_policy_summary ?? '',
+    sourceConfidence:
+      typeof item.source_confidence === 'number' ? item.source_confidence : undefined,
+    unavailableReasons: item.unavailable_reasons ?? [],
+    onchainIndexed: Boolean(item.onchain_indexed),
+    indexedAt: item.indexed_at ?? undefined,
   }
 }
 
@@ -1739,9 +2309,11 @@ export function mapExecutionApproval(
     approvalType: approval.approval_type,
     tokenSymbol: approval.token_symbol ?? '',
     spender: approval.spender ?? '',
+    approvalTarget: approval.approval_target ?? '',
     amount:
       typeof approval.amount === 'number' ? approval.amount : undefined,
     note: approval.note ?? '',
+    allowanceRequired: Boolean(approval.allowance_required),
   }
 }
 
@@ -1790,9 +2362,12 @@ export function mapExecutionStep(step: BackendExecutionStep): ExecutionStep {
     requiresSafe: step.requires_safe ?? false,
     complianceBlockers: step.compliance_blockers ?? [],
     requiredApprovals: (step.required_approvals ?? []).map(mapExecutionApproval),
+    checklist: step.checklist ?? [],
     warnings: step.warnings ?? [],
     txRequest: step.tx_request ?? {},
     offchainActions: step.offchain_actions ?? [],
+    redirectUrl: step.redirect_url ?? '',
+    externalRequestId: step.external_request_id ?? '',
     status: step.status ?? 'pending',
   }
 }
@@ -1813,27 +2388,53 @@ export function mapExecutionPlan(
     sourceChain: plan.source_chain ?? '',
     sourceAsset: plan.source_asset ?? '',
     targetAsset: plan.target_asset ?? '',
+    executionAdapterKind: mapExecutionAdapterKind(plan.execution_adapter_kind),
+    executionReadiness: mapExecutionReadiness(plan.execution_readiness),
+    readinessReason: plan.readiness_reason ?? '',
+    externalActionUrl: plan.external_action_url ?? '',
+    externalActionLabel: plan.external_action_label ?? '',
     ticketSize: plan.ticket_size,
-    status:
-      plan.status === 'READY' ||
-      plan.status === 'SIMULATED' ||
-      plan.status === 'BUNDLE_READY' ||
-      plan.status === 'EXECUTING' ||
-      plan.status === 'MONITORING' ||
-      plan.status === 'FAILED'
-        ? plan.status
-        : 'NOT_READY',
+    receiptId: plan.receipt_id ?? '',
+    status: mapExecutionLifecycleStatus(plan.status),
     quote: mapExecutionQuote(plan.quote),
     warnings: plan.warnings ?? [],
     simulationWarnings: plan.simulation_warnings ?? [],
     possibleFailureReasons: plan.possible_failure_reasons ?? [],
     complianceBlockers: plan.compliance_blockers ?? [],
     requiredApprovals: (plan.required_approvals ?? []).map(mapExecutionApproval),
+    checklist: plan.checklist ?? [],
+    externalSteps: plan.external_steps ?? [],
     steps: (plan.steps ?? []).map(mapExecutionStep),
     txBundle: plan.tx_bundle ?? [],
     eligibility: (plan.eligibility ?? []).map(mapEligibilityDecision),
     canExecuteOnchain: Boolean(plan.can_execute_onchain),
     planHash: plan.plan_hash ?? '',
+  }
+}
+
+export function mapExecutionReceipt(
+  receipt: BackendExecutionReceipt,
+): ExecutionReceipt {
+  return {
+    id: receipt.receipt_id,
+    sessionId: receipt.session_id ?? '',
+    assetId: receipt.asset_id,
+    adapterKind: mapExecutionAdapterKind(receipt.adapter_kind),
+    status: mapExecutionLifecycleStatus(receipt.status),
+    settlementStatus: mapSettlementStatus(receipt.settlement_status),
+    preparedPayload: receipt.prepared_payload ?? {},
+    submitPayload: receipt.submit_payload ?? {},
+    externalRequestId: receipt.external_request_id ?? '',
+    redirectUrl: receipt.redirect_url ?? '',
+    txHash: receipt.tx_hash ?? '',
+    blockNumber:
+      typeof receipt.block_number === 'number' ? receipt.block_number : undefined,
+    walletAddress: receipt.wallet_address ?? '',
+    safeAddress: receipt.safe_address ?? '',
+    failureReason: receipt.failure_reason ?? '',
+    note: receipt.note ?? '',
+    submittedAt: receipt.submitted_at ?? undefined,
+    updatedAt: receipt.updated_at,
   }
 }
 
@@ -1901,11 +2502,270 @@ export function mapPositionSnapshot(
     currentValue: snapshot.current_value,
     costBasis: snapshot.cost_basis,
     unrealizedPnl: snapshot.unrealized_pnl,
+    realizedIncome: snapshot.realized_income ?? 0,
     accruedYield: snapshot.accrued_yield,
+    redemptionForecast: snapshot.redemption_forecast ?? 0,
+    allocationWeightPct: snapshot.allocation_weight_pct ?? 0,
+    liquidityRisk: snapshot.liquidity_risk ?? '',
     nextRedemptionWindow: snapshot.next_redemption_window ?? '',
     oracleStalenessFlag: Boolean(snapshot.oracle_staleness_flag),
     kycChangeFlag: Boolean(snapshot.kyc_change_flag),
     asOf: snapshot.as_of,
+  }
+}
+
+export function mapPortfolioAlert(
+  alert: BackendPortfolioAlert,
+): PortfolioAlert {
+  return {
+    id: alert.alert_id,
+    address: alert.address ?? '',
+    alertType: alert.alert_type,
+    severity: alert.severity,
+    title: alert.title,
+    detail: alert.detail,
+    assetId: alert.asset_id ?? '',
+    assetName: alert.asset_name ?? '',
+    sourceUrl: alert.source_url ?? '',
+    sourceRef: alert.source_ref ?? '',
+    dedupeKey: alert.dedupe_key ?? '',
+    status: alert.status === 'resolved' ? 'resolved' : 'open',
+    acked: Boolean(alert.acked),
+    acknowledgedAt: alert.acknowledged_at ?? undefined,
+    read: Boolean(alert.read),
+    readAt: alert.read_at ?? undefined,
+    detectedAt: alert.detected_at,
+    resolvedAt: alert.resolved_at ?? undefined,
+  }
+}
+
+export function mapAssetProofSnapshot(
+  proof: BackendAssetProofSnapshot,
+): AssetProofSnapshot {
+  return {
+    snapshotId: proof.snapshot_id ?? '',
+    assetId: proof.asset_id,
+    assetName: proof.asset_name,
+    assetSymbol: proof.asset_symbol,
+    network: proof.network,
+    liveAsset: Boolean(proof.live_asset),
+    includedInRegistry: Boolean(proof.included_in_registry),
+    snapshotHash: proof.snapshot_hash,
+    snapshotUri: proof.snapshot_uri,
+    proofType: proof.proof_type,
+    effectiveAt: proof.effective_at,
+    publishedAt: proof.published_at ?? undefined,
+    attester: proof.attester,
+    registryAddress: proof.registry_address ?? '',
+    registryExplorerUrl: proof.registry_explorer_url ?? '',
+    anchorStatus: mapOnchainAnchorStatus(proof.anchor_status),
+    indexedAnchorStatus: proof.indexed_anchor_status
+      ? mapOnchainAnchorStatus(proof.indexed_anchor_status)
+      : undefined,
+    indexedAt: proof.indexed_at ?? undefined,
+    historySource: proof.history_source ?? undefined,
+    timelineVersion: proof.timeline_version ?? 1,
+    publishStatus: mapProofPublishStatus(proof.publish_status),
+    onchainProofKey: proof.onchain_proof_key ?? '',
+    executionAdapterKind: mapExecutionAdapterKind(proof.execution_adapter_kind),
+    executionReadiness: mapExecutionReadiness(proof.execution_readiness),
+    truthLevel: mapTruthLevel(proof.truth_level),
+    liveReadiness: mapLiveReadiness(proof.live_readiness),
+    requiredKycLevel:
+      typeof proof.required_kyc_level === 'number'
+        ? proof.required_kyc_level
+        : undefined,
+    proofFreshness: {
+      bucket: proof.proof_freshness.bucket,
+      label: proof.proof_freshness.label,
+      checkedAt: proof.proof_freshness.checked_at,
+      staleAfterHours: proof.proof_freshness.stale_after_hours,
+      ageHours:
+        typeof proof.proof_freshness.age_hours === 'number'
+          ? proof.proof_freshness.age_hours
+          : undefined,
+      reason: proof.proof_freshness.reason ?? '',
+    },
+    oracleFreshness: proof.oracle_freshness ?? '',
+    kycPolicySummary: proof.kyc_policy_summary ?? '',
+    sourceConfidence:
+      typeof proof.source_confidence === 'number'
+        ? proof.source_confidence
+        : undefined,
+    redemptionWindow: {
+      label: proof.redemption_window.label,
+      windowType: proof.redemption_window.window_type,
+      settlementDays: proof.redemption_window.settlement_days,
+      detail: proof.redemption_window.detail ?? '',
+      nextWindow: proof.redemption_window.next_window ?? '',
+      status: proof.redemption_window.status,
+    },
+    statusCards: (proof.status_cards ?? []).map((item) => ({
+      key: item.key,
+      label: item.label,
+      status: item.status,
+      detail: item.detail,
+    })),
+    proofSourceRefs: (proof.proof_source_refs ?? []).map((item) => ({
+      refId: item.ref_id,
+      title: item.title,
+      sourceName: item.source_name,
+      sourceUrl: item.source_url,
+      sourceKind: item.source_kind ?? '',
+      sourceTier: item.source_tier ?? '',
+      freshnessDate: item.freshness_date ?? '',
+      summary: item.summary ?? '',
+      status: item.status ?? '',
+      unavailableReason: item.unavailable_reason ?? '',
+      isPrimary: Boolean(item.is_primary),
+      confidence:
+        typeof item.confidence === 'number' ? item.confidence : undefined,
+    })),
+    unavailableReasons: proof.unavailable_reasons ?? [],
+    monitoringNotes: proof.monitoring_notes ?? [],
+    primaryActionUrl: proof.primary_action_url ?? '',
+    visibilityRole: proof.visibility_role ?? '',
+    isExecutable: Boolean(proof.is_executable),
+  }
+}
+
+export function mapPortfolioAlertAck(
+  ack: BackendPortfolioAlertAck,
+): PortfolioAlertAck {
+  return {
+    alertId: ack.alert_id,
+    address: ack.address,
+    acked: Boolean(ack.acked),
+    acknowledgedAt: ack.acknowledged_at ?? undefined,
+    read: Boolean(ack.read),
+    readAt: ack.read_at ?? undefined,
+  }
+}
+
+export function mapIndexerStatusItem(
+  item: BackendIndexerStatusItem,
+): IndexerStatusItem {
+  return {
+    network: item.network,
+    contractName: item.contract_name,
+    contractAddress: item.contract_address ?? '',
+    lastIndexedBlock: item.last_indexed_block ?? 0,
+    lastSafeHead: item.last_safe_head ?? 0,
+    chainHead: item.chain_head ?? 0,
+    lag: item.lag ?? 0,
+    status: item.status,
+    lastError: item.last_error ?? '',
+    updatedAt: item.updated_at,
+  }
+}
+
+export function mapOpsJobRun(job: BackendOpsJobRun): OpsJobRun {
+  return {
+    jobRunId: job.job_run_id,
+    jobName: job.job_name,
+    network: job.network ?? '',
+    status: job.status,
+    startedAt: job.started_at,
+    finishedAt: job.finished_at ?? undefined,
+    itemCount: job.item_count ?? 0,
+    errorMessage: job.error_message ?? '',
+    metadata: job.metadata ?? {},
+  }
+}
+
+export function mapDebugOperationReceipt(
+  receipt: BackendDebugOperationReceipt,
+): DebugOperationReceipt {
+  return {
+    operationId: receipt.operation_id,
+    status: receipt.status,
+    startedAt: receipt.started_at,
+    finishedAt: receipt.finished_at ?? undefined,
+    errorMessage: receipt.error_message ?? '',
+    itemCount: receipt.item_count ?? 0,
+    metadata: receipt.metadata ?? {},
+  }
+}
+
+export function mapAttesterRegistryStatus(
+  item: BackendAttesterRegistryStatus,
+): AttesterRegistryStatus {
+  return {
+    network: item.network,
+    registryAddress: item.registry_address ?? '',
+    owner: item.owner ?? '',
+    pendingOwner: item.pending_owner ?? '',
+    publisherAddress: item.publisher_address ?? '',
+    publisherAuthorized: Boolean(item.publisher_authorized),
+    publishEnabled: Boolean(item.publish_enabled),
+    attesters: item.attesters ?? [],
+    latestPublishStatus: item.latest_publish_status ?? '',
+    latestPublishTxHash: item.latest_publish_tx_hash ?? '',
+    latestPublishAt: item.latest_publish_at ?? undefined,
+  }
+}
+
+export function mapSourceHealthStatus(
+  item: BackendSourceHealthStatus,
+): SourceHealthStatus {
+  return {
+    assetId: item.asset_id,
+    assetName: item.asset_name,
+    network: item.network,
+    visibilityRole: item.visibility_role ?? '',
+    liveAsset: Boolean(item.live_asset),
+    proofFreshnessBucket: item.proof_freshness_bucket ?? '',
+    proofFreshnessLabel: item.proof_freshness_label ?? '',
+    oracleFreshness: item.oracle_freshness ?? '',
+    kycPolicySummary: item.kyc_policy_summary ?? '',
+    sourceConfidence:
+      typeof item.source_confidence === 'number' ? item.source_confidence : undefined,
+    publishStatus: mapProofPublishStatus(item.publish_status),
+    unavailableReasons: item.unavailable_reasons ?? [],
+  }
+}
+
+export function mapContractAnchorSummary(
+  item: BackendContractAnchorSummary,
+): ContractAnchorSummary {
+  return {
+    assetId: item.asset_id,
+    assetName: item.asset_name,
+    network: item.network,
+    visibilityRole: item.visibility_role ?? '',
+    isLive: Boolean(item.is_live),
+    latestProofKey: item.latest_proof_key ?? '',
+    latestSnapshotHash: item.latest_snapshot_hash ?? '',
+    latestPublishStatus: item.latest_publish_status ?? '',
+    latestTxHash: item.latest_tx_hash ?? '',
+    latestBlockNumber:
+      typeof item.latest_block_number === 'number' ? item.latest_block_number : undefined,
+    latestIndexedAt: item.latest_indexed_at ?? undefined,
+    proofHistoryCount: item.proof_history_count ?? 0,
+    latestPlanKey: item.latest_plan_key ?? '',
+    latestPlanSessionId: item.latest_plan_session_id ?? '',
+    latestPlanTxHash: item.latest_plan_tx_hash ?? '',
+    latestPlanBlockNumber:
+      typeof item.latest_plan_block_number === 'number' ? item.latest_plan_block_number : undefined,
+    latestPlanIndexedAt: item.latest_plan_indexed_at ?? undefined,
+  }
+}
+
+export function mapRwaOpsSummary(
+  summary: BackendRwaOpsSummary,
+): RwaOpsSummary {
+  return {
+    pendingPublishCount: summary.pending_publish_count ?? 0,
+    failedPublishCount: summary.failed_publish_count ?? 0,
+    staleProofCount: summary.stale_proof_count ?? 0,
+    maxIndexerLag: summary.max_indexer_lag ?? 0,
+    failedJobCount: summary.failed_job_count ?? 0,
+    proofQueue: (summary.proof_queue ?? []).map(mapAssetProofSnapshot),
+    attesterStatus: (summary.attester_status ?? []).map(mapAttesterRegistryStatus),
+    sourceHealth: (summary.source_health ?? []).map(mapSourceHealthStatus),
+    jobHealth: (summary.job_health ?? []).map(mapOpsJobRun),
+    indexerHealth: (summary.indexer_health ?? []).map(mapIndexerStatusItem),
+    contractAnchors: (summary.contract_anchors ?? []).map(mapContractAnchorSummary),
   }
 }
 
@@ -2826,15 +3686,7 @@ export function mapBackendSession(session: BackendSession): AnalysisSession {
       typeof session.max_drawdown_tolerance === 'number'
         ? session.max_drawdown_tolerance
         : undefined,
-    executionStatus:
-      session.execution_status === 'READY' ||
-      session.execution_status === 'SIMULATED' ||
-      session.execution_status === 'BUNDLE_READY' ||
-      session.execution_status === 'EXECUTING' ||
-      session.execution_status === 'MONITORING' ||
-      session.execution_status === 'FAILED'
-        ? session.execution_status
-        : 'NOT_READY',
+    executionStatus: mapExecutionLifecycleStatus(session.execution_status),
     lastOnchainSyncAt: session.last_onchain_sync_at ?? undefined,
     createdAt: session.created_at,
     updatedAt: session.updated_at,

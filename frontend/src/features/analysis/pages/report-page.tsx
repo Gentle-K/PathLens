@@ -174,6 +174,11 @@ export function ReportPage() {
     (item) => item.freshness?.bucket === 'stale',
   )
   const executiveSummary = extractExecutiveSummary(report.markdown)
+  const primaryAssetId =
+    report.executionPlan?.targetAsset ||
+    report.recommendedAllocations[0]?.assetId ||
+    report.assetCards[0]?.assetId ||
+    ''
   const recommendationLine =
     report.highlights[0]?.detail ?? session.lastInsight ?? executiveSummary
 
@@ -220,21 +225,27 @@ export function ReportPage() {
         <PageHeader
           eyebrow="Report detail"
           title={report.summaryTitle}
-          description="This report is designed as decision support. Facts, estimates, inferences, and unknowns remain visibly separated."
+          description="This report now sits behind the product loop: verify proof first, then move into execution readiness and monitoring."
           actions={
             <>
+              {primaryAssetId ? (
+                <Button onClick={() => void navigate(`/assets/${primaryAssetId}/proof`)}>
+                  <ExternalLink className="size-4" />
+                  Open proof center
+                </Button>
+              ) : null}
+              <Button variant="secondary" onClick={() => void navigate(`/sessions/${resolvedId}/execute`)}>
+                Review execution plan
+              </Button>
+              <Button variant="secondary" onClick={() => void navigate(`/sessions/${resolvedId}/execute`)}>
+                Execute on HashKey Chain
+              </Button>
               <Button variant="secondary" onClick={() => void navigate(`/sessions/${resolvedId}`)}>
                 Open session
               </Button>
               <Button variant="secondary" onClick={() => void reanalyzeMutation.mutateAsync()}>
                 <RefreshCw className="size-4" />
                 Re-open clarification
-              </Button>
-              <Button variant="secondary" onClick={() => void navigate(`/sessions/${resolvedId}/execute`)}>
-                Review execution plan
-              </Button>
-              <Button onClick={() => void navigate(`/sessions/${resolvedId}/execute`)}>
-                Execute on HashKey Chain
               </Button>
               <Button variant="secondary" onClick={() => void handleExport()}>
                 <FileDown className="size-4" />
@@ -244,7 +255,7 @@ export function ReportPage() {
                 <Copy className="size-4" />
                 Copy link
               </Button>
-              <Button onClick={() => void handleShare()}>
+              <Button variant="secondary" onClick={() => void handleShare()}>
                 <Share2 className="size-4" />
                 Share report
               </Button>
@@ -365,6 +376,10 @@ export function ReportPage() {
                   <div>Oracle: {asset.oracleProvider || 'N/A'}</div>
                 </div>
                 <p className="text-sm leading-6 text-text-secondary">{asset.fitSummary}</p>
+                <Button variant="secondary" onClick={() => void navigate(`/assets/${asset.assetId}/proof`)}>
+                  <ExternalLink className="size-4" />
+                  View proof
+                </Button>
               </Card>
             ))}
           </div>

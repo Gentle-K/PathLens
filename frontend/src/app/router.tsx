@@ -24,6 +24,16 @@ const SessionsPage = lazy(() =>
     default: module.SessionsPage,
   })),
 )
+const AssetsHubPage = lazy(() =>
+  import('@/features/assets/assets-hub-page').then((module) => ({
+    default: module.AssetsHubPage,
+  })),
+)
+const AssetProofPage = lazy(() =>
+  import('@/features/assets/asset-proof-page').then((module) => ({
+    default: module.AssetProofPage,
+  })),
+)
 const SessionDetailPage = lazy(() =>
   import('@/features/analysis/pages/session-detail-page').then((module) => ({
     default: module.SessionDetailPage,
@@ -72,6 +82,16 @@ const SettingsPage = lazy(() =>
 const RolesPage = lazy(() =>
   import('@/features/admin/roles-page').then((module) => ({
     default: module.RolesPage,
+  })),
+)
+const RwaOpsPage = lazy(() =>
+  import('@/features/admin/rwa-ops-page').then((module) => ({
+    default: module.RwaOpsPage,
+  })),
+)
+const PortfolioPage = lazy(() =>
+  import('@/features/portfolio/portfolio-page').then((module) => ({
+    default: module.PortfolioPage,
   })),
 )
 const AuditLogPage = lazy(() =>
@@ -146,6 +166,8 @@ export const router = createBrowserRouter([
           { index: true, element: <Navigate to="/new-analysis" replace /> },
           { path: '/dashboard', element: <Navigate to="/new-analysis" replace /> },
           { path: '/new-analysis', element: withRouteSuspense(<NewAnalysisPage />) },
+          { path: '/assets', element: withRouteSuspense(<AssetsHubPage />) },
+          { path: '/assets/:assetId/proof', element: withRouteSuspense(<AssetProofPage />) },
           { path: '/sessions', element: withRouteSuspense(<SessionsPage />) },
           { path: '/sessions/:sessionId', element: withRouteSuspense(<SessionDetailPage />) },
           {
@@ -161,6 +183,8 @@ export const router = createBrowserRouter([
             path: '/reports/:reportId',
             element: withRouteSuspense(<ReportDetailPage />),
           },
+          { path: '/portfolio', element: withRouteSuspense(<PortfolioPage />) },
+          { path: '/portfolio/:address', element: withRouteSuspense(<PortfolioPage />) },
           {
             path: '/sessions/:sessionId/execute',
             element: withRouteSuspense(<ExecutionPage />),
@@ -229,6 +253,10 @@ export const router = createBrowserRouter([
           {
             path: '/debug/admin/roles',
             element: withRouteSuspense(<RolesPage />),
+          },
+          {
+            path: '/debug/rwa-ops',
+            element: withRouteSuspense(<RwaOpsPage />),
           },
         ],
       },

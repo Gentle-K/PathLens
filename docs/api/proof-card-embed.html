@@ -1,0 +1,192 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>HashKey Proof Card Embed Demo</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #07111f;
+        --panel: rgba(15, 27, 49, 0.92);
+        --border: rgba(111, 130, 163, 0.18);
+        --text: #edf4ff;
+        --muted: #9fb2cf;
+        --accent: #4f7cff;
+        --info: #22d3ee;
+        --success: #22c55e;
+        --warning: #f59e0b;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        background: radial-gradient(circle at top, rgba(34, 211, 238, 0.12), transparent 28%),
+          linear-gradient(180deg, #07111f, #0a182c 52%, #06101d);
+        color: var(--text);
+        font: 15px/1.6 Manrope, system-ui, sans-serif;
+        display: grid;
+        place-items: center;
+        padding: 32px;
+      }
+
+      .frame {
+        width: min(100%, 520px);
+      }
+
+      .card {
+        border: 1px solid var(--border);
+        border-radius: 28px;
+        background: var(--panel);
+        padding: 24px;
+        box-shadow: 0 24px 60px rgba(2, 10, 24, 0.4);
+      }
+
+      .eyebrow {
+        text-transform: uppercase;
+        letter-spacing: 0.12em;
+        color: var(--info);
+        font-size: 12px;
+        margin-bottom: 12px;
+      }
+
+      h1 {
+        font-size: 28px;
+        line-height: 1.1;
+        margin: 0 0 10px;
+      }
+
+      p {
+        margin: 0;
+        color: var(--muted);
+      }
+
+      .badges,
+      .meta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-top: 16px;
+      }
+
+      .badge {
+        border: 1px solid var(--border);
+        border-radius: 999px;
+        padding: 6px 10px;
+        font-size: 12px;
+        color: var(--text);
+      }
+
+      .meta-grid {
+        display: grid;
+        gap: 12px;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        margin-top: 20px;
+      }
+
+      .stat {
+        border-radius: 20px;
+        background: rgba(7, 17, 31, 0.52);
+        padding: 14px;
+      }
+
+      .stat-label {
+        font-size: 11px;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: var(--muted);
+      }
+
+      .stat-value {
+        margin-top: 8px;
+        font-weight: 700;
+        color: var(--text);
+      }
+
+      .actions {
+        display: flex;
+        gap: 12px;
+        margin-top: 20px;
+      }
+
+      a.button {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        min-height: 42px;
+        padding: 0 16px;
+        border-radius: 16px;
+        text-decoration: none;
+        color: white;
+        background: var(--accent);
+      }
+
+      a.secondary {
+        background: rgba(15, 27, 49, 0.84);
+        border: 1px solid var(--border);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="frame">
+      <div id="proof-card" class="card">Loading proof card...</div>
+    </div>
+
+    <script type="module">
+      const params = new URLSearchParams(window.location.search)
+      const baseUrl = params.get('baseUrl') || 'http://localhost:8000'
+      const frontendBaseUrl = params.get('frontendBaseUrl') || 'http://localhost:5173'
+      const assetId = params.get('asset') || 'hsk-usdt'
+      const network = params.get('network') || 'testnet'
+      const root = document.querySelector('#proof-card')
+
+      const response = await fetch(
+        `${baseUrl}/api/rwa/assets/${encodeURIComponent(assetId)}/proof?network=${encodeURIComponent(network)}`,
+        {
+          headers: { Accept: 'application/json' },
+        },
+      )
+
+      if (!response.ok) {
+        root.textContent = `Failed to load proof card: ${response.status} ${response.statusText}`
+      } else {
+        const payload = await response.json()
+        const proof = payload.latest_proof
+        root.innerHTML = `
+          <div class="eyebrow">HashKey Proof Layer</div>
+          <h1>${proof.asset_name}</h1>
+          <p>Embed-ready proof card showing freshness, onchain anchor status, and executability.</p>
+          <div class="badges">
+            <span class="badge">${proof.asset_symbol}</span>
+            <span class="badge">${proof.truth_level}</span>
+            <span class="badge">${proof.execution_readiness}</span>
+            <span class="badge">${proof.visibility_role || 'live'}</span>
+          </div>
+          <div class="meta-grid">
+            <div class="stat">
+              <div class="stat-label">Freshness</div>
+              <div class="stat-value">${proof.proof_freshness.label}</div>
+            </div>
+            <div class="stat">
+              <div class="stat-label">Anchor</div>
+              <div class="stat-value">${payload.onchain_anchor_status.status}</div>
+            </div>
+            <div class="stat">
+              <div class="stat-label">Snapshot hash</div>
+              <div class="stat-value">${proof.snapshot_hash.slice(0, 18)}...</div>
+            </div>
+            <div class="stat">
+              <div class="stat-label">Executable</div>
+              <div class="stat-value">${proof.is_executable ? 'Yes' : 'No'}</div>
+            </div>
+          </div>
+          <div class="actions">
+            <a class="button" href="${frontendBaseUrl}/assets/${assetId}/proof">Open proof page</a>
+            <a class="button secondary" href="${proof.primary_action_url || '#'}">Primary source</a>
+          </div>
+        `
+      }
+    </script>
+  </body>
+</html>

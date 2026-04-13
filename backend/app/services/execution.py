@@ -9,23 +9,38 @@ from app.domain.rwa import (
     AssetTemplate,
     EligibilityDecision,
     EligibilityStatus,
+    ExecutionAdapterKind,
     ExecutionApproval,
     ExecutionLifecycleStatus,
     ExecutionPlan,
     ExecutionQuote,
+    ExecutionReadiness,
+    ExecutionReceipt,
     ExecutionStep,
+    IssuerRequestRecord,
     ReportAnchorRecord,
+    SettlementStatus,
 )
 from app.rwa.explorer_service import address_url, chain_id_for, tx_url
 from app.services.eligibility import EligibilityService
+from app.services.execution_receipts import ExecutionReceiptsService
 from app.services.sessions import SessionService
+
+LIVE_EXECUTION_ASSET_IDS = {
+    "hsk-usdt",
+    "hsk-usdc",
+    "cpic-estable-mmf",
+    "hk-regulated-silver",
+}
 
 
 def _normalize(value: str) -> str:
     return value.strip().lower()
 
 
-def _asset_price(asset: AssetTemplate) -> float:
+def _asset_price(asset: AssetTemplate | None) -> float:
+    if asset is None:
+        return 1.0
     if asset.nav_or_price is not None and asset.nav_or_price > 0:
         return asset.nav_or_price
     if asset.asset_type.value in {"stablecoin", "mmf"}:
@@ -41,15 +56,38 @@ def _hash_json(payload: object) -> str:
     ).hexdigest()
 
 
+def _method_selector(signature: str) -> str:
+    return hashlib.sha3_256(signature.encode("utf-8")).hexdigest()[:8]
+
+
+def _abi_word(value: object) -> str:
+    if isinstance(value, str) and value.startswith("0x") and len(value) == 42:
+        return f"{'0' * 24}{value[2:].lower()}"
+    if isinstance(value, bool):
+        return f"{1 if value else 0:064x}"
+    if isinstance(value, int):
+        return f"{max(value, 0):064x}"
+    if isinstance(value, float):
+        return f"{max(int(round(value)), 0):064x}"
+    digest = hashlib.sha256(str(value).encode("utf-8")).hexdigest()
+    return digest[:64]
+
+
+def _encode_call(signature: str, args: list[object]) -> str:
+    return f"0x{_method_selector(signature)}{''.join(_abi_word(arg) for arg in args)}"
+
+
 class ExecutionService:
     def __init__(
         self,
         *,
         session_service: SessionService,
         eligibility_service: EligibilityService,
+        receipts_service: ExecutionReceiptsService,
     ) -> None:
         self.session_service = session_service
         self.eligibility_service = eligibility_service
+        self.receipts_service = receipts_service
 
     @staticmethod
     def resolve_asset(assets: Iterable[AssetTemplate], key: str) -> AssetTemplate | None:
@@ -77,33 +115,41 @@ class ExecutionService:
         if target is None:
             raise ValueError(f"Unknown target asset '{target_asset}'.")
 
-        source_price = _asset_price(source) if source is not None else 1.0
+        source_price = _asset_price(source)
         target_price = _asset_price(target)
-        route_type = target.execution_style or "erc20"
+        route_type = self._route_type_for(target)
         fee_bps = float(
             max(
                 5,
-                target.entry_fee_bps + target.slippage_bps + (20 if route_type == "issuer_portal" else 0),
+                target.entry_fee_bps
+                + target.slippage_bps
+                + (20 if route_type == "issuer_portal" else 0),
             )
         )
+        if route_type == "view_only":
+            fee_bps = 0.0
         fee_amount = round(amount * fee_bps / 10000, 6)
         amount_after_fees = max(0.0, amount - fee_amount)
         expected_amount_out = round((amount_after_fees * source_price) / max(target_price, 0.000001), 6)
-        gas_estimate = 190000 if route_type == "erc20" else 85000
-        gas_estimate_usd = round(3.8 if route_type == "erc20" else 1.2, 4)
-        eta_seconds = 90 if route_type == "erc20" else 600
+        gas_estimate = 190000 if route_type == "erc20" else (85000 if route_type == "issuer_portal" else 0)
+        gas_estimate_usd = round(3.8 if route_type == "erc20" else (1.2 if route_type == "issuer_portal" else 0.0), 4)
+        eta_seconds = 90 if route_type == "erc20" else (600 if route_type == "issuer_portal" else 0)
 
         warnings = list(target.risk_flags)
         if _normalize(source_asset) and _normalize(source_asset) != _normalize(target.settlement_asset):
             warnings.append(
                 f"Route requires settlement into {target.settlement_asset} before subscribing."
             )
-        if source_chain and _normalize(source_chain) not in {"hashkey", "hashkey chain"}:
+        if source_chain and _normalize(source_chain) not in {"hashkey", "hashkey chain", "mainnet", "testnet"}:
             warnings.append("Source funds originate off HashKey Chain; bridge or settlement routing may be required.")
         if target.lockup_days > 0:
             warnings.append(f"Target asset has a {target.lockup_days}-day lockup.")
         if target.redemption_window:
             warnings.append(f"Redemption window: {target.redemption_window}.")
+        if route_type == "view_only":
+            warnings.append(
+                "Asset is reference-only in the current stack and should not be treated as a live execution target."
+            )
 
         return ExecutionQuote(
             source_asset=source_asset or target.settlement_asset,
@@ -137,8 +183,10 @@ class ExecutionService:
                     approval_type="erc20_allowance",
                     token_symbol=quote.source_asset,
                     spender=target.contract_address,
+                    approval_target=target.contract_address,
                     amount=quote.amount_in,
                     note=f"Approve {quote.source_asset} spending for {target.name}.",
+                    allowance_required=True,
                 )
             )
             possible_failure_reasons.extend(
@@ -148,7 +196,7 @@ class ExecutionService:
                     "Slippage or price guard exceeded before submission.",
                 ]
             )
-        else:
+        elif quote.route_type == "issuer_portal":
             possible_failure_reasons.extend(
                 [
                     "Issuer offchain compliance review is incomplete.",
@@ -156,6 +204,16 @@ class ExecutionService:
                 ]
             )
             warnings.append("Primary asset execution follows an issuer or portal workflow rather than a direct ERC20 call.")
+        else:
+            compliance_blockers.append(
+                "This asset is view-only in the current release and cannot be executed from the workbench."
+            )
+            possible_failure_reasons.append(
+                "The asset is outside the v1 live execution scope."
+            )
+            warnings.append(
+                "Use the proof view for verification and comparison instead of treating this asset as executable."
+            )
 
         if decision.status == EligibilityStatus.BLOCKED:
             compliance_blockers.extend(decision.reasons + decision.missing_requirements)
@@ -169,7 +227,120 @@ class ExecutionService:
 
         return approvals, possible_failure_reasons, compliance_blockers, warnings
 
-    def build_execution_plan(
+    @staticmethod
+    def _route_type_for(target: AssetTemplate) -> str:
+        if (
+            target.asset_id not in LIVE_EXECUTION_ASSET_IDS
+            or target.live_readiness.value in {"demo_only", "benchmark_only"}
+            or target.asset_type.value == "benchmark"
+        ):
+            return "view_only"
+        return target.execution_style or "erc20"
+
+    def _execution_adapter_kind_for(self, target: AssetTemplate) -> ExecutionAdapterKind:
+        route_type = self._route_type_for(target)
+        if route_type == "erc20":
+            return ExecutionAdapterKind.DIRECT_CONTRACT
+        if route_type == "issuer_portal":
+            return ExecutionAdapterKind.ISSUER_PORTAL
+        return ExecutionAdapterKind.VIEW_ONLY
+
+    def _execution_readiness_for(
+        self,
+        target: AssetTemplate,
+        decision: EligibilityDecision,
+    ) -> ExecutionReadiness:
+        if decision.status == EligibilityStatus.BLOCKED:
+            return ExecutionReadiness.BLOCKED
+        adapter_kind = self._execution_adapter_kind_for(target)
+        if adapter_kind == ExecutionAdapterKind.DIRECT_CONTRACT:
+            return ExecutionReadiness.READY
+        if adapter_kind == ExecutionAdapterKind.ISSUER_PORTAL:
+            return ExecutionReadiness.REQUIRES_ISSUER
+        return ExecutionReadiness.VIEW_ONLY
+
+    @staticmethod
+    def _checklist_for(target: AssetTemplate, adapter_kind: ExecutionAdapterKind) -> list[str]:
+        checklist = [
+            "Verify the target asset proof freshness before signing.",
+            "Confirm wallet network and settlement asset routing.",
+        ]
+        if target.requires_kyc_level:
+            checklist.append(f"Confirm KYC level {target.requires_kyc_level}+ is active.")
+        if target.minimum_ticket_usd:
+            checklist.append(f"Minimum ticket: ${target.minimum_ticket_usd:,.0f}.")
+        if adapter_kind == ExecutionAdapterKind.DIRECT_CONTRACT:
+            checklist.append("Review allowance scope and tx request payload before signing.")
+        elif adapter_kind == ExecutionAdapterKind.ISSUER_PORTAL:
+            checklist.append("Collect issuer-side docs and whitelist approvals before redirect.")
+        return checklist
+
+    @staticmethod
+    def _external_steps_for(target: AssetTemplate, adapter_kind: ExecutionAdapterKind) -> list[str]:
+        if adapter_kind == ExecutionAdapterKind.DIRECT_CONTRACT:
+            return [
+                "Sign allowance if required.",
+                "Submit contract transaction from the connected wallet.",
+                "Track settlement and proof/portfolio writeback.",
+            ]
+        if adapter_kind == ExecutionAdapterKind.ISSUER_PORTAL:
+            return [
+                "Open issuer flow.",
+                "Complete whitelist / docs / subscription confirmation.",
+                "Wait for issuer settlement and sync the resulting status.",
+            ]
+        return [
+            "View proof and readiness only.",
+            "Do not treat this asset as executable in the live flow.",
+        ]
+
+    @staticmethod
+    def _amount_units(asset_symbol: str, amount: float) -> int:
+        decimals = 6 if asset_symbol.upper() in {"USDT", "USDC"} else 18
+        return max(int(round(amount * (10**decimals))), 0)
+
+    def _build_direct_contract_payload(
+        self,
+        *,
+        target: AssetTemplate,
+        source: AssetTemplate | None,
+        quote: ExecutionQuote,
+        wallet_address: str,
+        chain_id: int,
+    ) -> tuple[dict[str, object], dict[str, object]]:
+        amount_units = self._amount_units(quote.source_asset, quote.amount_in)
+        source_contract = source.contract_address if source else target.contract_address
+        approval_request = {
+            "to": source_contract,
+            "value": "0x0",
+            "data": _encode_call(
+                "approve(address,uint256)",
+                [target.contract_address, amount_units],
+            ),
+            "chainId": chain_id,
+            "methodName": "approve",
+            "args": [target.contract_address, str(amount_units)],
+        }
+
+        if target.asset_type.value == "stablecoin":
+            method_name = "transfer"
+            signature = "transfer(address,uint256)"
+            args = [wallet_address or "0x0000000000000000000000000000000000000000", amount_units]
+        else:
+            method_name = "subscribe"
+            signature = "subscribe(uint256,address)"
+            args = [amount_units, wallet_address or "0x0000000000000000000000000000000000000000"]
+        execution_request = {
+            "to": target.contract_address,
+            "value": "0x0",
+            "data": _encode_call(signature, args),
+            "chainId": chain_id,
+            "methodName": method_name,
+            "args": [str(arg) for arg in args],
+        }
+        return approval_request, execution_request
+
+    def prepare_execution(
         self,
         *,
         session: AnalysisSession,
@@ -180,11 +351,11 @@ class ExecutionService:
         source_asset: str = "",
         source_chain: str = "",
         include_attestation: bool = True,
-        generate_only: bool = True,
     ) -> ExecutionPlan:
         target = self.resolve_asset(assets, target_asset_key)
         if target is None:
             raise ValueError(f"Unknown target asset '{target_asset_key}'.")
+        source = self.resolve_asset(assets, source_asset or target.settlement_asset)
 
         decision = self.eligibility_service.evaluate_asset(
             target,
@@ -207,9 +378,26 @@ class ExecutionService:
             quote=quote,
             decision=decision,
         )
+        adapter_kind = self._execution_adapter_kind_for(target)
+        execution_readiness = self._execution_readiness_for(target, decision)
+        checklist = self._checklist_for(target, adapter_kind)
+        external_steps = self._external_steps_for(target, adapter_kind)
+        readiness_reason = (
+            "Eligible for direct contract execution on HashKey Chain."
+            if execution_readiness == ExecutionReadiness.READY
+            else (
+                "Execution still depends on issuer or platform workflow after wallet qualification."
+                if execution_readiness == ExecutionReadiness.REQUIRES_ISSUER
+                else (
+                    "Execution is blocked by current eligibility constraints."
+                    if execution_readiness == ExecutionReadiness.BLOCKED
+                    else "Asset is view-only in the current release."
+                )
+            )
+        )
 
         steps: list[ExecutionStep] = []
-        tx_bundle: list[dict[str, str | int | float | bool]] = []
+        tx_bundle: list[dict[str, object]] = []
         network = (
             session.intake_context.wallet_network
             or session.source_chain
@@ -219,118 +407,141 @@ class ExecutionService:
         network = "mainnet" if _normalize(network) == "mainnet" else "testnet"
         chain_id = chain_id_for(chain_config, network)
 
-        if approvals:
-            approval_step = ExecutionStep(
-                step_index=1,
-                title="Approve settlement asset",
-                description=f"Approve {quote.source_asset} spending before the target asset call.",
-                step_type="approval",
-                route_kind=quote.route_type,
-                asset_id=target.asset_id,
-                target_contract=target.contract_address,
-                explorer_url=address_url(chain_config, network, target.contract_address),
+        if adapter_kind == ExecutionAdapterKind.DIRECT_CONTRACT:
+            approval_request, execution_request = self._build_direct_contract_payload(
+                target=target,
+                source=source,
+                quote=quote,
+                wallet_address=session.wallet_address or session.safe_address,
                 chain_id=chain_id,
-                estimated_fee_usd=round(quote.gas_estimate_usd * 0.4, 4),
-                requires_signature=True,
-                requires_wallet=True,
-                required_approvals=approvals,
-                warnings=list(warnings),
-                tx_request={
-                    "to": target.contract_address,
-                    "value": "0x0",
-                    "data": f"approve({quote.source_asset},{quote.amount_in})",
-                    "chainId": chain_id,
-                },
             )
-            steps.append(approval_step)
-            tx_bundle.append(dict(approval_step.tx_request))
+            if approvals:
+                approval_step = ExecutionStep(
+                    step_index=1,
+                    title="Approve settlement asset",
+                    description=f"Approve {quote.source_asset} spending before the target asset call.",
+                    step_type="approval",
+                    route_kind=quote.route_type,
+                    asset_id=target.asset_id,
+                    target_contract=source.contract_address if source else target.contract_address,
+                    explorer_url=address_url(chain_config, network, source.contract_address if source else target.contract_address),
+                    chain_id=chain_id,
+                    estimated_fee_usd=round(quote.gas_estimate_usd * 0.4, 4),
+                    requires_signature=True,
+                    requires_wallet=True,
+                    required_approvals=approvals,
+                    checklist=["Review allowance scope."],
+                    warnings=list(warnings),
+                    tx_request=approval_request,
+                )
+                steps.append(approval_step)
+                tx_bundle.append(dict(approval_step.tx_request))
 
-        asset_step_index = len(steps) + 1
-        if quote.route_type == "erc20":
-            asset_step = ExecutionStep(
-                step_index=asset_step_index,
-                title="Execute allocation",
-                description=f"Subscribe or mint {target.name} using {quote.source_asset}.",
-                step_type="asset_execution",
-                route_kind=quote.route_type,
-                asset_id=target.asset_id,
-                target_contract=target.contract_address,
-                explorer_url=address_url(chain_config, network, target.contract_address),
-                chain_id=chain_id,
-                estimated_fee_usd=quote.gas_estimate_usd,
-                expected_amount=quote.expected_amount_out,
-                requires_signature=True,
-                requires_wallet=True,
-                compliance_blockers=list(compliance_blockers),
-                required_approvals=list(approvals),
-                warnings=list(warnings),
-                tx_request={
-                    "to": target.contract_address,
-                    "value": "0x0",
-                    "data": f"allocate({quote.source_asset},{quote.amount_in})",
-                    "chainId": chain_id,
-                    "routeType": quote.route_type,
-                },
+            steps.append(
+                ExecutionStep(
+                    step_index=len(steps) + 1,
+                    title="Submit direct contract transaction",
+                    description=f"Execute the direct contract route for {target.name}.",
+                    step_type="asset_execution",
+                    route_kind=quote.route_type,
+                    asset_id=target.asset_id,
+                    target_contract=target.contract_address,
+                    explorer_url=address_url(chain_config, network, target.contract_address),
+                    chain_id=chain_id,
+                    estimated_fee_usd=quote.gas_estimate_usd,
+                    expected_amount=quote.expected_amount_out,
+                    requires_signature=True,
+                    requires_wallet=True,
+                    compliance_blockers=list(compliance_blockers),
+                    required_approvals=list(approvals),
+                    checklist=["Verify calldata.", "Verify recipient and amount."],
+                    warnings=list(warnings),
+                    tx_request=execution_request,
+                )
+            )
+            tx_bundle.append(execution_request)
+        elif adapter_kind == ExecutionAdapterKind.ISSUER_PORTAL:
+            steps.append(
+                ExecutionStep(
+                    step_index=1,
+                    title="Prepare issuer submission",
+                    description=f"Complete the issuer or portal workflow for {target.name}.",
+                    step_type="offchain_compliance",
+                    route_kind=quote.route_type,
+                    asset_id=target.asset_id,
+                    target_contract=target.contract_address,
+                    explorer_url=address_url(chain_config, network, target.contract_address) if target.contract_address else "",
+                    chain_id=chain_id,
+                    estimated_fee_usd=0.0,
+                    expected_amount=quote.expected_amount_out,
+                    requires_signature=False,
+                    requires_wallet=False,
+                    compliance_blockers=list(compliance_blockers),
+                    warnings=list(warnings),
+                    checklist=["Collect required docs.", "Review whitelist / KYC status."],
+                    offchain_actions=list(external_steps),
+                    redirect_url=target.action_links[0].url if target.action_links else "",
+                )
             )
         else:
-            asset_step = ExecutionStep(
-                step_index=asset_step_index,
-                title="Complete issuer subscription flow",
-                description=f"Finish the issuer or portal workflow for {target.name}.",
-                step_type="offchain_compliance",
-                route_kind=quote.route_type,
-                asset_id=target.asset_id,
-                target_contract=target.contract_address,
-                explorer_url=address_url(chain_config, network, target.contract_address),
-                chain_id=chain_id,
-                estimated_fee_usd=0.0,
-                expected_amount=quote.expected_amount_out,
-                requires_signature=False,
-                requires_wallet=False,
-                compliance_blockers=list(compliance_blockers),
-                warnings=list(warnings),
-                offchain_actions=[
-                    "Confirm whitelist, KYC, and investor classification with the issuer.",
-                    f"Settle in {target.settlement_asset} and submit the subscription ticket.",
-                    "Collect confirmation from the issuer before anchoring the report.",
-                ],
+            steps.append(
+                ExecutionStep(
+                    step_index=1,
+                    title="View proof and execution requirements",
+                    description=f"{target.name} is visible for verification and comparison but not executable from this console.",
+                    step_type="view_only_guidance",
+                    route_kind=quote.route_type,
+                    asset_id=target.asset_id,
+                    target_contract=target.contract_address,
+                    explorer_url=address_url(chain_config, network, target.contract_address) if target.contract_address else "",
+                    chain_id=chain_id,
+                    estimated_fee_usd=0.0,
+                    expected_amount=quote.expected_amount_out,
+                    requires_signature=False,
+                    requires_wallet=False,
+                    compliance_blockers=list(compliance_blockers),
+                    checklist=["Do not submit.", "Use the proof page for verification."],
+                    warnings=list(warnings),
+                    offchain_actions=list(external_steps),
+                )
             )
-        steps.append(asset_step)
-        if asset_step.tx_request:
-            tx_bundle.append(dict(asset_step.tx_request))
 
         if include_attestation and session.report and session.report.attestation_draft:
             draft = session.report.attestation_draft
             attestation_network = draft.network or network
             attestation_chain_id = draft.chain_id or chain_id_for(chain_config, attestation_network)
-            attestation_step = ExecutionStep(
-                step_index=len(steps) + 1,
-                title="Anchor report and execution plan",
-                description="Write the report hash, evidence hash, and execution plan hash into the attestation flow.",
-                step_type="attestation",
-                route_kind="erc20",
-                target_contract=draft.contract_address,
-                explorer_url=draft.explorer_url,
-                chain_id=attestation_chain_id,
-                estimated_fee_usd=1.1,
-                requires_signature=bool(draft.contract_address),
-                requires_wallet=True,
-                warnings=[
-                    "Attestation proves report and plan integrity, not asset-leg settlement finality.",
-                ],
-                tx_request={
-                    "to": draft.contract_address,
-                    "value": "0x0",
-                    "data": f"registerPlan({draft.report_hash},{draft.attestation_hash})",
-                    "chainId": attestation_chain_id,
-                    "network": attestation_network,
-                }
+            attestation_request = {
+                "to": draft.contract_address,
+                "value": "0x0",
+                "data": _encode_call(
+                    "registerPlan(bytes32,bytes32,bytes32,string,string)",
+                    [draft.report_hash, draft.portfolio_hash, draft.attestation_hash, session.session_id, "hashkey://report-anchor"],
+                )
                 if draft.contract_address
-                else {},
+                else "",
+                "chainId": attestation_chain_id,
+            }
+            steps.append(
+                ExecutionStep(
+                    step_index=len(steps) + 1,
+                    title="Anchor report and execution plan",
+                    description="Write the report hash, evidence hash, and execution plan hash into the attestation flow.",
+                    step_type="attestation",
+                    route_kind="erc20",
+                    target_contract=draft.contract_address,
+                    explorer_url=draft.explorer_url,
+                    chain_id=attestation_chain_id,
+                    estimated_fee_usd=1.1,
+                    requires_signature=bool(draft.contract_address),
+                    requires_wallet=True,
+                    warnings=[
+                        "Attestation proves report and plan integrity, not asset-leg settlement finality.",
+                    ],
+                    tx_request=attestation_request if draft.contract_address else {},
+                )
             )
-            steps.append(attestation_step)
-            if attestation_step.tx_request:
-                tx_bundle.append(dict(attestation_step.tx_request))
+            if attestation_request.get("to"):
+                tx_bundle.append(attestation_request)
 
         plan = ExecutionPlan(
             session_id=session.session_id,
@@ -339,29 +550,131 @@ class ExecutionService:
             source_chain=source_chain or session.source_chain or session.intake_context.source_chain or "hashkey",
             source_asset=quote.source_asset,
             target_asset=target.asset_id,
-            ticket_size=amount,
-            status=(
-                ExecutionLifecycleStatus.READY
-                if compliance_blockers
-                else (
-                    ExecutionLifecycleStatus.BUNDLE_READY
-                    if tx_bundle or generate_only
-                    else ExecutionLifecycleStatus.SIMULATED
-                )
+            execution_adapter_kind=adapter_kind,
+            execution_readiness=execution_readiness,
+            readiness_reason=readiness_reason,
+            external_action_url=(target.action_links[0].url if target.action_links else ""),
+            external_action_label=(
+                "Issuer portal"
+                if adapter_kind == ExecutionAdapterKind.ISSUER_PORTAL
+                else "Proof view"
             ),
+            ticket_size=amount,
+            status=ExecutionLifecycleStatus.PREPARED,
             quote=quote,
             warnings=warnings,
             simulation_warnings=list(warnings),
             possible_failure_reasons=possible_failure_reasons,
             compliance_blockers=compliance_blockers,
             required_approvals=approvals,
+            checklist=checklist,
+            external_steps=external_steps,
             steps=steps,
             tx_bundle=tx_bundle,
             eligibility=[decision],
-            can_execute_onchain=bool(tx_bundle),
+            can_execute_onchain=bool(tx_bundle) and adapter_kind == ExecutionAdapterKind.DIRECT_CONTRACT,
         )
         plan.plan_hash = self.session_service.compute_execution_plan_hash(plan)
         return plan
+
+    def submit_execution(
+        self,
+        *,
+        session: AnalysisSession,
+        chain_config,
+        assets: list[AssetTemplate],
+        target_asset_key: str,
+        amount: float,
+        source_asset: str = "",
+        source_chain: str = "",
+        include_attestation: bool = True,
+        network: str = "",
+        transaction_hash: str = "",
+        submitted_by: str = "",
+        block_number: int | None = None,
+    ) -> tuple[ExecutionPlan, ExecutionReceipt, IssuerRequestRecord | None]:
+        plan = self.prepare_execution(
+            session=session,
+            chain_config=chain_config,
+            assets=assets,
+            target_asset_key=target_asset_key,
+            amount=amount,
+            source_asset=source_asset,
+            source_chain=source_chain,
+            include_attestation=include_attestation,
+        )
+        issuer_request: IssuerRequestRecord | None = None
+        wallet = submitted_by or session.wallet_address or session.safe_address
+        receipt = ExecutionReceipt(
+            session_id=session.session_id,
+            asset_id=plan.target_asset,
+            adapter_kind=plan.execution_adapter_kind,
+            status=ExecutionLifecycleStatus.PREPARED,
+            settlement_status=SettlementStatus.NOT_STARTED,
+            prepared_payload={
+                "executionPlanId": plan.execution_plan_id,
+                "planHash": plan.plan_hash,
+                "quote": plan.quote.model_dump(mode="json") if plan.quote else {},
+                "checklist": list(plan.checklist),
+            },
+            wallet_address=wallet,
+            safe_address=session.safe_address,
+        )
+
+        if plan.execution_adapter_kind == ExecutionAdapterKind.VIEW_ONLY:
+            raise ValueError("This asset is visible for proof and comparison only.")
+
+        if plan.execution_adapter_kind == ExecutionAdapterKind.DIRECT_CONTRACT:
+            submit_payload = next(
+                (step.tx_request for step in plan.steps if step.step_type == "asset_execution"),
+                {},
+            )
+            receipt.submit_payload = submit_payload
+            receipt.tx_hash = transaction_hash
+            receipt.block_number = block_number
+            receipt.submitted_at = None if not transaction_hash else session.updated_at
+            receipt.status = (
+                ExecutionLifecycleStatus.COMPLETED
+                if block_number is not None
+                else (ExecutionLifecycleStatus.SUBMITTED if transaction_hash else ExecutionLifecycleStatus.PREPARED)
+            )
+            receipt.settlement_status = (
+                SettlementStatus.COMPLETED
+                if block_number is not None
+                else (SettlementStatus.PENDING if transaction_hash else SettlementStatus.NOT_STARTED)
+            )
+        elif plan.execution_adapter_kind == ExecutionAdapterKind.ISSUER_PORTAL:
+            target = self.resolve_asset(assets, plan.target_asset)
+            receipt.status = ExecutionLifecycleStatus.REDIRECT_REQUIRED
+            receipt.settlement_status = SettlementStatus.PENDING
+            receipt.submitted_at = session.updated_at
+            receipt.redirect_url = target.action_links[0].url if target and target.action_links else ""
+            receipt.external_request_id = _hash_json(
+                {
+                    "session_id": session.session_id,
+                    "target_asset": plan.target_asset,
+                    "ticket_size": amount,
+                }
+            )[:18]
+            receipt.submit_payload = {
+                "redirectUrl": receipt.redirect_url,
+                "requestId": receipt.external_request_id,
+                "requiredDocs": list(plan.checklist),
+            }
+            issuer_request = self.receipts_service.save_issuer_request(
+                IssuerRequestRecord(
+                    receipt_id=receipt.receipt_id,
+                    asset_id=plan.target_asset,
+                    issuer_case_id=receipt.external_request_id,
+                    redirect_url=receipt.redirect_url,
+                    issuer_status="redirect_required",
+                )
+            )
+
+        stored_receipt = self.receipts_service.save_receipt(receipt)
+        plan.receipt_id = stored_receipt.receipt_id
+        plan.status = stored_receipt.status
+        return plan, stored_receipt, issuer_request
 
     def compute_evidence_hash(self, session: AnalysisSession) -> str:
         payload = [

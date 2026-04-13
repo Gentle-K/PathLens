@@ -2113,7 +2113,7 @@ def _build_provisional_execution_plan(
         source_asset=working_context.source_asset or working_context.base_currency,
         target_asset=next((decision.asset_id for decision in eligibility if decision.status != decision.status.BLOCKED), ""),
         ticket_size=working_context.ticket_size or working_context.investment_amount,
-        status=ExecutionLifecycleStatus.READY if blocked else ExecutionLifecycleStatus.BUNDLE_READY,
+        status=ExecutionLifecycleStatus.PREPARED,
         quote=ExecutionQuote(
             source_asset=working_context.source_asset or working_context.base_currency,
             target_asset=next((decision.asset_id for decision in eligibility if decision.status != decision.status.BLOCKED), ""),

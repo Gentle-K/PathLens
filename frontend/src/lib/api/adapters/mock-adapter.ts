@@ -16,19 +16,29 @@ import type { ApiAdapter } from '@/lib/api/adapters/base'
 import type { BackendSession } from '@/lib/api/adapters/genius-backend'
 import { useAppStore } from '@/lib/store/app-store'
 import type {
+  AssetProofHistoryItem,
+  AssetProofSnapshot,
+  AssetReadiness,
   AnalysisProgress,
   AnalysisSession,
   AuditLogEntry,
+  DebugOperationReceipt,
   DemoScenarioDefinition,
+  ExecutionApproval,
   FileItem,
   HashKeyChainConfig,
   NotificationItem,
+  OpsJobRun,
   PaginatedResponse,
+  PortfolioAlert,
+  PortfolioAlertAck,
+  PortfolioOverview,
   RequestMeta,
   ResourceRecord,
   RwaAssetTemplate,
   RwaBootstrap,
   RwaIntakeContext,
+  RwaOpsSummary,
 } from '@/types'
 
 const db = createMockDatabase()
@@ -51,10 +61,13 @@ const mockChainConfig: HashKeyChainConfig = {
   mainnetExplorerUrl: 'https://hashkey.blockscout.com',
   planRegistryAddress: '0x0000000000000000000000000000000000000133',
   kycSbtAddress: '0x0000000000000000000000000000000000000134',
+  assetProofRegistryAddress: '0x0000000000000000000000000000000000000135',
   testnetPlanRegistryAddress: '0x0000000000000000000000000000000000000133',
   mainnetPlanRegistryAddress: '0x0000000000000000000000000000000000000177',
   testnetKycSbtAddress: '0x0000000000000000000000000000000000000134',
   mainnetKycSbtAddress: '0x0000000000000000000000000000000000000178',
+  testnetAssetProofRegistryAddress: '0x0000000000000000000000000000000000000135',
+  mainnetAssetProofRegistryAddress: '0x0000000000000000000000000000000000000179',
   docsUrls: [
     'https://docs.hashkeychain.net/docs/About-HashKey-Chain',
     'https://docs.hashkeychain.net/docs/Build-on-HashKey-Chain/network-info',
@@ -550,6 +563,502 @@ const mockRwaBootstrap: RwaBootstrap = {
   demoScenarios: mockDemoScenarios,
 }
 
+function proofAdapterKind(asset: RwaAssetTemplate): AssetProofSnapshot['executionAdapterKind'] {
+  if (
+    asset.id === 'tokenized-real-estate-demo' ||
+    asset.assetType === 'benchmark' ||
+    asset.liveReadiness === 'demo_only'
+  ) {
+    return 'view_only'
+  }
+  if (asset.executionStyle === 'erc20' && asset.contractAddress) {
+    return 'direct_contract'
+  }
+  return 'issuer_portal'
+}
+
+function proofReadiness(
+  asset: RwaAssetTemplate,
+): AssetProofSnapshot['executionReadiness'] {
+  const adapterKind = proofAdapterKind(asset)
+  if (adapterKind === 'direct_contract') {
+    return 'ready'
+  }
+  if (adapterKind === 'issuer_portal') {
+    return 'requires_issuer'
+  }
+  return 'view_only'
+}
+
+function buildMockProofSnapshot(asset: RwaAssetTemplate): AssetProofSnapshot {
+  const adapterKind = proofAdapterKind(asset)
+  const readiness = proofReadiness(asset)
+  const snapshotHash = `0xproof${asset.id.replace(/[^a-z0-9]/gi, '').slice(0, 20)}`
+  return {
+    snapshotId: `snapshot-${asset.id}`,
+    assetId: asset.id,
+    assetName: asset.name,
+    assetSymbol: asset.symbol,
+    network: 'testnet',
+    liveAsset: asset.id !== 'tokenized-real-estate-demo' && asset.assetType !== 'benchmark',
+    includedInRegistry:
+      asset.id === 'hsk-usdt' ||
+      asset.id === 'hsk-usdc' ||
+      asset.id === 'cpic-estable-mmf' ||
+      asset.id === 'hk-regulated-silver',
+    snapshotHash,
+    snapshotUri: `hashkey://asset-proof/${asset.id}/${snapshotHash.slice(0, 18)}`,
+    proofType: asset.onchainVerified ? 'onchain_registry_anchor' : 'offchain_snapshot',
+    effectiveAt: nowIso(),
+    publishedAt: nowIso(),
+    attester: 'mock-proof-service',
+    registryAddress: mockChainConfig.testnetAssetProofRegistryAddress,
+    registryExplorerUrl: `${mockChainConfig.testnetExplorerUrl}/address/${mockChainConfig.testnetAssetProofRegistryAddress}`,
+    anchorStatus: {
+      status: asset.onchainVerified ? 'published' : 'unpublished',
+      proofKey: asset.onchainVerified ? snapshotHash : '',
+      registryAddress: mockChainConfig.testnetAssetProofRegistryAddress,
+      explorerUrl: `${mockChainConfig.testnetExplorerUrl}/address/${mockChainConfig.testnetAssetProofRegistryAddress}`,
+      recordedAt: nowIso(),
+      attester: 'mock-proof-service',
+      note: asset.onchainVerified ? 'Mock registry anchor available.' : 'Mock proof not published onchain.',
+    },
+    timelineVersion: 1,
+    publishStatus: asset.onchainVerified ? 'published' : 'pending',
+    onchainProofKey: asset.onchainVerified ? snapshotHash : '',
+    executionAdapterKind: adapterKind,
+    executionReadiness: readiness,
+    truthLevel: asset.truthLevel ?? 'issuer_disclosed',
+    liveReadiness: asset.liveReadiness ?? 'partial',
+    requiredKycLevel: asset.requiresKycLevel,
+    proofFreshness: {
+      bucket: asset.liveReadiness === 'demo_only' ? 'unavailable' : 'fresh',
+      label: asset.liveReadiness === 'demo_only' ? 'Demo only' : 'Fresh',
+      checkedAt: nowIso(),
+      staleAfterHours: 168,
+      ageHours: 0,
+      reason:
+        asset.liveReadiness === 'demo_only'
+          ? 'Demo-only asset.'
+          : 'Mock snapshot seeded from the local asset library.',
+    },
+    oracleFreshness: asset.liveReadiness === 'demo_only' ? 'unavailable' : 'fresh < 1h',
+    kycPolicySummary: asset.requiresKycLevel
+      ? `KYC level ${asset.requiresKycLevel}+ required`
+      : 'Base wallet screening only',
+    sourceConfidence: asset.onchainVerified ? 0.95 : 0.78,
+    redemptionWindow: {
+      label: asset.redemptionWindow || (asset.redemptionDays ? `T+${asset.redemptionDays}` : 'T+0'),
+      windowType: asset.redemptionDays ? 'scheduled' : 'instant',
+      settlementDays: asset.redemptionDays,
+      detail: asset.executionNotes?.[0] || asset.fitSummary,
+      nextWindow: asset.redemptionWindow || '',
+      status: asset.liveReadiness === 'demo_only' ? 'demo_only' : 'open',
+    },
+    statusCards: [
+      {
+        key: 'authenticity',
+        label: '真实性证明',
+        status: asset.truthLevel === 'onchain_verified' ? 'verified' : 'partial',
+        detail: asset.truthLevelExplanation || asset.statusExplanation || asset.description,
+      },
+      {
+        key: 'eligibility',
+        label: '准入资格',
+        status: asset.requiresKycLevel ? 'permissioned' : 'open',
+        detail: asset.executionNotes?.[0] || 'Mock eligibility signal.',
+      },
+      {
+        key: 'execution',
+        label: '执行方式',
+        status: readiness,
+        detail: asset.statusExplanation || 'Mock execution route derived from asset metadata.',
+      },
+      {
+        key: 'redemption',
+        label: '流动性 / 赎回窗口',
+        status: asset.redemptionDays ? 'scheduled' : 'open',
+        detail: asset.executionNotes?.[1] || asset.fitSummary,
+      },
+      {
+        key: 'monitoring',
+        label: '投后监控健康度',
+        status: asset.liveReadiness === 'demo_only' ? 'unavailable' : 'fresh',
+        detail: asset.liveReadiness === 'demo_only' ? 'Mock demo asset.' : 'Mock proof is current.',
+      },
+    ],
+    proofSourceRefs: [
+      {
+        refId: `ref-${asset.id}`,
+        title: `${asset.name} disclosure`,
+        sourceName: asset.issuer || 'Issuer disclosure',
+        sourceUrl: asset.primarySourceUrl || asset.evidenceUrls[0] || mockChainConfig.docsUrls[0],
+        sourceKind: 'official',
+        sourceTier: 'official',
+        freshnessDate: nowIso().slice(0, 10),
+        summary: asset.statusExplanation || asset.description,
+        status: 'available',
+        isPrimary: true,
+        confidence: asset.onchainVerified ? 0.96 : 0.8,
+      },
+    ],
+    unavailableReasons:
+      readiness === 'view_only'
+        ? ['Mock mode keeps this asset in proof-only state.']
+        : [],
+    monitoringNotes: asset.executionNotes ?? [],
+    primaryActionUrl: asset.actionLinks?.[0]?.url || asset.primarySourceUrl || '',
+    visibilityRole:
+      asset.liveReadiness === 'demo_only'
+        ? 'demo_only'
+        : asset.liveReadiness === 'benchmark_only'
+          ? 'benchmark_only'
+          : 'live',
+    isExecutable: readiness !== 'view_only',
+  }
+}
+
+function buildMockProofHistory(asset: RwaAssetTemplate): AssetProofHistoryItem[] {
+  const latest = buildMockProofSnapshot(asset)
+  const olderHash = `${latest.snapshotHash}-v0`
+  return [
+    {
+      snapshotId: `${latest.snapshotId}-1`,
+      assetId: latest.assetId,
+      network: latest.network,
+      snapshotHash: latest.snapshotHash,
+      snapshotUri: latest.snapshotUri,
+      proofType: latest.proofType,
+      effectiveAt: latest.effectiveAt,
+      publishedAt: latest.publishedAt,
+      timelineVersion: latest.timelineVersion,
+      attester: latest.attester,
+      publishStatus: latest.publishStatus,
+      onchainAnchorStatus: latest.anchorStatus,
+      oracleFreshness: latest.oracleFreshness,
+      kycPolicySummary: latest.kycPolicySummary,
+      sourceConfidence: latest.sourceConfidence,
+      unavailableReasons: latest.unavailableReasons,
+    },
+    {
+      snapshotId: `${latest.snapshotId}-0`,
+      assetId: latest.assetId,
+      network: latest.network,
+      snapshotHash: olderHash,
+      snapshotUri: `${latest.snapshotUri}/history/0`,
+      proofType: latest.proofType,
+      effectiveAt: new Date(Date.now() - 1000 * 60 * 60 * 24).toISOString(),
+      publishedAt: new Date(Date.now() - 1000 * 60 * 60 * 24).toISOString(),
+      timelineVersion: 0,
+      attester: latest.attester,
+      publishStatus: latest.publishStatus,
+      onchainAnchorStatus: {
+        ...latest.anchorStatus,
+        proofKey: latest.anchorStatus.proofKey ? olderHash : '',
+      },
+      oracleFreshness: 'fresh < 24h',
+      kycPolicySummary: latest.kycPolicySummary,
+      sourceConfidence: latest.sourceConfidence,
+      unavailableReasons: [],
+    },
+  ]
+}
+
+function buildMockReadiness(asset: RwaAssetTemplate): AssetReadiness {
+  const proof = buildMockProofSnapshot(asset)
+  const decision = {
+    id: `decision-${asset.id}`,
+    assetId: asset.id,
+    assetName: asset.name,
+    chainId: asset.chainId,
+    contractAddress: asset.contractAddress,
+    status: asset.requiresKycLevel ? 'conditional' : 'eligible',
+    reasons:
+      asset.requiresKycLevel
+        ? ['Investor must satisfy higher-tier KYC requirements.']
+        : [],
+    missingRequirements:
+      asset.requiresKycLevel
+        ? [`KYC level ${asset.requiresKycLevel} or higher`]
+        : [],
+    nextActions:
+      proof.executionReadiness === 'requires_issuer'
+        ? ['Complete issuer workflow after wallet and KYC checks.']
+        : [],
+    checkedAt: nowIso(),
+  } as AssetReadiness['decision']
+  const requiredApprovals: ExecutionApproval[] =
+    proof.executionAdapterKind === 'direct_contract'
+      ? [
+          {
+            approvalType: 'erc20_allowance',
+            tokenSymbol: asset.settlementAsset,
+            spender: asset.contractAddress,
+            approvalTarget: asset.contractAddress,
+            amount: asset.minimumTicketUsd || 1000,
+            note: 'Mock approval seeded for local execution preview.',
+            allowanceRequired: true,
+          },
+        ]
+      : []
+  return {
+    asset,
+    proof,
+    decision,
+    executionAdapterKind: proof.executionAdapterKind,
+    executionReadiness: proof.executionReadiness,
+    routeSummary:
+      proof.executionReadiness === 'ready'
+        ? 'Direct contract route is available in mock mode.'
+        : proof.executionReadiness === 'requires_issuer'
+          ? 'Issuer flow is required in mock mode.'
+          : 'This asset stays proof-only in mock mode.',
+    quote:
+      proof.executionReadiness === 'view_only'
+        ? undefined
+        : {
+            sourceAsset: asset.settlementAsset,
+            targetAsset: asset.id,
+            amountIn: asset.minimumTicketUsd || 1000,
+            expectedAmountOut: asset.minimumTicketUsd || 1000,
+            feeAmount: 12,
+            feeBps: 12,
+            gasEstimate: proof.executionAdapterKind === 'direct_contract' ? 190000 : 0,
+            gasEstimateUsd: proof.executionAdapterKind === 'direct_contract' ? 3.8 : 0,
+            etaSeconds: proof.executionAdapterKind === 'direct_contract' ? 90 : 600,
+            routeType: proof.executionAdapterKind,
+            warnings: asset.riskFlags ?? [],
+          },
+    requiredApprovals,
+    possibleFailureReasons:
+      proof.executionReadiness === 'ready'
+        ? ['Mock wallet signature not yet submitted.']
+        : ['Issuer or proof-only route still blocks direct execution.'],
+    complianceBlockers: decision.missingRequirements,
+    warnings: asset.actionBlockerReasons ?? [],
+  }
+}
+
+function buildMockPortfolio(address: string): PortfolioOverview {
+  const liveAssets = mockAssetLibrary.filter(
+    (asset) => asset.id !== 'tokenized-real-estate-demo' && asset.assetType !== 'benchmark',
+  )
+  const positions = liveAssets.slice(0, 3).map((asset, index) => ({
+    id: `pos-${asset.id}`,
+    assetId: asset.id,
+    assetName: asset.name,
+    chainId: asset.chainId,
+    contractAddress: asset.contractAddress,
+    walletAddress: address,
+    safeAddress: '',
+    currentBalance: index === 0 ? 5000 : index === 1 ? 12000 : 30,
+    latestNavOrPrice: asset.navOrPrice ?? 1,
+    currentValue: index === 0 ? 5000 : index === 1 ? 12024 : 6450,
+    costBasis: index === 0 ? 5000 : index === 1 ? 11900 : 6000,
+    unrealizedPnl: index === 0 ? 0 : index === 1 ? 124 : 450,
+    realizedIncome: index === 1 ? 42 : index === 2 ? 18 : 0,
+    accruedYield: index === 1 ? 74 : 0,
+    redemptionForecast: index === 0 ? 5000 : index === 1 ? 12024 : 6450,
+    allocationWeightPct: index === 0 ? 0.22 : index === 1 ? 0.51 : 0.27,
+    liquidityRisk: index === 2 ? 'watch' : 'low',
+    nextRedemptionWindow: asset.redemptionWindow || (asset.redemptionDays ? `T+${asset.redemptionDays}` : 'T+0'),
+    oracleStalenessFlag: false,
+    kycChangeFlag: false,
+    asOf: nowIso(),
+  }))
+  const proofSnapshots = positions.map((position) =>
+    buildMockProofSnapshot(
+      liveAssets.find((asset) => asset.id === position.assetId) ?? liveAssets[0],
+    ),
+  )
+  const alerts: PortfolioAlert[] = proofSnapshots
+    .filter((proof) => proof.executionAdapterKind === 'issuer_portal')
+    .map((proof) => ({
+      id: `alert-${proof.assetId}`,
+      address,
+      alertType: 'issuer_disclosure_updated',
+      severity: 'info',
+      title: `${proof.assetName}: issuer workflow still governs redemption`,
+      detail: proof.redemptionWindow.detail || 'Mock issuer route alert.',
+      assetId: proof.assetId,
+      assetName: proof.assetName,
+      sourceUrl: proof.primaryActionUrl,
+      sourceRef: proof.proofSourceRefs[0]?.refId ?? '',
+      dedupeKey: `mock-${proof.assetId}`,
+      status: 'open',
+      acked: false,
+      read: false,
+      detectedAt: nowIso(),
+    }))
+  return {
+    address,
+    network: 'testnet',
+    positions,
+    proofSnapshots,
+    alerts,
+    indexerHealth: [
+      {
+        network: 'testnet',
+        contractName: 'asset_proof_registry',
+        contractAddress: mockChainConfig.testnetAssetProofRegistryAddress,
+        lastIndexedBlock: 1284000,
+        lastSafeHead: 1284000,
+        chainHead: 1284002,
+        lag: 2,
+        status: 'synced',
+        lastError: '',
+        updatedAt: nowIso(),
+      },
+      {
+        network: 'testnet',
+        contractName: 'plan_registry',
+        contractAddress: mockChainConfig.testnetPlanRegistryAddress,
+        lastIndexedBlock: 1283998,
+        lastSafeHead: 1283998,
+        chainHead: 1284002,
+        lag: 4,
+        status: 'synced',
+        lastError: '',
+        updatedAt: nowIso(),
+      },
+    ],
+    latestAnchorSummary: proofSnapshots.map((proof) => ({
+      assetId: proof.assetId,
+      assetName: proof.assetName,
+      network: proof.network,
+      visibilityRole: proof.visibilityRole,
+      isLive: proof.liveAsset,
+      latestProofKey: proof.onchainProofKey,
+      latestSnapshotHash: proof.snapshotHash,
+      latestPublishStatus: proof.publishStatus,
+      latestTxHash: proof.anchorStatus.transactionHash,
+      latestBlockNumber: proof.anchorStatus.blockNumber,
+      latestIndexedAt: proof.publishedAt,
+      proofHistoryCount: 2,
+      latestPlanKey: `0xplan-${proof.assetId}`,
+      latestPlanSessionId: `session-${proof.assetId}`,
+      latestPlanTxHash: `0xtx-${proof.assetId}`,
+      latestPlanBlockNumber: 1283000,
+      latestPlanIndexedAt: nowIso(),
+    })),
+    totalValueUsd: positions.reduce((total, position) => total + position.currentValue, 0),
+    totalCostBasis: positions.reduce((total, position) => total + position.costBasis, 0),
+    totalUnrealizedPnl: positions.reduce((total, position) => total + position.unrealizedPnl, 0),
+    totalRealizedIncome: positions.reduce((total, position) => total + position.realizedIncome, 0),
+    totalAccruedYield: positions.reduce((total, position) => total + position.accruedYield, 0),
+    totalRedemptionForecast: positions.reduce((total, position) => total + position.redemptionForecast, 0),
+    allocationMix: Object.fromEntries(positions.map((position) => [position.assetId, position.allocationWeightPct])),
+    lastSyncAt: nowIso(),
+  }
+}
+
+function buildMockOpsJobs(): OpsJobRun[] {
+  return [
+    {
+      jobRunId: 'job-proof-refresh',
+      jobName: 'proof_refresh',
+      network: 'testnet',
+      status: 'success',
+      startedAt: nowIso(),
+      finishedAt: nowIso(),
+      itemCount: 4,
+      errorMessage: '',
+      metadata: {},
+    },
+    {
+      jobRunId: 'job-monitoring',
+      jobName: 'monitoring_scheduler',
+      network: 'testnet',
+      status: 'success',
+      startedAt: nowIso(),
+      finishedAt: nowIso(),
+      itemCount: 6,
+      errorMessage: '',
+      metadata: {},
+    },
+    {
+      jobRunId: 'job-indexer',
+      jobName: 'chain_indexer',
+      network: 'testnet',
+      status: 'success',
+      startedAt: nowIso(),
+      finishedAt: nowIso(),
+      itemCount: 8,
+      errorMessage: '',
+      metadata: {},
+    },
+  ]
+}
+
+function buildMockOpsSummary(network: 'testnet' | 'mainnet' | '' = 'testnet'): RwaOpsSummary {
+  const resolvedNetwork = network === 'mainnet' ? 'mainnet' : 'testnet'
+  const proofQueue = mockAssetLibrary
+    .filter((asset) =>
+      ['hsk-usdt', 'hsk-usdc', 'cpic-estable-mmf', 'hk-regulated-silver'].includes(asset.id),
+    )
+    .map(buildMockProofSnapshot)
+    .map((proof, index) => ({
+      ...proof,
+      network: resolvedNetwork,
+      publishStatus: index === 0 ? 'pending' : proof.publishStatus,
+    }))
+  return {
+    pendingPublishCount: 1,
+    failedPublishCount: 0,
+    staleProofCount: 0,
+    maxIndexerLag: resolvedNetwork === 'mainnet' ? 0 : 4,
+    failedJobCount: 0,
+    proofQueue,
+    attesterStatus: [
+      {
+        network: resolvedNetwork,
+        registryAddress:
+          resolvedNetwork === 'mainnet'
+            ? mockChainConfig.mainnetAssetProofRegistryAddress
+            : mockChainConfig.testnetAssetProofRegistryAddress,
+        owner: '0x00000000000000000000000000000000000000aa',
+        pendingOwner: '',
+        publisherAddress: '0x00000000000000000000000000000000000000bb',
+        publisherAuthorized: true,
+        publishEnabled: true,
+        attesters: ['0x00000000000000000000000000000000000000bb'],
+        latestPublishStatus: 'indexed',
+        latestPublishTxHash: '0xmockpublish',
+        latestPublishAt: nowIso(),
+      },
+    ],
+    sourceHealth: proofQueue.map((proof) => ({
+      assetId: proof.assetId,
+      assetName: proof.assetName,
+      network: proof.network,
+      visibilityRole: proof.visibilityRole,
+      liveAsset: proof.liveAsset,
+      proofFreshnessBucket: proof.proofFreshness.bucket,
+      proofFreshnessLabel: proof.proofFreshness.label,
+      oracleFreshness: proof.oracleFreshness,
+      kycPolicySummary: proof.kycPolicySummary,
+      sourceConfidence: proof.sourceConfidence,
+      publishStatus: proof.publishStatus,
+      unavailableReasons: proof.unavailableReasons,
+    })),
+    jobHealth: buildMockOpsJobs(),
+    indexerHealth: buildMockPortfolio('0xmock').indexerHealth ?? [],
+    contractAnchors: buildMockPortfolio('0xmock').latestAnchorSummary ?? [],
+  }
+}
+
+function buildMockOperationReceipt(operationId: string, itemCount = 1): DebugOperationReceipt {
+  return {
+    operationId,
+    status: 'success',
+    startedAt: nowIso(),
+    finishedAt: nowIso(),
+    errorMessage: '',
+    itemCount,
+    metadata: {},
+  }
+}
+
 export const defaultRwaIntakeContext: RwaIntakeContext = {
   investmentAmount: 10000,
   baseCurrency: 'USDT',
@@ -904,11 +1413,65 @@ export const mockApiAdapter: ApiAdapter = {
       await wait(120)
       return structuredClone(mockRwaBootstrap)
     },
+    async getAssetProof(assetId) {
+      await wait(120)
+      const asset = mockAssetLibrary.find((item) => item.id === assetId)
+      if (!asset) {
+        throw new Error(`Unknown mock asset: ${assetId}`)
+      }
+      return buildMockProofSnapshot(asset)
+    },
+    async getAssetProofHistory(assetId) {
+      await wait(120)
+      const asset = mockAssetLibrary.find((item) => item.id === assetId)
+      if (!asset) {
+        throw new Error(`Unknown mock asset: ${assetId}`)
+      }
+      return buildMockProofHistory(asset)
+    },
+    async getAssetReadiness({ assetId }) {
+      await wait(120)
+      const asset = mockAssetLibrary.find((item) => item.id === assetId)
+      if (!asset) {
+        throw new Error(`Unknown mock asset: ${assetId}`)
+      }
+      return buildMockReadiness(asset)
+    },
     async getWalletSummary() {
       throw new Error('Wallet summary is REST-only in the HashKey Chain RWA workbench.')
     },
     async getWalletPositions() {
       throw new Error('Wallet positions are REST-only in the HashKey Chain RWA workbench.')
+    },
+    async getPortfolio(address) {
+      await wait(120)
+      return buildMockPortfolio(address)
+    },
+    async getPortfolioAlerts(address) {
+      await wait(120)
+      return buildMockPortfolio(address).alerts
+    },
+    async ackPortfolioAlert(address, alertId) {
+      await wait(80)
+      return {
+        alertId,
+        address,
+        acked: true,
+        acknowledgedAt: nowIso(),
+        read: false,
+        readAt: undefined,
+      } satisfies PortfolioAlertAck
+    },
+    async readPortfolioAlert(address, alertId) {
+      await wait(80)
+      return {
+        alertId,
+        address,
+        acked: false,
+        acknowledgedAt: undefined,
+        read: true,
+        readAt: nowIso(),
+      } satisfies PortfolioAlertAck
     },
     async getEligibleCatalog() {
       throw new Error('Eligible catalog is REST-only in the HashKey Chain RWA workbench.')
@@ -922,8 +1485,35 @@ export const mockApiAdapter: ApiAdapter = {
     async execute() {
       throw new Error('Execution is REST-only in the HashKey Chain RWA workbench.')
     },
+    async submitExecution() {
+      throw new Error('Execution submission is REST-only in the HashKey Chain RWA workbench.')
+    },
+    async getExecutionReceipt() {
+      throw new Error('Execution receipts are REST-only in the HashKey Chain RWA workbench.')
+    },
+    async listExecutionReceipts() {
+      return []
+    },
     async monitor() {
-      throw new Error('Monitoring is REST-only in the HashKey Chain RWA workbench.')
+      const portfolio = buildMockPortfolio('0x0000000000000000000000000000000000000001')
+      return {
+        positionSnapshots: portfolio.positions,
+        currentBalance: portfolio.positions.reduce((total, position) => total + position.currentBalance, 0),
+        latestNavOrPrice: portfolio.positions[0]?.latestNavOrPrice ?? 0,
+        costBasis: portfolio.totalCostBasis,
+        unrealizedPnl: portfolio.totalUnrealizedPnl,
+        realizedIncome: portfolio.totalRealizedIncome,
+        accruedYield: portfolio.positions.reduce((total, position) => total + position.accruedYield, 0),
+        redemptionForecast: portfolio.totalRedemptionForecast,
+        allocationMix: portfolio.allocationMix,
+        nextRedemptionWindow: portfolio.positions[0]?.nextRedemptionWindow ?? 'T+0',
+        oracleStalenessFlag: false,
+        kycChangeFlag: false,
+        proofStalenessFlag: false,
+        issuerDisclosureUpdateFlag: portfolio.alerts.some((alert) => alert.alertType === 'issuer_disclosure_updated'),
+        alertFlags: portfolio.alerts.map((alert) => alert.alertType),
+        portfolioAlerts: portfolio.alerts,
+      }
     },
     async anchorReport() {
       throw new Error('Report anchoring is REST-only in the HashKey Chain RWA workbench.')
@@ -1554,6 +2144,34 @@ export const mockApiAdapter: ApiAdapter = {
           updated_at: session.updatedAt,
         },
       }
+    },
+    async getRwaOpsSummary(network = '') {
+      await wait(120)
+      return buildMockOpsSummary(network)
+    },
+    async listRwaJobs() {
+      await wait(120)
+      return buildMockOpsJobs()
+    },
+    async refreshRwaProofs() {
+      await wait(120)
+      return buildMockOperationReceipt('mock-proof-refresh', 4)
+    },
+    async retryRwaPublishes() {
+      await wait(120)
+      return buildMockOperationReceipt('mock-proof-retry', 1)
+    },
+    async publishRwaSnapshot(snapshotId) {
+      await wait(120)
+      return buildMockOperationReceipt(`mock-proof-publish-${snapshotId}`, 1)
+    },
+    async syncRwaExecutionStatus() {
+      await wait(120)
+      return buildMockOperationReceipt('mock-execution-sync', 2)
+    },
+    async runRwaIndexer() {
+      await wait(120)
+      return buildMockOperationReceipt('mock-indexer-run', 8)
     },
   },
   files: {

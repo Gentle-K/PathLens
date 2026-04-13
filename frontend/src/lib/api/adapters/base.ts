@@ -1,4 +1,8 @@
 import type {
+  AssetProofHistoryItem,
+  AssetProofSnapshot,
+  AssetReadiness,
+  DebugOperationReceipt,
   RwaBootstrap,
   AnalysisProgress,
   AnalysisReport,
@@ -9,9 +13,14 @@ import type {
   DashboardOverview,
   DataVizBundle,
   ExecutionPlan,
+  ExecutionReceipt,
   ExecutionQuote,
   FileItem,
   FileUploadPayload,
+  OpsJobRun,
+  PortfolioAlert,
+  PortfolioAlertAck,
+  PortfolioOverview,
   PositionSnapshot,
   LoginPayload,
   ModeDefinition,
@@ -22,6 +31,7 @@ import type {
   ReportAnchorRecord,
   ResourceRecord,
   Role,
+  RwaOpsSummary,
   RwaAssetTemplate,
   SettingsPayload,
   SubmitAnswersPayload,
@@ -43,8 +53,23 @@ export interface ApiAdapter {
   }
   rwa: {
     getBootstrap(): Promise<RwaBootstrap>
+    getAssetProof(assetId: string, network?: 'testnet' | 'mainnet' | ''): Promise<AssetProofSnapshot>
+    getAssetProofHistory(assetId: string, network?: 'testnet' | 'mainnet' | ''): Promise<AssetProofHistoryItem[]>
+    getAssetReadiness(params: {
+      assetId: string
+      address?: string
+      sessionId?: string
+      network?: 'testnet' | 'mainnet' | ''
+      amount?: number
+      sourceAsset?: string
+      sourceChain?: string
+    }): Promise<AssetReadiness>
     getWalletSummary(address: string, network?: 'testnet' | 'mainnet' | ''): Promise<WalletSummary>
     getWalletPositions(address: string, network?: 'testnet' | 'mainnet' | ''): Promise<PositionSnapshot[]>
+    getPortfolio(address: string, network?: 'testnet' | 'mainnet' | ''): Promise<PortfolioOverview>
+    getPortfolioAlerts(address: string, network?: 'testnet' | 'mainnet' | ''): Promise<PortfolioAlert[]>
+    ackPortfolioAlert(address: string, alertId: string): Promise<PortfolioAlertAck>
+    readPortfolioAlert(address: string, alertId: string): Promise<PortfolioAlertAck>
     getEligibleCatalog(params: {
       address: string
       sessionId?: string
@@ -92,20 +117,58 @@ export interface ApiAdapter {
       generateOnly?: boolean
     }): Promise<{
       executionPlan: ExecutionPlan
+      prepareSummary: string
+      checklist: string[]
+      blockers: string[]
+      executionReceipt?: ExecutionReceipt
       txReceipts: import('@/types').TransactionReceiptRecord[]
       reportAnchorRecords: ReportAnchorRecord[]
     }>
+    submitExecution(payload: {
+      sessionId: string
+      sourceAsset: string
+      targetAsset: string
+      amount: number
+      walletAddress?: string
+      safeAddress?: string
+      sourceChain?: string
+      includeAttestation?: boolean
+      network?: 'testnet' | 'mainnet' | ''
+      transactionHash?: string
+      submittedBy?: string
+      blockNumber?: number
+      note?: string
+    }): Promise<{
+      executionPlan: ExecutionPlan
+      receipt: ExecutionReceipt
+      allowanceSteps: import('@/types').ExecutionApproval[]
+      issuerRequestId?: string
+      redirectUrl?: string
+      submissionStatus: string
+      submissionMessage: string
+      externalActionUrl?: string
+      txReceipts: import('@/types').TransactionReceiptRecord[]
+      reportAnchorRecords: ReportAnchorRecord[]
+    }>
+    getExecutionReceipt(receiptId: string): Promise<ExecutionReceipt>
+    listExecutionReceipts(params?: { sessionId?: string; assetId?: string }): Promise<ExecutionReceipt[]>
     monitor(sessionId: string): Promise<{
       positionSnapshots: PositionSnapshot[]
       currentBalance: number
       latestNavOrPrice: number
       costBasis: number
       unrealizedPnl: number
+      realizedIncome: number
       accruedYield: number
+      redemptionForecast: number
+      allocationMix: Record<string, number>
       nextRedemptionWindow?: string
       oracleStalenessFlag: boolean
       kycChangeFlag: boolean
+      proofStalenessFlag: boolean
+      issuerDisclosureUpdateFlag: boolean
       alertFlags: string[]
+      portfolioAlerts: PortfolioAlert[]
     }>
     anchorReport(payload: {
       reportId: string
@@ -153,6 +216,13 @@ export interface ApiAdapter {
   debug: {
     listSessions(): Promise<DebugSessionSummary[]>
     getSession(sessionId: string): Promise<DebugSessionDetail>
+    getRwaOpsSummary(network?: 'testnet' | 'mainnet' | ''): Promise<RwaOpsSummary>
+    listRwaJobs(): Promise<OpsJobRun[]>
+    refreshRwaProofs(network?: 'testnet' | 'mainnet' | ''): Promise<DebugOperationReceipt>
+    retryRwaPublishes(network?: 'testnet' | 'mainnet' | ''): Promise<DebugOperationReceipt>
+    publishRwaSnapshot(snapshotId: string): Promise<DebugOperationReceipt>
+    syncRwaExecutionStatus(): Promise<DebugOperationReceipt>
+    runRwaIndexer(): Promise<DebugOperationReceipt>
   }
   files: {
     list(): Promise<FileItem[]>

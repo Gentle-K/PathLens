@@ -1,6 +1,15 @@
 # Genius Actuary
 
-Genius Actuary is an AI-powered HashKey Chain RWA decision-and-execution layer. The backend owns analysis, risk decomposition, oracle normalization, KYC reads, evidence records, report generation, and attestation metadata. The frontend handles intake, wallet connection, network switching, rendering, and transaction initiation.
+Genius Actuary is a HashKey Chain RWA decision-and-execution layer built around a verifiable asset hub. The backend owns proof snapshots, readiness checks, oracle and KYC normalization, execution planning, and portfolio monitoring. The frontend exposes asset proof pages, wallet-aware readiness checks, execution flows, and portfolio alerts.
+
+## Product loop
+
+The product is now organized around four operator-facing surfaces:
+
+- `proof`: latest proof snapshot, proof timeline, source refs, freshness, and onchain anchor status
+- `readiness`: wallet-aware KYC and route checks that separate `direct_contract`, `issuer_portal`, and `view_only`
+- `execution`: `prepare -> submit -> receipt -> status` with a persisted execution receipt store
+- `monitoring`: event-driven portfolio alerts, allocation mix, PnL, accrued yield, and redemption forecasts
 
 ## What the product does
 
@@ -8,17 +17,49 @@ Genius Actuary is an AI-powered HashKey Chain RWA decision-and-execution layer. 
 - backend-driven clarification and analysis sessions
 - deterministic RWA scoring, comparison matrices, and holding-period simulations
 - evidence-linked recommendation and report generation
+- per-asset proof snapshots with `snapshot_hash`, disclosure sources, freshness, and redemption terms
+- asset readiness views that separate `direct_contract`, `issuer_portal`, and `view_only` flows
+- public read-only proof and portfolio APIs for embedding asset verification cards in other HashKey apps
 - backend-owned HashKey oracle snapshots for `BTC/USD`, `USDT/USD`, and `USDC/USD`
 - backend-owned HashKey KYC snapshot reads
 - wallet connection and HashKey network switching in the frontend via `viem`
-- plan attestation draft generation and real on-chain Plan Registry writes on testnet
-- result pages with tx hash, explorer links, KYC/oracle context, and execution path
+- plan attestation draft generation and real on-chain `PlanRegistry` writes on testnet
+- separate `AssetProofRegistry` contract for future proof anchoring
+- persisted proof timelines, execution receipts, issuer request tracking, and alert state in SQLite
+- result pages with tx hash, explorer links, KYC/oracle/proof context, and execution path
+- portfolio monitoring with proof freshness, issuer-workflow, and redemption-window alerts
+- repo-local JS SDK and proof card embed example under `sdk/js/` and `docs/api/`
+
+## Live assets vs demo assets
+
+Live execution scope in the current repo:
+
+- `hsk-usdt`
+- `hsk-usdc`
+- `cpic-estable-mmf`
+- `hk-regulated-silver`
+
+Strictly isolated from live submit:
+
+- `tokenized-real-estate-demo` -> `demo_only`
+- `hsk-wbtc-benchmark` -> `benchmark_only`
+
+These two assets still render inside proof and comparison flows, but submit requests are blocked server-side and should never be presented as live-buyable assets.
+
+## 3-minute demo path
+
+Use this order during a review:
+
+1. Open `/assets/{assetId}/proof` and show the latest proof, timeline, source refs, and anchor state.
+2. Open `/sessions/{sessionId}/execute` and show the adapter split, checklist, submit payload, and receipt status.
+3. Open `/portfolio/{address}` and show alert severity ordering, ack/read state, and redemption / yield monitoring.
+4. Finish with the public proof-layer docs in [docs/api/rwa-proof-layer.md](/Users/kk./Desktop/Gay/docs/api/rwa-proof-layer.md) and the embed example in [proof-card-embed.html](/Users/kk./Desktop/Gay/docs/api/proof-card-embed.html).
 
 ## Repository layout
 
-- `backend/` FastAPI API, session orchestration, RWA engine, persistence, KYC/oracle services
+- `backend/` FastAPI API, session orchestration, proof/readiness services, RWA engine, persistence, KYC/oracle services
 - `frontend/` React + TypeScript + Vite product UI
-- `contracts/` minimal `PlanRegistry` contract
+- `contracts/` `PlanRegistry` plus `AssetProofRegistry`
 - `scripts/` deploy and verification entrypoints
 - `AUDIT_REPORT.md` repository audit, broken-flow inventory, and priority order
 - `IMPLEMENTATION_SUMMARY.md` delivered changes, remaining gaps, and limitations
@@ -55,20 +96,35 @@ Most important variables:
 - `ACTUARY_DATA_REFRESH_PROFILE`
 - `ACTUARY_EVAL_SET_VERSION`
 - `HASHKEY_DEFAULT_EXECUTION_NETWORK`
+- `HASHKEY_INDEXER_FINALITY_BUFFER`
 - `HASHKEY_TESTNET_RPC_URL`
 - `HASHKEY_TESTNET_EXPLORER_URL`
 - `HASHKEY_TESTNET_PLAN_REGISTRY_ADDRESS`
 - `HASHKEY_TESTNET_KYC_SBT_ADDRESS`
+- `HASHKEY_TESTNET_ASSET_PROOF_REGISTRY_ADDRESS`
 - `HASHKEY_MAINNET_RPC_URL`
 - `HASHKEY_MAINNET_EXPLORER_URL`
 - `HASHKEY_MAINNET_PLAN_REGISTRY_ADDRESS`
 - `HASHKEY_MAINNET_KYC_SBT_ADDRESS`
+- `HASHKEY_MAINNET_ASSET_PROOF_REGISTRY_ADDRESS`
+- `ASSET_PROOF_REGISTRY_ADDRESS`
 - `VITE_API_MODE`
 - `VITE_API_BASE_URL`
 - `VITE_PROXY_TARGET`
 - `PLAN_REGISTRY_DEPLOYER_PRIVATE_KEY`
+- `ASSET_PROOF_REGISTRY_DEPLOYER_PRIVATE_KEY`
+- `ASSET_PROOF_REGISTRY_INITIAL_ATTESTER`
 
 If the plan registry address is blank, the app still produces a deterministic attestation draft but disables the live on-chain write.
+If the asset proof registry address is blank, proof pages still render deterministic snapshots, but they cannot point to a deployed registry address for later anchoring.
+
+## Debug ops and indexer
+
+- The protected ops console now lives at `/debug/rwa-ops`.
+- Operator write actions are only exposed under `/api/debug/rwa/*` and use `DEBUG_USERNAME` / `DEBUG_PASSWORD`.
+- The repo-local indexer writes `AssetProofRegistry` and `PlanRegistry` history into SQLite-backed read models.
+- `HASHKEY_INDEXER_FINALITY_BUFFER` controls how many tip blocks the indexer leaves unconsumed before marking a head as safe. Default is `2`.
+- Public proof and portfolio reads now prefer indexed chain state, then fall back to persisted proof / execution state if the indexer is not caught up.
 
 ## RWA actuary expert mode
 
@@ -116,6 +172,8 @@ npm run dev
 ```
 
 Open `http://localhost:5173`.
+
+For operator review, open `http://localhost:5173/debug/rwa-ops` and authenticate with the debug credentials from `.env.local`.
 
 ## User guide
 
@@ -194,7 +252,32 @@ Copy the deployed contract address into:
 
 - `HASHKEY_TESTNET_PLAN_REGISTRY_ADDRESS`
 
-### 2. Configure the KYC SBT and RPC endpoints
+### 2. Deploy the demo Asset Proof Registry
+
+```bash
+cd frontend
+npm run deploy:asset-proof-registry
+```
+
+Expected env:
+
+- `ASSET_PROOF_REGISTRY_DEPLOYER_PRIVATE_KEY`
+- `ASSET_PROOF_REGISTRY_INITIAL_ATTESTER` optional, grants a publisher wallet during deploy
+- `HASHKEY_DEPLOY_NETWORK=testnet`
+
+Copy the deployed contract address into:
+
+- `HASHKEY_TESTNET_ASSET_PROOF_REGISTRY_ADDRESS`
+
+Owner / attester initialization order:
+
+1. Deploy `AssetProofRegistry`.
+2. Keep the deployer as `owner`.
+3. Optionally set `ASSET_PROOF_REGISTRY_INITIAL_ATTESTER` before deploy so the script grants a non-deployer publisher immediately.
+4. Point the backend to `HASHKEY_TESTNET_ASSET_PROOF_REGISTRY_ADDRESS`.
+5. Use `/debug/rwa-ops` to refresh proofs, retry publishes, and confirm indexed anchors match the registry.
+
+### 3. Configure the KYC SBT and RPC endpoints
 
 Set:
 
@@ -202,17 +285,18 @@ Set:
 - `HASHKEY_TESTNET_EXPLORER_URL`
 - `HASHKEY_TESTNET_KYC_SBT_ADDRESS`
 
-### 3. Run the product
+### 4. Run the product
 
 Start backend and frontend, complete a session, then use the execution console to write the attestation transaction.
 
-### 4. Verify the result
+### 5. Verify the result
 
 The result page should show:
 
 - wallet/network context
 - KYC snapshot
 - live oracle snapshots
+- proof registry address and proof freshness on asset proof pages
 - attestation contract address
 - tx hash
 - explorer link
@@ -232,14 +316,17 @@ Direct commands:
 
 ```bash
 cd backend
-python -m unittest discover -s tests
+.venv/bin/python3.13 -m pytest tests/integration/test_debug_rwa_ops.py tests/contract/test_rwa_api_contracts.py
 
 cd ../frontend
 npm run lint
 npm run test:unit
+npm run test:contracts
 npm run build
 npm run test:e2e
 ```
+
+`npm run test:contracts` uses an in-memory repo-local EVM harness built on `@ethereumjs/vm`, so it does not require Ganache, Hardhat, or Foundry.
 
 Training helpers:
 
@@ -254,9 +341,10 @@ python training/scripts/evaluate_predictions.py training/eval/gold_eval_cases.js
 
 The current codebase was verified with:
 
-- `python -m unittest discover -s tests` in `backend/`
+- `.venv/bin/python3.13 -m pytest tests/integration/test_debug_rwa_ops.py tests/contract/test_rwa_api_contracts.py` in `backend/`
 - `npm run lint` in `frontend/`
 - `npm run test:unit` in `frontend/`
+- `npm run test:contracts` in `frontend/`
 - `npm run build` in `frontend/`
 - `npm run test:e2e` in `frontend/`
 - `python scripts/test_smoke.py`

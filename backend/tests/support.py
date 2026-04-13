@@ -14,10 +14,21 @@ from app.bootstrap import AppServices
 from app.main import create_app
 from app.orchestrator.engine import AnalysisOrchestrator
 from app.persistence.memory import InMemorySessionRepository
+from app.repositories.rwa import InMemoryRwaRepository
 from app.services.audit import AuditLogService
 from app.services.eligibility import EligibilityService
 from app.services.execution import ExecutionService
+from app.services.execution_receipts import ExecutionReceiptsService
+from app.services.execution_status_sync import ExecutionStatusSyncService
+from app.services.chain_indexer import ChainIndexerService
 from app.services.monitoring import MonitoringService
+from app.services.monitoring_scheduler import MonitoringSchedulerService
+from app.services.ops_jobs import OpsJobService
+from app.services.portfolio_alerts import PortfolioAlertsService
+from app.services.proof import ProofService
+from app.services.proof_publisher import ProofPublisherService
+from app.services.proof_repository import ProofRepositoryService
+from app.services.rwa_ops import RwaOpsService
 from app.services.sessions import SessionService
 from app.services.wallets import WalletService
 
@@ -32,6 +43,7 @@ def build_test_services(
     follow_up_round_limit: int = 3,
 ) -> AppServices:
     repo = repository or InMemorySessionRepository()
+    rwa_repo = InMemoryRwaRepository()
     audit_log_service = AuditLogService(repo)
     session_service = SessionService(
         repo,
@@ -40,13 +52,46 @@ def build_test_services(
     )
     wallet_service = WalletService()
     eligibility_service = EligibilityService()
+    proof_repository_service = ProofRepositoryService(repository=rwa_repo)
+    ops_job_service = OpsJobService(repository=rwa_repo)
+    proof_publisher_service = ProofPublisherService(repository_service=proof_repository_service)
+    execution_receipts_service = ExecutionReceiptsService(repository=rwa_repo)
+    execution_status_sync_service = ExecutionStatusSyncService(
+        receipts_service=execution_receipts_service,
+    )
+    portfolio_alerts_service = PortfolioAlertsService(repository=rwa_repo)
+    chain_indexer_service = ChainIndexerService(
+        repository=rwa_repo,
+        session_service=session_service,
+        ops_job_service=ops_job_service,
+    )
     execution_service = ExecutionService(
         session_service=session_service,
         eligibility_service=eligibility_service,
+        receipts_service=execution_receipts_service,
     )
     monitoring_service = MonitoringService(
         session_service=session_service,
         wallet_service=wallet_service,
+        receipts_service=execution_receipts_service,
+    )
+    proof_service = ProofService(
+        repository_service=proof_repository_service,
+        publisher_service=proof_publisher_service,
+    )
+    monitoring_scheduler_service = MonitoringSchedulerService(
+        execution_status_sync_service=execution_status_sync_service,
+        portfolio_alerts_service=portfolio_alerts_service,
+        ops_job_service=ops_job_service,
+    )
+    rwa_ops_service = RwaOpsService(
+        proof_service=proof_service,
+        proof_repository_service=proof_repository_service,
+        proof_publisher_service=proof_publisher_service,
+        execution_status_sync_service=execution_status_sync_service,
+        execution_receipts_service=execution_receipts_service,
+        chain_indexer_service=chain_indexer_service,
+        ops_job_service=ops_job_service,
     )
     orchestrator = AnalysisOrchestrator(
         repository=repo,
@@ -63,7 +108,17 @@ def build_test_services(
         wallet_service=wallet_service,
         eligibility_service=eligibility_service,
         execution_service=execution_service,
+        execution_receipts_service=execution_receipts_service,
+        execution_status_sync_service=execution_status_sync_service,
         monitoring_service=monitoring_service,
+        monitoring_scheduler_service=monitoring_scheduler_service,
+        portfolio_alerts_service=portfolio_alerts_service,
+        chain_indexer_service=chain_indexer_service,
+        ops_job_service=ops_job_service,
+        rwa_ops_service=rwa_ops_service,
+        proof_service=proof_service,
+        proof_repository_service=proof_repository_service,
+        proof_publisher_service=proof_publisher_service,
     )
 
 

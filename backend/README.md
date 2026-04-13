@@ -1,5 +1,7 @@
 # Backend MVP for HashKey Chain RWA
 
+This backend now acts as the proof, readiness, execution-planning, and monitoring layer for the HashKey RWA hub. In addition to analysis and report generation, it exposes asset proof snapshots, wallet-aware readiness checks, and portfolio alert endpoints.
+
 ## Run
 
 ```bash
@@ -20,14 +22,18 @@ uvicorn app.main:app --reload
    - `ANALYSIS_API_KEY`
    - `ANALYSIS_MODEL`
 6. HashKey Chain defaults are now configurable through:
+   - `HASHKEY_INDEXER_FINALITY_BUFFER`
    - `HASHKEY_TESTNET_CHAIN_ID`
    - `HASHKEY_TESTNET_RPC_URL`
    - `HASHKEY_TESTNET_EXPLORER_URL`
+   - `HASHKEY_TESTNET_ASSET_PROOF_REGISTRY_ADDRESS`
    - `HASHKEY_MAINNET_CHAIN_ID`
    - `HASHKEY_MAINNET_RPC_URL`
    - `HASHKEY_MAINNET_EXPLORER_URL`
+   - `HASHKEY_MAINNET_ASSET_PROOF_REGISTRY_ADDRESS`
    - `PLAN_REGISTRY_ADDRESS`
    - `KYC_SBT_ADDRESS`
+   - `ASSET_PROOF_REGISTRY_ADDRESS`
 7. When using Brave Search, fill at least:
    - `SEARCH_ADAPTER=brave`
    - `SEARCH_API_KEY`
@@ -78,6 +84,8 @@ Debug console notes:
 - Protected debug APIs live under `/api/debug/*`
 - Debug credentials come from `DEBUG_USERNAME` and `DEBUG_PASSWORD` in the repository-root `.env.local`
 - The regular user UI and the debug UI are intentionally split so audit logs are no longer embedded in the main frontend experience
+- RWA operator actions and health views now live under `/api/debug/rwa/*` and the frontend route `/debug/rwa-ops`
+- The repo-local indexer writes `AssetProofRegistry` / `PlanRegistry` event history into SQLite-backed read models
 
 ## Current scope
 
@@ -122,3 +130,19 @@ Debug console notes:
 - `POST /api/sessions`
 - `GET /api/sessions/{session_id}`
 - `POST /api/sessions/{session_id}/step`
+- `GET /api/rwa/assets/{asset_id}/proof`
+- `GET /api/rwa/assets/{asset_id}/proof/anchor-history`
+- `GET /api/rwa/assets/{asset_id}/readiness`
+- `GET /api/rwa/assets/{asset_id}/plan-history`
+- `GET /api/rwa/indexer/status`
+- `POST /api/rwa/execute/prepare`
+- `POST /api/rwa/execute/submit`
+- `GET /api/rwa/portfolio/{address}`
+- `GET /api/rwa/portfolio/{address}/alerts`
+- `GET /api/debug/rwa/ops/summary`
+- `GET /api/debug/rwa/jobs`
+- `POST /api/debug/rwa/proofs/refresh`
+- `POST /api/debug/rwa/proofs/publish/retry`
+- `POST /api/debug/rwa/proofs/{snapshot_id}/publish`
+- `POST /api/debug/rwa/execution/status-sync`
+- `POST /api/debug/rwa/indexer/run`

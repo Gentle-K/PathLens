@@ -260,8 +260,20 @@ class SessionService:
         session.execution_plan = execution_plan
         session.eligibility_decisions = list(execution_plan.eligibility)
         session.execution_status = execution_plan.status
-        session.status = SessionStatus.READY_FOR_EXECUTION
-        session.activity_status = "execution_plan_ready"
+        session.status = (
+            SessionStatus.MONITORING
+            if execution_plan.status == ExecutionLifecycleStatus.COMPLETED
+            else (
+                SessionStatus.EXECUTING
+                if execution_plan.status in {
+                    ExecutionLifecycleStatus.SUBMITTED,
+                    ExecutionLifecycleStatus.REDIRECT_REQUIRED,
+                    ExecutionLifecycleStatus.PENDING_SETTLEMENT,
+                }
+                else SessionStatus.READY_FOR_EXECUTION
+            )
+        )
+        session.activity_status = f"execution_{execution_plan.status.value}"
         session.last_onchain_sync_at = utcnow()
 
         if session.report is not None:
@@ -318,10 +330,10 @@ class SessionService:
             session.execution_status = ExecutionLifecycleStatus.FAILED
             session.status = SessionStatus.READY_FOR_EXECUTION
         elif receipt.tx_status == TransactionStatus.CONFIRMED:
-            session.execution_status = ExecutionLifecycleStatus.MONITORING
+            session.execution_status = ExecutionLifecycleStatus.COMPLETED
             session.status = SessionStatus.MONITORING
         else:
-            session.execution_status = ExecutionLifecycleStatus.EXECUTING
+            session.execution_status = ExecutionLifecycleStatus.SUBMITTED
             session.status = SessionStatus.EXECUTING
 
         if session.report is not None:
@@ -486,9 +498,9 @@ class SessionService:
             else TransactionStatus.SUBMITTED
         )
         session.execution_status = (
-            ExecutionLifecycleStatus.MONITORING
+            ExecutionLifecycleStatus.COMPLETED
             if tx_status == TransactionStatus.CONFIRMED
-            else ExecutionLifecycleStatus.EXECUTING
+            else ExecutionLifecycleStatus.SUBMITTED
         )
         session.status = (
             SessionStatus.MONITORING

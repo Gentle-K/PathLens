@@ -8,10 +8,21 @@ from app.adapters.search import BraveSearchAdapter, MockSearchAdapter
 from app.config import Settings
 from app.orchestrator.engine import AnalysisOrchestrator
 from app.persistence.sqlite import SQLiteSessionRepository
+from app.repositories.rwa import SQLiteRwaRepository
 from app.services.audit import AuditLogService
 from app.services.eligibility import EligibilityService
 from app.services.execution import ExecutionService
+from app.services.execution_receipts import ExecutionReceiptsService
+from app.services.execution_status_sync import ExecutionStatusSyncService
+from app.services.chain_indexer import ChainIndexerService
 from app.services.monitoring import MonitoringService
+from app.services.monitoring_scheduler import MonitoringSchedulerService
+from app.services.ops_jobs import OpsJobService
+from app.services.portfolio_alerts import PortfolioAlertsService
+from app.services.proof import ProofService
+from app.services.proof_publisher import ProofPublisherService
+from app.services.proof_repository import ProofRepositoryService
+from app.services.rwa_ops import RwaOpsService
 from app.services.sessions import SessionService
 from app.services.wallets import WalletService
 
@@ -24,7 +35,17 @@ class AppServices:
     wallet_service: WalletService
     eligibility_service: EligibilityService
     execution_service: ExecutionService
+    execution_receipts_service: ExecutionReceiptsService
+    execution_status_sync_service: ExecutionStatusSyncService
     monitoring_service: MonitoringService
+    monitoring_scheduler_service: MonitoringSchedulerService
+    portfolio_alerts_service: PortfolioAlertsService
+    chain_indexer_service: ChainIndexerService
+    ops_job_service: OpsJobService
+    rwa_ops_service: RwaOpsService
+    proof_service: ProofService
+    proof_repository_service: ProofRepositoryService
+    proof_publisher_service: ProofPublisherService
 
 
 _services: AppServices | None = None
@@ -114,6 +135,7 @@ def get_app_services() -> AppServices:
     if _services is None:
         settings = Settings.from_env()
         repository = SQLiteSessionRepository(str(settings.session_db_path))
+        rwa_repository = SQLiteRwaRepository(str(settings.session_db_path))
         audit_log_service = AuditLogService(repository)
         session_service = SessionService(
             repository,
@@ -122,13 +144,50 @@ def get_app_services() -> AppServices:
         )
         wallet_service = WalletService()
         eligibility_service = EligibilityService()
+        proof_repository_service = ProofRepositoryService(repository=rwa_repository)
+        ops_job_service = OpsJobService(repository=rwa_repository)
+        proof_publisher_service = ProofPublisherService(
+            repository_service=proof_repository_service,
+            settings=settings,
+        )
+        execution_receipts_service = ExecutionReceiptsService(repository=rwa_repository)
+        execution_status_sync_service = ExecutionStatusSyncService(
+            receipts_service=execution_receipts_service,
+        )
+        portfolio_alerts_service = PortfolioAlertsService(repository=rwa_repository)
+        chain_indexer_service = ChainIndexerService(
+            repository=rwa_repository,
+            session_service=session_service,
+            settings=settings,
+            ops_job_service=ops_job_service,
+        )
         execution_service = ExecutionService(
             session_service=session_service,
             eligibility_service=eligibility_service,
+            receipts_service=execution_receipts_service,
         )
         monitoring_service = MonitoringService(
             session_service=session_service,
             wallet_service=wallet_service,
+            receipts_service=execution_receipts_service,
+        )
+        proof_service = ProofService(
+            repository_service=proof_repository_service,
+            publisher_service=proof_publisher_service,
+        )
+        monitoring_scheduler_service = MonitoringSchedulerService(
+            execution_status_sync_service=execution_status_sync_service,
+            portfolio_alerts_service=portfolio_alerts_service,
+            ops_job_service=ops_job_service,
+        )
+        rwa_ops_service = RwaOpsService(
+            proof_service=proof_service,
+            proof_repository_service=proof_repository_service,
+            proof_publisher_service=proof_publisher_service,
+            execution_status_sync_service=execution_status_sync_service,
+            execution_receipts_service=execution_receipts_service,
+            chain_indexer_service=chain_indexer_service,
+            ops_job_service=ops_job_service,
         )
         orchestrator = AnalysisOrchestrator(
             repository=repository,
@@ -145,6 +204,16 @@ def get_app_services() -> AppServices:
             wallet_service=wallet_service,
             eligibility_service=eligibility_service,
             execution_service=execution_service,
+            execution_receipts_service=execution_receipts_service,
+            execution_status_sync_service=execution_status_sync_service,
             monitoring_service=monitoring_service,
+            monitoring_scheduler_service=monitoring_scheduler_service,
+            portfolio_alerts_service=portfolio_alerts_service,
+            chain_indexer_service=chain_indexer_service,
+            ops_job_service=ops_job_service,
+            rwa_ops_service=rwa_ops_service,
+            proof_service=proof_service,
+            proof_repository_service=proof_repository_service,
+            proof_publisher_service=proof_publisher_service,
         )
     return _services

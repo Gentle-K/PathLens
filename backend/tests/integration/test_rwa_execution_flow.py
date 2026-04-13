@@ -230,3 +230,237 @@ class RwaExecutionFlowTests(unittest.TestCase):
             refreshed = client.get(f"/api/sessions/{session_id}")
             self.assertEqual(200, refreshed.status_code)
             self.assertEqual("draft", refreshed.json()["report_anchor_records"][-1]["status"])
+
+    def test_submit_endpoint_distinguishes_issuer_flow_and_portfolio_api_returns_proof(self):
+        services = build_test_services()
+        services.wallet_service.build_wallet_positions = Mock(
+            return_value=(
+                "testnet",
+                [
+                    PositionSnapshot(
+                        asset_id="cpic-estable-mmf",
+                        asset_name="CPIC Estable MMF",
+                        chain_id=177,
+                        contract_address="",
+                        wallet_address=ADDRESS,
+                        current_balance=10000,
+                        latest_nav_or_price=1.001,
+                        current_value=10010,
+                        cost_basis=10000,
+                        unrealized_pnl=10,
+                        accrued_yield=24,
+                        next_redemption_window="T+2",
+                        oracle_staleness_flag=False,
+                        kyc_change_flag=False,
+                    )
+                ],
+                datetime.now(timezone.utc),
+            )
+        )
+
+        with patched_test_client(services) as client:
+            created = client.post(
+                "/api/sessions",
+                json=_session_payload(
+                    "Build a portfolio around a professional-investor MMF sleeve.",
+                    mode=AnalysisMode.STRATEGY_COMPARE.value,
+                ),
+            )
+            self.assertEqual(200, created.status_code)
+            session_id = created.json()["session_id"]
+            completed = complete_session_via_api(
+                client,
+                session_id,
+                answer_value="User is a professional investor and accepts T+2 redemption.",
+            )
+            self.assertEqual("READY_FOR_EXECUTION", completed["status"])
+
+            session = services.session_service.get_session(session_id)
+            session.wallet_address = ADDRESS
+            session.kyc_level = 2
+            session.kyc_status = "approved"
+            session.investor_type = "professional"
+            session.jurisdiction = "hk"
+            session.ticket_size = 10000
+            session.source_asset = "USDT"
+            session.source_chain = "hashkey"
+            services.session_service.repository.save(session)
+
+            submit = client.post(
+                "/api/rwa/execute/submit",
+                json={
+                    "session_id": session_id,
+                    "source_asset": "USDT",
+                    "target_asset": "cpic-estable-mmf",
+                    "amount": 10000,
+                    "wallet_address": ADDRESS,
+                    "source_chain": "hashkey",
+                    "include_attestation": True,
+                    "network": "testnet",
+                },
+            )
+            self.assertEqual(200, submit.status_code)
+            self.assertEqual("redirect_required", submit.json()["submission_status"])
+
+            portfolio = client.get(f"/api/rwa/portfolio/{ADDRESS}?network=testnet")
+            self.assertEqual(200, portfolio.status_code)
+            portfolio_payload = portfolio.json()
+            self.assertEqual(ADDRESS, portfolio_payload["address"])
+            self.assertGreaterEqual(len(portfolio_payload["proof_snapshots"]), 1)
+            self.assertGreaterEqual(len(portfolio_payload["alerts"]), 1)
+
+    def test_direct_contract_submission_exposes_receipt_lookup_and_proof_history(self):
+        services = build_test_services()
+
+        with patched_test_client(services) as client:
+            created = client.post(
+                "/api/sessions",
+                json=_session_payload(
+                    "Prepare a stablecoin sleeve with a direct contract route.",
+                    mode=AnalysisMode.STRATEGY_COMPARE.value,
+                ),
+            )
+            self.assertEqual(200, created.status_code)
+            session_id = created.json()["session_id"]
+            complete_session_via_api(
+                client,
+                session_id,
+                answer_value="User is professional, KYC approved, and wants stablecoin execution.",
+            )
+
+            session = services.session_service.get_session(session_id)
+            session.wallet_address = ADDRESS
+            session.kyc_level = 2
+            session.kyc_status = "approved"
+            session.investor_type = "professional"
+            session.jurisdiction = "hk"
+            session.ticket_size = 10000
+            session.source_asset = "USDT"
+            session.source_chain = "hashkey"
+            services.session_service.repository.save(session)
+
+            proof_response = client.get("/api/rwa/assets/hsk-usdt/proof?network=testnet")
+            self.assertEqual(200, proof_response.status_code)
+            self.assertIn("latest_proof", proof_response.json())
+            self.assertIn("onchain_anchor_status", proof_response.json())
+            self.assertIn("proof_timeline_preview", proof_response.json())
+
+            proof_history = client.get("/api/rwa/assets/hsk-usdt/proof/history?network=testnet")
+            self.assertEqual(200, proof_history.status_code)
+            self.assertEqual("hsk-usdt", proof_history.json()["asset_id"])
+            self.assertGreaterEqual(len(proof_history.json()["history"]), 1)
+
+            submit = client.post(
+                "/api/rwa/execute/submit",
+                json={
+                    "session_id": session_id,
+                    "source_asset": "USDT",
+                    "target_asset": "hsk-usdt",
+                    "amount": 10000,
+                    "wallet_address": ADDRESS,
+                    "source_chain": "hashkey",
+                    "include_attestation": True,
+                    "network": "testnet",
+                },
+            )
+            self.assertEqual(200, submit.status_code)
+            submit_payload = submit.json()
+            self.assertEqual("prepared", submit_payload["submission_status"])
+            self.assertEqual("direct_contract", submit_payload["receipt"]["adapter_kind"])
+            self.assertTrue(submit_payload["receipt"]["submit_payload"]["data"].startswith("0x"))
+
+            receipt_id = submit_payload["receipt"]["receipt_id"]
+            receipt_detail = client.get(f"/api/rwa/execution/receipts/{receipt_id}")
+            self.assertEqual(200, receipt_detail.status_code)
+            self.assertEqual(receipt_id, receipt_detail.json()["receipt"]["receipt_id"])
+
+            receipt_list = client.get(f"/api/rwa/execution/receipts?session_id={session_id}")
+            self.assertEqual(200, receipt_list.status_code)
+            self.assertGreaterEqual(len(receipt_list.json()["receipts"]), 1)
+
+    def test_portfolio_alert_ack_read_and_benchmark_submit_block(self):
+        services = build_test_services()
+        services.wallet_service.build_wallet_positions = Mock(
+            return_value=(
+                "testnet",
+                [
+                    PositionSnapshot(
+                        asset_id="cpic-estable-mmf",
+                        asset_name="CPIC Estable MMF",
+                        chain_id=177,
+                        contract_address="",
+                        wallet_address=ADDRESS,
+                        current_balance=10000,
+                        latest_nav_or_price=1.001,
+                        current_value=10010,
+                        cost_basis=10000,
+                        unrealized_pnl=10,
+                        realized_income=8,
+                        accrued_yield=24,
+                        redemption_forecast=10010,
+                        allocation_weight_pct=1.0,
+                        liquidity_risk="medium",
+                        next_redemption_window="T+2",
+                        oracle_staleness_flag=False,
+                        kyc_change_flag=False,
+                    )
+                ],
+                datetime.now(timezone.utc),
+            )
+        )
+
+        with patched_test_client(services) as client:
+            created = client.post(
+                "/api/sessions",
+                json=_session_payload(
+                    "Verify benchmark and live isolation in the execution submit flow.",
+                    mode=AnalysisMode.STRATEGY_COMPARE.value,
+                ),
+            )
+            self.assertEqual(200, created.status_code)
+            session_id = created.json()["session_id"]
+            complete_session_via_api(
+                client,
+                session_id,
+                answer_value="User is professional and wants live execution only.",
+            )
+
+            session = services.session_service.get_session(session_id)
+            session.wallet_address = ADDRESS
+            session.kyc_level = 2
+            session.kyc_status = "approved"
+            session.investor_type = "professional"
+            session.jurisdiction = "hk"
+            session.ticket_size = 10000
+            session.source_asset = "USDT"
+            session.source_chain = "hashkey"
+            services.session_service.repository.save(session)
+
+            portfolio_alerts = client.get(f"/api/rwa/portfolio/{ADDRESS}/alerts?network=testnet")
+            self.assertEqual(200, portfolio_alerts.status_code)
+            alerts = portfolio_alerts.json()["alerts"]
+            self.assertGreaterEqual(len(alerts), 1)
+
+            alert_id = alerts[0]["alert_id"]
+            acked = client.post(f"/api/rwa/portfolio/{ADDRESS}/alerts/{alert_id}/ack")
+            self.assertEqual(200, acked.status_code)
+            self.assertTrue(acked.json()["state"]["acked"])
+
+            marked_read = client.post(f"/api/rwa/portfolio/{ADDRESS}/alerts/{alert_id}/read")
+            self.assertEqual(200, marked_read.status_code)
+            self.assertTrue(marked_read.json()["state"]["read"])
+
+            blocked = client.post(
+                "/api/rwa/execute/submit",
+                json={
+                    "session_id": session_id,
+                    "source_asset": "USDT",
+                    "target_asset": "hsk-wbtc-benchmark",
+                    "amount": 10000,
+                    "wallet_address": ADDRESS,
+                    "source_chain": "hashkey",
+                    "include_attestation": True,
+                    "network": "testnet",
+                },
+            )
+            self.assertEqual(409, blocked.status_code)

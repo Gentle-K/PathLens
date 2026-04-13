@@ -5,15 +5,27 @@ import {
   COOKIE_SESSION_TOKEN,
   type BackendAuditLogEntry,
   type BackendAuditLogListResponse,
+  type BackendDebugOperationReceiptResponse,
   type BackendDebugSessionListResponse,
   type BackendEligibleCatalogBucketItem,
+  type BackendRwaOpsJobsResponse,
+  type BackendRwaOpsSummaryResponse,
   type BackendPersonalDataDeletionResponse,
   type BackendUserAnswer,
   type BackendBootstrapResponse,
   type BackendEligibleCatalogResponse,
   type BackendReportAnchorResponse,
+  type BackendRwaAssetProofResponse,
+  type BackendRwaAssetProofHistoryResponse,
+  type BackendRwaAssetReadinessResponse,
   type BackendRwaExecuteResponse,
+  type BackendRwaExecuteSubmitResponse,
+  type BackendRwaExecutionReceiptListResponse,
+  type BackendRwaExecutionReceiptResponse,
   type BackendRwaMonitorResponse,
+  type BackendRwaPortfolioAlertStateResponse,
+  type BackendRwaPortfolioAlertsResponse,
+  type BackendRwaPortfolioResponse,
   type BackendRwaQuoteResponse,
   type BackendRwaSimulateResponse,
   type BackendSession,
@@ -24,16 +36,26 @@ import {
   backendSessionToResourceRecord,
   createBackendPseudoUser,
   mapAssetTemplate,
+  mapAssetProofHistoryItem,
+  mapAssetProofSnapshot,
   mapAuditLogEntry,
+  mapContractAnchorSummary,
+  mapDebugOperationReceipt,
   mapDebugSessionSummary,
   mapBackendProgress,
   mapBackendReport,
   mapBackendSession,
   mapEligibilityDecision,
+  mapIndexerStatusItem,
   mapExecutionPlan,
+  mapExecutionReceipt,
   mapExecutionQuote,
+  mapOpsJobRun,
+  mapPortfolioAlert,
+  mapPortfolioAlertAck,
   mapPositionSnapshot,
   mapReportAnchorRecord,
+  mapRwaOpsSummary,
   mapModeDefinitions,
   mapRwaBootstrap,
   mapTransactionReceipt,
@@ -284,6 +306,60 @@ export const restApiAdapter: ApiAdapter = {
       const bootstrap = await getBootstrap()
       return mapRwaBootstrap(bootstrap)
     },
+    async getAssetProof(assetId, network = '') {
+      const payload = await apiClient.request<BackendRwaAssetProofResponse>(
+        endpoints.backend.rwaAssetProof(assetId, network),
+      )
+      return mapAssetProofSnapshot(payload.latest_proof ?? payload.proof)
+    },
+    async getAssetProofHistory(assetId, network = '') {
+      const payload = await apiClient.request<BackendRwaAssetProofHistoryResponse>(
+        endpoints.backend.rwaAssetProofHistory(assetId, network),
+      )
+      return (payload.history ?? []).map(mapAssetProofHistoryItem)
+    },
+    async getAssetReadiness({
+      assetId,
+      address = '',
+      sessionId = '',
+      network = '',
+      amount,
+      sourceAsset = '',
+      sourceChain = '',
+    }) {
+      const payload = await apiClient.request<BackendRwaAssetReadinessResponse>(
+        endpoints.backend.rwaAssetReadiness(assetId, {
+          address,
+          sessionId,
+          network,
+          amount,
+          sourceAsset,
+          sourceChain,
+        }),
+      )
+        return {
+          asset: mapAssetTemplate(payload.asset),
+          proof: mapAssetProofSnapshot(payload.proof),
+          decision: mapEligibilityDecision(payload.decision),
+          executionAdapterKind: payload.execution_adapter_kind as import('@/types').ExecutionAdapterKind,
+        executionReadiness: payload.execution_readiness as import('@/types').ExecutionReadiness,
+        routeSummary: payload.route_summary,
+        quote: mapExecutionQuote(payload.quote),
+        requiredApprovals: (payload.required_approvals ?? []).map((approval) => ({
+          approvalType: approval.approval_type,
+          tokenSymbol: approval.token_symbol ?? '',
+          spender: approval.spender ?? '',
+          approvalTarget: approval.approval_target ?? '',
+          amount:
+            typeof approval.amount === 'number' ? approval.amount : undefined,
+          note: approval.note ?? '',
+          allowanceRequired: Boolean(approval.allowance_required),
+        })),
+        possibleFailureReasons: payload.possible_failure_reasons ?? [],
+        complianceBlockers: payload.compliance_blockers ?? [],
+        warnings: payload.warnings ?? [],
+      }
+    },
     async getWalletSummary(address, network = '') {
       const payload = await apiClient.request<BackendWalletSummaryResponse>(
         endpoints.backend.walletSummary(address, network),
@@ -313,6 +389,54 @@ export const restApiAdapter: ApiAdapter = {
         endpoints.backend.walletPositions(address, network),
       )
       return (payload.positions ?? []).map(mapPositionSnapshot)
+    },
+    async getPortfolio(address, network = '') {
+      const payload = await apiClient.request<BackendRwaPortfolioResponse>(
+        endpoints.backend.rwaPortfolio(address, network),
+      )
+      return {
+        address: payload.address,
+        network: payload.network,
+        positions: (payload.positions ?? []).map(mapPositionSnapshot),
+        proofSnapshots: (payload.proof_snapshots ?? []).map(mapAssetProofSnapshot),
+        alerts: (payload.alerts ?? []).map(mapPortfolioAlert),
+        indexerHealth: (payload.indexer_health ?? []).map(mapIndexerStatusItem),
+        latestAnchorSummary: (payload.latest_anchor_summary ?? []).map(
+          mapContractAnchorSummary,
+        ),
+        totalValueUsd: payload.total_value_usd,
+        totalCostBasis: payload.total_cost_basis,
+        totalUnrealizedPnl: payload.total_unrealized_pnl,
+        totalRealizedIncome: payload.total_realized_income ?? 0,
+        totalAccruedYield: payload.total_accrued_yield ?? 0,
+        totalRedemptionForecast: payload.total_redemption_forecast ?? 0,
+        allocationMix: payload.allocation_mix ?? {},
+        lastSyncAt: payload.last_sync_at,
+      }
+    },
+    async getPortfolioAlerts(address, network = '') {
+      const payload = await apiClient.request<BackendRwaPortfolioAlertsResponse>(
+        endpoints.backend.rwaPortfolioAlerts(address, network),
+      )
+      return (payload.alerts ?? []).map(mapPortfolioAlert)
+    },
+    async ackPortfolioAlert(address, alertId) {
+      const payload = await apiClient.request<BackendRwaPortfolioAlertStateResponse>(
+        endpoints.backend.rwaPortfolioAlertAck(address, alertId),
+        {
+          method: 'POST',
+        },
+      )
+      return mapPortfolioAlertAck(payload.state)
+    },
+    async readPortfolioAlert(address, alertId) {
+      const payload = await apiClient.request<BackendRwaPortfolioAlertStateResponse>(
+        endpoints.backend.rwaPortfolioAlertRead(address, alertId),
+        {
+          method: 'POST',
+        },
+      )
+      return mapPortfolioAlertAck(payload.state)
     },
     async getEligibleCatalog({ address, sessionId = '', network = '' }) {
       const payload = await apiClient.request<BackendEligibleCatalogResponse>(
@@ -393,9 +517,71 @@ export const restApiAdapter: ApiAdapter = {
       )
       return {
         executionPlan: mapExecutionPlan(response.execution_plan)!,
+        prepareSummary: response.prepare_summary ?? '',
+        checklist: response.checklist ?? [],
+        blockers: response.blockers ?? [],
+        executionReceipt: response.execution_receipt
+          ? mapExecutionReceipt(response.execution_receipt)
+          : undefined,
         txReceipts: (response.tx_receipts ?? []).map(mapTransactionReceipt),
         reportAnchorRecords: (response.report_anchor_records ?? []).map(mapReportAnchorRecord),
       }
+    },
+    async submitExecution(payload) {
+      const response = await apiClient.request<BackendRwaExecuteSubmitResponse>(
+        endpoints.backend.rwaExecuteSubmit,
+        {
+          method: 'POST',
+          body: JSON.stringify({
+            session_id: payload.sessionId,
+            source_asset: payload.sourceAsset,
+            target_asset: payload.targetAsset,
+            amount: payload.amount,
+            wallet_address: payload.walletAddress ?? '',
+            safe_address: payload.safeAddress ?? '',
+            source_chain: payload.sourceChain ?? 'hashkey',
+            include_attestation: payload.includeAttestation ?? true,
+            network: payload.network ?? '',
+            transaction_hash: payload.transactionHash ?? '',
+            submitted_by: payload.submittedBy ?? '',
+            block_number: payload.blockNumber,
+            note: payload.note ?? '',
+          }),
+        },
+      )
+      return {
+        executionPlan: mapExecutionPlan(response.execution_plan)!,
+        receipt: mapExecutionReceipt(response.receipt),
+        allowanceSteps: (response.allowance_steps ?? []).map((approval) => ({
+          approvalType: approval.approval_type,
+          tokenSymbol: approval.token_symbol ?? '',
+          spender: approval.spender ?? '',
+          approvalTarget: approval.approval_target ?? '',
+          amount:
+            typeof approval.amount === 'number' ? approval.amount : undefined,
+          note: approval.note ?? '',
+          allowanceRequired: Boolean(approval.allowance_required),
+        })),
+        issuerRequestId: response.issuer_request_id ?? '',
+        redirectUrl: response.redirect_url ?? '',
+        submissionStatus: response.submission_status,
+        submissionMessage: response.submission_message,
+        externalActionUrl: response.external_action_url ?? '',
+        txReceipts: (response.tx_receipts ?? []).map(mapTransactionReceipt),
+        reportAnchorRecords: (response.report_anchor_records ?? []).map(mapReportAnchorRecord),
+      }
+    },
+    async getExecutionReceipt(receiptId) {
+      const payload = await apiClient.request<BackendRwaExecutionReceiptResponse>(
+        endpoints.backend.rwaExecutionReceipt(receiptId),
+      )
+      return mapExecutionReceipt(payload.receipt)
+    },
+    async listExecutionReceipts(params = {}) {
+      const payload = await apiClient.request<BackendRwaExecutionReceiptListResponse>(
+        endpoints.backend.rwaExecutionReceipts(params),
+      )
+      return (payload.receipts ?? []).map(mapExecutionReceipt)
     },
     async monitor(sessionId) {
       const response = await apiClient.request<BackendRwaMonitorResponse>(
@@ -407,11 +593,17 @@ export const restApiAdapter: ApiAdapter = {
         latestNavOrPrice: response.latest_nav_or_price,
         costBasis: response.cost_basis,
         unrealizedPnl: response.unrealized_pnl,
+        realizedIncome: response.realized_income ?? 0,
         accruedYield: response.accrued_yield,
+        redemptionForecast: response.redemption_forecast ?? 0,
+        allocationMix: response.allocation_mix ?? {},
         nextRedemptionWindow: response.next_redemption_window ?? '',
         oracleStalenessFlag: Boolean(response.oracle_staleness_flag),
         kycChangeFlag: Boolean(response.kyc_change_flag),
+        proofStalenessFlag: Boolean(response.proof_staleness_flag),
+        issuerDisclosureUpdateFlag: Boolean(response.issuer_disclosure_update_flag),
         alertFlags: response.alert_flags ?? [],
+        portfolioAlerts: (response.portfolio_alerts ?? []).map(mapPortfolioAlert),
       }
     },
     async anchorReport(payload) {
@@ -605,6 +797,53 @@ export const restApiAdapter: ApiAdapter = {
         }),
         session,
       }
+    },
+    async getRwaOpsSummary(network = '') {
+      const payload = await apiClient.request<BackendRwaOpsSummaryResponse>(
+        endpoints.backend.debugRwaOpsSummary(network),
+      )
+      return mapRwaOpsSummary(payload.summary)
+    },
+    async listRwaJobs() {
+      const payload = await apiClient.request<BackendRwaOpsJobsResponse>(
+        endpoints.backend.debugRwaJobs,
+      )
+      return (payload.jobs ?? []).map(mapOpsJobRun)
+    },
+    async refreshRwaProofs(network = '') {
+      const payload = await apiClient.request<BackendDebugOperationReceiptResponse>(
+        endpoints.backend.debugRwaProofRefresh(network),
+        { method: 'POST' },
+      )
+      return mapDebugOperationReceipt(payload.receipt)
+    },
+    async retryRwaPublishes(network = '') {
+      const payload = await apiClient.request<BackendDebugOperationReceiptResponse>(
+        endpoints.backend.debugRwaProofRetryPublish(network),
+        { method: 'POST' },
+      )
+      return mapDebugOperationReceipt(payload.receipt)
+    },
+    async publishRwaSnapshot(snapshotId) {
+      const payload = await apiClient.request<BackendDebugOperationReceiptResponse>(
+        endpoints.backend.debugRwaProofPublish(snapshotId),
+        { method: 'POST' },
+      )
+      return mapDebugOperationReceipt(payload.receipt)
+    },
+    async syncRwaExecutionStatus() {
+      const payload = await apiClient.request<BackendDebugOperationReceiptResponse>(
+        endpoints.backend.debugRwaExecutionStatusSync,
+        { method: 'POST' },
+      )
+      return mapDebugOperationReceipt(payload.receipt)
+    },
+    async runRwaIndexer() {
+      const payload = await apiClient.request<BackendDebugOperationReceiptResponse>(
+        endpoints.backend.debugRwaIndexerRun,
+        { method: 'POST' },
+      )
+      return mapDebugOperationReceipt(payload.receipt)
     },
   },
   files: {

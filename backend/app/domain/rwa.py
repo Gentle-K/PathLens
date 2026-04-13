@@ -50,6 +50,20 @@ class LiveReadiness(str, Enum):
     PARTIAL = "partial"
     UNAVAILABLE = "unavailable"
     DEMO_ONLY = "demo_only"
+    BENCHMARK_ONLY = "benchmark_only"
+
+
+class ExecutionAdapterKind(str, Enum):
+    DIRECT_CONTRACT = "direct_contract"
+    ISSUER_PORTAL = "issuer_portal"
+    VIEW_ONLY = "view_only"
+
+
+class ExecutionReadiness(str, Enum):
+    READY = "ready"
+    REQUIRES_ISSUER = "requires_issuer"
+    VIEW_ONLY = "view_only"
+    BLOCKED = "blocked"
 
 
 class ActionType(str, Enum):
@@ -108,13 +122,48 @@ class EligibilityStatus(str, Enum):
 
 
 class ExecutionLifecycleStatus(str, Enum):
-    NOT_READY = "NOT_READY"
-    READY = "READY"
-    SIMULATED = "SIMULATED"
-    BUNDLE_READY = "BUNDLE_READY"
-    EXECUTING = "EXECUTING"
-    MONITORING = "MONITORING"
-    FAILED = "FAILED"
+    PREPARED = "prepared"
+    SUBMITTED = "submitted"
+    REDIRECT_REQUIRED = "redirect_required"
+    PENDING_SETTLEMENT = "pending_settlement"
+    COMPLETED = "completed"
+    FAILED = "failed"
+
+    @classmethod
+    def _missing_(cls, value: object) -> "ExecutionLifecycleStatus" | None:
+        if not isinstance(value, str):
+            return None
+        normalized = value.strip().lower()
+        aliases = {
+            "not_ready": cls.PREPARED,
+            "ready": cls.PREPARED,
+            "simulated": cls.PREPARED,
+            "bundle_ready": cls.PREPARED,
+            "executing": cls.SUBMITTED,
+            "monitoring": cls.COMPLETED,
+        }
+        return aliases.get(normalized)
+
+
+class SettlementStatus(str, Enum):
+    NOT_STARTED = "not_started"
+    PENDING = "pending"
+    DELAYED = "delayed"
+    COMPLETED = "completed"
+    FAILED = "failed"
+
+
+class ProofPublishStatus(str, Enum):
+    PENDING = "pending"
+    PUBLISHED = "published"
+    RETRY = "retry"
+    FAILED = "failed"
+    SKIPPED = "skipped"
+
+
+class AlertEventStatus(str, Enum):
+    OPEN = "open"
+    RESOLVED = "resolved"
 
 
 class TransactionStatus(str, Enum):
@@ -136,10 +185,13 @@ class HashKeyChainConfig(BaseModel):
     mainnet_explorer_url: str = "https://hashkey.blockscout.com"
     plan_registry_address: str = ""
     kyc_sbt_address: str = ""
+    asset_proof_registry_address: str = ""
     testnet_plan_registry_address: str = ""
     mainnet_plan_registry_address: str = ""
     testnet_kyc_sbt_address: str = ""
     mainnet_kyc_sbt_address: str = ""
+    testnet_asset_proof_registry_address: str = ""
+    mainnet_asset_proof_registry_address: str = ""
     docs_urls: list[str] = Field(default_factory=list)
     oracle_feeds: list["OracleFeedConfig"] = Field(default_factory=list)
 
@@ -318,6 +370,328 @@ class AssetTemplate(BaseModel):
             + self.slippage_bps
             + annualized_management_bps
         )
+
+
+class ProofSourceRef(BaseModel):
+    ref_id: str
+    title: str
+    source_name: str
+    source_url: str
+    source_kind: str = "official"
+    source_tier: str = "official"
+    freshness_date: str = ""
+    summary: str = ""
+    status: str = "available"
+    unavailable_reason: str = ""
+    is_primary: bool = False
+    confidence: float = 0.5
+
+
+class ProofFreshnessState(BaseModel):
+    bucket: str = "undated"
+    label: str = "Undated"
+    checked_at: datetime = Field(default_factory=utcnow)
+    stale_after_hours: int = 168
+    age_hours: float | None = None
+    reason: str = ""
+
+
+class RedemptionWindow(BaseModel):
+    label: str
+    window_type: str = "instant"
+    settlement_days: int = 0
+    detail: str = ""
+    next_window: str = ""
+    status: str = "open"
+
+
+class ProofStatusCard(BaseModel):
+    key: str
+    label: str
+    status: str
+    detail: str
+
+
+class OnchainAnchorStatus(BaseModel):
+    status: str = "unpublished"
+    proof_key: str = ""
+    registry_address: str = ""
+    transaction_hash: str = ""
+    block_number: int | None = None
+    explorer_url: str = ""
+    recorded_at: datetime | None = None
+    attester: str = ""
+    note: str = ""
+
+
+class IndexerStatusItem(BaseModel):
+    network: str
+    contract_name: str
+    contract_address: str = ""
+    last_indexed_block: int = 0
+    last_safe_head: int = 0
+    chain_head: int = 0
+    lag: int = 0
+    status: str = "idle"
+    last_error: str = ""
+    updated_at: datetime = Field(default_factory=utcnow)
+
+
+class IndexedAssetProofEvent(BaseModel):
+    event_id: str
+    asset_id: str
+    asset_name: str = ""
+    network: str
+    contract_address: str
+    proof_key: str
+    snapshot_hash: str
+    snapshot_uri: str = ""
+    proof_type: str = ""
+    attester: str = ""
+    transaction_hash: str = ""
+    block_number: int = 0
+    log_index: int = 0
+    effective_at: datetime | None = None
+    recorded_at: datetime | None = None
+    indexed_at: datetime = Field(default_factory=utcnow)
+
+
+class IndexedPlanHistoryItem(BaseModel):
+    event_id: str
+    asset_id: str = ""
+    asset_name: str = ""
+    network: str
+    contract_address: str
+    attestation_hash: str
+    report_hash: str = ""
+    portfolio_hash: str = ""
+    submitter: str = ""
+    session_id: str = ""
+    summary_uri: str = ""
+    transaction_hash: str = ""
+    block_number: int = 0
+    log_index: int = 0
+    recorded_at: datetime | None = None
+    indexed_at: datetime = Field(default_factory=utcnow)
+
+
+class AssetProofHistoryItem(BaseModel):
+    snapshot_id: str
+    asset_id: str
+    network: str
+    snapshot_hash: str
+    snapshot_uri: str
+    proof_type: str
+    effective_at: datetime
+    published_at: datetime | None = None
+    timeline_version: int = 1
+    attester: str = ""
+    publish_status: ProofPublishStatus = ProofPublishStatus.PENDING
+    onchain_anchor_status: OnchainAnchorStatus = Field(default_factory=OnchainAnchorStatus)
+    oracle_freshness: str = ""
+    kyc_policy_summary: str = ""
+    source_confidence: float = 0.5
+    unavailable_reasons: list[str] = Field(default_factory=list)
+    onchain_indexed: bool = False
+    indexed_at: datetime | None = None
+
+
+class ProofPublishAttempt(BaseModel):
+    attempt_id: str = Field(default_factory=lambda: str(__import__("uuid").uuid4()))
+    snapshot_id: str
+    status: ProofPublishStatus = ProofPublishStatus.PENDING
+    tx_hash: str = ""
+    block_number: int | None = None
+    error_message: str = ""
+    published_at: datetime | None = None
+    created_at: datetime = Field(default_factory=utcnow)
+
+
+class AssetProofSnapshot(BaseModel):
+    snapshot_id: str = Field(default_factory=lambda: str(__import__("uuid").uuid4()))
+    asset_id: str
+    asset_name: str
+    asset_symbol: str
+    network: str
+    live_asset: bool = False
+    included_in_registry: bool = False
+    snapshot_hash: str
+    snapshot_uri: str
+    proof_type: str
+    effective_at: datetime = Field(default_factory=utcnow)
+    published_at: datetime | None = None
+    attester: str = "genius-actuary-proof-service"
+    registry_address: str = ""
+    registry_explorer_url: str = ""
+    anchor_status: OnchainAnchorStatus = Field(default_factory=OnchainAnchorStatus)
+    indexed_anchor_status: OnchainAnchorStatus | None = None
+    indexed_at: datetime | None = None
+    history_source: str = "repository"
+    timeline_version: int = 1
+    publish_status: ProofPublishStatus = ProofPublishStatus.PENDING
+    onchain_proof_key: str = ""
+    execution_adapter_kind: ExecutionAdapterKind = ExecutionAdapterKind.VIEW_ONLY
+    execution_readiness: ExecutionReadiness = ExecutionReadiness.VIEW_ONLY
+    truth_level: TruthLevel = TruthLevel.ISSUER_DISCLOSED
+    live_readiness: LiveReadiness = LiveReadiness.PARTIAL
+    required_kyc_level: int | None = None
+    proof_freshness: ProofFreshnessState = Field(default_factory=ProofFreshnessState)
+    oracle_freshness: str = ""
+    kyc_policy_summary: str = ""
+    source_confidence: float = 0.5
+    redemption_window: RedemptionWindow = Field(
+        default_factory=lambda: RedemptionWindow(label="T+0")
+    )
+    status_cards: list[ProofStatusCard] = Field(default_factory=list)
+    proof_source_refs: list[ProofSourceRef] = Field(default_factory=list)
+    unavailable_reasons: list[str] = Field(default_factory=list)
+    monitoring_notes: list[str] = Field(default_factory=list)
+    primary_action_url: str = ""
+    visibility_role: str = "live"
+    is_executable: bool = False
+
+    def to_history_item(self) -> AssetProofHistoryItem:
+        return AssetProofHistoryItem(
+            snapshot_id=self.snapshot_id,
+            asset_id=self.asset_id,
+            network=self.network,
+            snapshot_hash=self.snapshot_hash,
+            snapshot_uri=self.snapshot_uri,
+            proof_type=self.proof_type,
+            effective_at=self.effective_at,
+            published_at=self.published_at,
+            timeline_version=self.timeline_version,
+            attester=self.attester,
+            publish_status=self.publish_status,
+            onchain_anchor_status=self.anchor_status,
+            oracle_freshness=self.oracle_freshness,
+            kyc_policy_summary=self.kyc_policy_summary,
+            source_confidence=self.source_confidence,
+            unavailable_reasons=list(self.unavailable_reasons),
+            onchain_indexed=bool(self.indexed_anchor_status and self.indexed_anchor_status.proof_key),
+            indexed_at=self.indexed_at,
+        )
+
+
+class PortfolioAlert(BaseModel):
+    alert_id: str = Field(default_factory=lambda: str(__import__("uuid").uuid4()))
+    address: str = ""
+    alert_type: str
+    severity: str = "warning"
+    title: str
+    detail: str
+    asset_id: str = ""
+    asset_name: str = ""
+    source_url: str = ""
+    source_ref: str = ""
+    dedupe_key: str = ""
+    status: AlertEventStatus = AlertEventStatus.OPEN
+    acked: bool = False
+    acknowledged_at: datetime | None = None
+    read: bool = False
+    read_at: datetime | None = None
+    detected_at: datetime = Field(default_factory=utcnow)
+    resolved_at: datetime | None = None
+
+
+class PortfolioAlertAck(BaseModel):
+    alert_id: str
+    address: str
+    acked: bool = False
+    acknowledged_at: datetime | None = None
+    read: bool = False
+    read_at: datetime | None = None
+
+
+class AlertTimelineItem(BaseModel):
+    alert: PortfolioAlert
+    snapshot_hash: str = ""
+    source_version: str = ""
+
+
+class OpsJobRun(BaseModel):
+    job_run_id: str = Field(default_factory=lambda: str(__import__("uuid").uuid4()))
+    job_name: str
+    network: str = ""
+    status: str = "running"
+    started_at: datetime = Field(default_factory=utcnow)
+    finished_at: datetime | None = None
+    item_count: int = 0
+    error_message: str = ""
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+
+class DebugOperationReceipt(BaseModel):
+    operation_id: str
+    status: str
+    started_at: datetime
+    finished_at: datetime | None = None
+    error_message: str = ""
+    item_count: int = 0
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+
+class AttesterRegistryStatus(BaseModel):
+    network: str
+    registry_address: str = ""
+    owner: str = ""
+    pending_owner: str = ""
+    publisher_address: str = ""
+    publisher_authorized: bool = False
+    publish_enabled: bool = False
+    attesters: list[str] = Field(default_factory=list)
+    latest_publish_status: str = ""
+    latest_publish_tx_hash: str = ""
+    latest_publish_at: datetime | None = None
+
+
+class SourceHealthStatus(BaseModel):
+    asset_id: str
+    asset_name: str
+    network: str
+    visibility_role: str = "live"
+    live_asset: bool = False
+    proof_freshness_bucket: str = ""
+    proof_freshness_label: str = ""
+    oracle_freshness: str = ""
+    kyc_policy_summary: str = ""
+    source_confidence: float = 0.0
+    publish_status: ProofPublishStatus = ProofPublishStatus.PENDING
+    unavailable_reasons: list[str] = Field(default_factory=list)
+
+
+class ContractAnchorSummary(BaseModel):
+    asset_id: str
+    asset_name: str
+    network: str
+    visibility_role: str = "live"
+    is_live: bool = False
+    latest_proof_key: str = ""
+    latest_snapshot_hash: str = ""
+    latest_publish_status: str = ""
+    latest_tx_hash: str = ""
+    latest_block_number: int | None = None
+    latest_indexed_at: datetime | None = None
+    proof_history_count: int = 0
+    latest_plan_key: str = ""
+    latest_plan_session_id: str = ""
+    latest_plan_tx_hash: str = ""
+    latest_plan_block_number: int | None = None
+    latest_plan_indexed_at: datetime | None = None
+
+
+class RwaOpsSummary(BaseModel):
+    pending_publish_count: int = 0
+    failed_publish_count: int = 0
+    stale_proof_count: int = 0
+    max_indexer_lag: int = 0
+    failed_job_count: int = 0
+    proof_queue: list[AssetProofSnapshot] = Field(default_factory=list)
+    attester_status: list[AttesterRegistryStatus] = Field(default_factory=list)
+    source_health: list[SourceHealthStatus] = Field(default_factory=list)
+    job_health: list[OpsJobRun] = Field(default_factory=list)
+    indexer_health: list[IndexerStatusItem] = Field(default_factory=list)
+    contract_anchors: list[ContractAnchorSummary] = Field(default_factory=list)
 
 
 class RiskVector(BaseModel):
@@ -505,8 +879,10 @@ class ExecutionApproval(BaseModel):
     approval_type: str
     token_symbol: str = ""
     spender: str = ""
+    approval_target: str = ""
     amount: float | None = None
     note: str = ""
+    allowance_required: bool = False
 
 
 class ExecutionQuote(BaseModel):
@@ -549,7 +925,11 @@ class PositionSnapshot(BaseModel):
     current_value: float = 0.0
     cost_basis: float = 0.0
     unrealized_pnl: float = 0.0
+    realized_income: float = 0.0
     accrued_yield: float = 0.0
+    redemption_forecast: float = 0.0
+    allocation_weight_pct: float = 0.0
+    liquidity_risk: str = ""
     next_redemption_window: str = ""
     oracle_staleness_flag: bool = False
     kyc_change_flag: bool = False
@@ -574,9 +954,12 @@ class ExecutionStep(BaseModel):
     requires_safe: bool = False
     compliance_blockers: list[str] = Field(default_factory=list)
     required_approvals: list[ExecutionApproval] = Field(default_factory=list)
+    checklist: list[str] = Field(default_factory=list)
     warnings: list[str] = Field(default_factory=list)
     tx_request: dict[str, Any] = Field(default_factory=dict)
     offchain_actions: list[str] = Field(default_factory=list)
+    redirect_url: str = ""
+    external_request_id: str = ""
     status: str = "pending"
 
 
@@ -589,19 +972,67 @@ class ExecutionPlan(BaseModel):
     source_chain: str = ""
     source_asset: str = ""
     target_asset: str = ""
+    execution_adapter_kind: ExecutionAdapterKind = ExecutionAdapterKind.VIEW_ONLY
+    execution_readiness: ExecutionReadiness = ExecutionReadiness.VIEW_ONLY
+    readiness_reason: str = ""
+    external_action_url: str = ""
+    external_action_label: str = ""
     ticket_size: float = 0.0
-    status: ExecutionLifecycleStatus = ExecutionLifecycleStatus.NOT_READY
+    receipt_id: str = ""
+    status: ExecutionLifecycleStatus = ExecutionLifecycleStatus.PREPARED
     quote: ExecutionQuote | None = None
     warnings: list[str] = Field(default_factory=list)
     simulation_warnings: list[str] = Field(default_factory=list)
     possible_failure_reasons: list[str] = Field(default_factory=list)
     compliance_blockers: list[str] = Field(default_factory=list)
     required_approvals: list[ExecutionApproval] = Field(default_factory=list)
+    checklist: list[str] = Field(default_factory=list)
+    external_steps: list[str] = Field(default_factory=list)
     steps: list[ExecutionStep] = Field(default_factory=list)
     tx_bundle: list[dict[str, Any]] = Field(default_factory=list)
     eligibility: list[EligibilityDecision] = Field(default_factory=list)
     can_execute_onchain: bool = False
     plan_hash: str = ""
+
+
+class ExecutionReceipt(BaseModel):
+    receipt_id: str = Field(default_factory=lambda: str(__import__("uuid").uuid4()))
+    session_id: str = ""
+    asset_id: str
+    adapter_kind: ExecutionAdapterKind = ExecutionAdapterKind.VIEW_ONLY
+    status: ExecutionLifecycleStatus = ExecutionLifecycleStatus.PREPARED
+    settlement_status: SettlementStatus = SettlementStatus.NOT_STARTED
+    prepared_payload: dict[str, Any] = Field(default_factory=dict)
+    submit_payload: dict[str, Any] = Field(default_factory=dict)
+    external_request_id: str = ""
+    redirect_url: str = ""
+    tx_hash: str = ""
+    block_number: int | None = None
+    wallet_address: str = ""
+    safe_address: str = ""
+    failure_reason: str = ""
+    note: str = ""
+    submitted_at: datetime | None = None
+    updated_at: datetime = Field(default_factory=utcnow)
+
+
+class ExecutionSubmitResult(BaseModel):
+    execution_plan: ExecutionPlan
+    receipt: ExecutionReceipt
+    allowance_steps: list[ExecutionApproval] = Field(default_factory=list)
+    redirect_url: str = ""
+    issuer_request_id: str = ""
+    submission_message: str = ""
+
+
+class IssuerRequestRecord(BaseModel):
+    request_id: str = Field(default_factory=lambda: str(__import__("uuid").uuid4()))
+    receipt_id: str
+    asset_id: str
+    issuer_case_id: str = ""
+    redirect_url: str = ""
+    issuer_status: str = "created"
+    last_synced_at: datetime = Field(default_factory=utcnow)
 
 
 class TxDraftStep(BaseModel):

@@ -26,6 +26,7 @@ from app.services.audit import AuditLogService
 from app.services.eligibility import EligibilityService
 from app.services.execution import ExecutionService
 from app.services.monitoring import MonitoringService
+from app.services.proof import ProofService
 from app.services.sessions import SessionService
 from app.services.wallets import WalletService
 from app.adapters.llm_analysis import OpenAICompatibleAnalysisAdapter
@@ -98,6 +99,7 @@ def build_services():
         session_service=session_service,
         wallet_service=wallet_service,
     )
+    proof_service = ProofService()
     orchestrator = AnalysisOrchestrator(
         repository=repository,
         audit_log_service=audit_log_service,
@@ -114,6 +116,7 @@ def build_services():
         eligibility_service=eligibility_service,
         execution_service=execution_service,
         monitoring_service=monitoring_service,
+        proof_service=proof_service,
     )
 
 

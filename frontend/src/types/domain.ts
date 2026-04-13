@@ -52,14 +52,21 @@ export type DataSourceTag =
 export type KycStatus = 'none' | 'approved' | 'revoked' | 'unavailable'
 export type EligibilityStatus = 'eligible' | 'conditional' | 'blocked'
 export type ExecutionLifecycleStatus =
-  | 'NOT_READY'
-  | 'READY'
-  | 'SIMULATED'
-  | 'BUNDLE_READY'
-  | 'EXECUTING'
-  | 'MONITORING'
-  | 'FAILED'
+  | 'prepared'
+  | 'submitted'
+  | 'redirect_required'
+  | 'pending_settlement'
+  | 'completed'
+  | 'failed'
 export type TransactionStatus = 'pending' | 'submitted' | 'confirmed' | 'failed'
+export type SettlementStatus =
+  | 'not_started'
+  | 'pending'
+  | 'delayed'
+  | 'completed'
+  | 'failed'
+export type ProofPublishStatus = 'pending' | 'published' | 'retry' | 'failed' | 'skipped'
+export type AlertEventStatus = 'open' | 'resolved'
 
 export interface OracleSnapshotBackend {
   feedId: string
@@ -185,10 +192,13 @@ export interface HashKeyChainConfig {
   mainnetExplorerUrl: string
   planRegistryAddress?: string
   kycSbtAddress?: string
+  assetProofRegistryAddress?: string
   testnetPlanRegistryAddress?: string
   mainnetPlanRegistryAddress?: string
   testnetKycSbtAddress?: string
   mainnetKycSbtAddress?: string
+  testnetAssetProofRegistryAddress?: string
+  mainnetAssetProofRegistryAddress?: string
   docsUrls: string[]
   oracleFeeds: OracleFeedConfig[]
 }
@@ -247,7 +257,9 @@ export type TruthLevel =
   | 'benchmark_reference'
   | 'demo_only'
 
-export type LiveReadiness = 'ready' | 'partial' | 'unavailable' | 'demo_only'
+export type LiveReadiness = 'ready' | 'partial' | 'unavailable' | 'demo_only' | 'benchmark_only'
+export type ExecutionAdapterKind = 'direct_contract' | 'issuer_portal' | 'view_only'
+export type ExecutionReadiness = 'ready' | 'requires_issuer' | 'view_only' | 'blocked'
 
 export type ActionType =
   | 'subscribe'
@@ -742,8 +754,10 @@ export interface ExecutionApproval {
   approvalType: string
   tokenSymbol?: string
   spender?: string
+  approvalTarget?: string
   amount?: number
   note?: string
+  allowanceRequired?: boolean
 }
 
 export interface ExecutionQuote {
@@ -778,9 +792,12 @@ export interface ExecutionStep {
   requiresSafe: boolean
   complianceBlockers: string[]
   requiredApprovals: ExecutionApproval[]
+  checklist: string[]
   warnings: string[]
   txRequest: Record<string, unknown>
   offchainActions: string[]
+  redirectUrl?: string
+  externalRequestId?: string
   status: string
 }
 
@@ -793,7 +810,13 @@ export interface ExecutionPlan {
   sourceChain?: string
   sourceAsset?: string
   targetAsset?: string
+  executionAdapterKind?: ExecutionAdapterKind
+  executionReadiness?: ExecutionReadiness
+  readinessReason?: string
+  externalActionUrl?: string
+  externalActionLabel?: string
   ticketSize: number
+  receiptId?: string
   status: ExecutionLifecycleStatus
   quote?: ExecutionQuote
   warnings: string[]
@@ -801,11 +824,66 @@ export interface ExecutionPlan {
   possibleFailureReasons: string[]
   complianceBlockers: string[]
   requiredApprovals: ExecutionApproval[]
+  checklist: string[]
+  externalSteps: string[]
   steps: ExecutionStep[]
   txBundle: Array<Record<string, unknown>>
   eligibility: EligibilityDecision[]
   canExecuteOnchain: boolean
   planHash?: string
+}
+
+export interface ExecutionReceipt {
+  id: string
+  sessionId?: string
+  assetId: string
+  adapterKind: ExecutionAdapterKind
+  status: ExecutionLifecycleStatus
+  settlementStatus: SettlementStatus
+  preparedPayload: Record<string, unknown>
+  submitPayload: Record<string, unknown>
+  externalRequestId?: string
+  redirectUrl?: string
+  txHash?: string
+  blockNumber?: number
+  walletAddress?: string
+  safeAddress?: string
+  failureReason?: string
+  note?: string
+  submittedAt?: string
+  updatedAt: string
+}
+
+export interface AssetReadiness {
+  asset: RwaAssetTemplate
+  proof: AssetProofSnapshot
+  decision: EligibilityDecision
+  executionAdapterKind: ExecutionAdapterKind
+  executionReadiness: ExecutionReadiness
+  routeSummary: string
+  quote?: ExecutionQuote
+  requiredApprovals: ExecutionApproval[]
+  possibleFailureReasons: string[]
+  complianceBlockers: string[]
+  warnings: string[]
+}
+
+export interface PortfolioOverview {
+  address: string
+  network: WalletNetworkKey | string
+  positions: PositionSnapshot[]
+  proofSnapshots: AssetProofSnapshot[]
+  alerts: PortfolioAlert[]
+  indexerHealth?: IndexerStatusItem[]
+  latestAnchorSummary?: ContractAnchorSummary[]
+  totalValueUsd: number
+  totalCostBasis: number
+  totalUnrealizedPnl: number
+  totalRealizedIncome: number
+  totalAccruedYield: number
+  totalRedemptionForecast: number
+  allocationMix: Record<string, number>
+  lastSyncAt: string
 }
 
 export interface TransactionReceiptRecord {
@@ -853,11 +931,258 @@ export interface PositionSnapshot {
   currentValue: number
   costBasis: number
   unrealizedPnl: number
+  realizedIncome: number
   accruedYield: number
+  redemptionForecast: number
+  allocationWeightPct: number
+  liquidityRisk?: string
   nextRedemptionWindow?: string
   oracleStalenessFlag: boolean
   kycChangeFlag: boolean
   asOf: string
+}
+
+export interface ProofSourceRef {
+  refId: string
+  title: string
+  sourceName: string
+  sourceUrl: string
+  sourceKind?: string
+  sourceTier?: string
+  freshnessDate?: string
+  summary?: string
+  status?: string
+  unavailableReason?: string
+  isPrimary?: boolean
+  confidence?: number
+}
+
+export interface ProofFreshnessState {
+  bucket: string
+  label: string
+  checkedAt: string
+  staleAfterHours: number
+  ageHours?: number
+  reason?: string
+}
+
+export interface RedemptionWindow {
+  label: string
+  windowType: string
+  settlementDays: number
+  detail?: string
+  nextWindow?: string
+  status: string
+}
+
+export interface ProofStatusCard {
+  key: string
+  label: string
+  status: string
+  detail: string
+}
+
+export interface OnchainAnchorStatus {
+  status: string
+  proofKey?: string
+  registryAddress?: string
+  transactionHash?: string
+  blockNumber?: number
+  explorerUrl?: string
+  recordedAt?: string
+  attester?: string
+  note?: string
+}
+
+export interface AssetProofHistoryItem {
+  snapshotId: string
+  assetId: string
+  network: WalletNetworkKey | string
+  snapshotHash: string
+  snapshotUri: string
+  proofType: string
+  effectiveAt: string
+  publishedAt?: string
+  timelineVersion: number
+  attester: string
+  publishStatus: ProofPublishStatus
+  onchainAnchorStatus: OnchainAnchorStatus
+  oracleFreshness?: string
+  kycPolicySummary?: string
+  sourceConfidence?: number
+  unavailableReasons: string[]
+  onchainIndexed?: boolean
+  indexedAt?: string
+}
+
+export interface AssetProofSnapshot {
+  snapshotId?: string
+  assetId: string
+  assetName: string
+  assetSymbol: string
+  network: WalletNetworkKey | string
+  liveAsset: boolean
+  includedInRegistry: boolean
+  snapshotHash: string
+  snapshotUri: string
+  proofType: string
+  effectiveAt: string
+  publishedAt?: string
+  attester: string
+  registryAddress?: string
+  registryExplorerUrl?: string
+  anchorStatus: OnchainAnchorStatus
+  indexedAnchorStatus?: OnchainAnchorStatus
+  indexedAt?: string
+  historySource?: string
+  timelineVersion: number
+  publishStatus: ProofPublishStatus
+  onchainProofKey?: string
+  executionAdapterKind: ExecutionAdapterKind
+  executionReadiness: ExecutionReadiness
+  truthLevel: TruthLevel
+  liveReadiness: LiveReadiness
+  requiredKycLevel?: number
+  proofFreshness: ProofFreshnessState
+  oracleFreshness?: string
+  kycPolicySummary?: string
+  sourceConfidence?: number
+  redemptionWindow: RedemptionWindow
+  statusCards: ProofStatusCard[]
+  proofSourceRefs: ProofSourceRef[]
+  unavailableReasons: string[]
+  monitoringNotes: string[]
+  primaryActionUrl?: string
+  visibilityRole?: string
+  isExecutable: boolean
+}
+
+export interface PortfolioAlert {
+  id: string
+  address?: string
+  alertType: string
+  severity: string
+  title: string
+  detail: string
+  assetId?: string
+  assetName?: string
+  sourceUrl?: string
+  sourceRef?: string
+  dedupeKey?: string
+  status?: AlertEventStatus
+  acked?: boolean
+  acknowledgedAt?: string
+  read?: boolean
+  readAt?: string
+  detectedAt: string
+  resolvedAt?: string
+}
+
+export interface PortfolioAlertAck {
+  alertId: string
+  address: string
+  acked: boolean
+  acknowledgedAt?: string
+  read: boolean
+  readAt?: string
+}
+
+export interface IndexerStatusItem {
+  network: WalletNetworkKey | string
+  contractName: string
+  contractAddress?: string
+  lastIndexedBlock: number
+  lastSafeHead: number
+  chainHead: number
+  lag: number
+  status: string
+  lastError?: string
+  updatedAt: string
+}
+
+export interface OpsJobRun {
+  jobRunId: string
+  jobName: string
+  network?: WalletNetworkKey | string
+  status: string
+  startedAt: string
+  finishedAt?: string
+  itemCount: number
+  errorMessage?: string
+  metadata?: Record<string, unknown>
+}
+
+export interface DebugOperationReceipt {
+  operationId: string
+  status: string
+  startedAt: string
+  finishedAt?: string
+  errorMessage?: string
+  itemCount: number
+  metadata?: Record<string, unknown>
+}
+
+export interface AttesterRegistryStatus {
+  network: WalletNetworkKey | string
+  registryAddress?: string
+  owner?: string
+  pendingOwner?: string
+  publisherAddress?: string
+  publisherAuthorized: boolean
+  publishEnabled: boolean
+  attesters: string[]
+  latestPublishStatus?: string
+  latestPublishTxHash?: string
+  latestPublishAt?: string
+}
+
+export interface SourceHealthStatus {
+  assetId: string
+  assetName: string
+  network: WalletNetworkKey | string
+  visibilityRole?: string
+  liveAsset: boolean
+  proofFreshnessBucket?: string
+  proofFreshnessLabel?: string
+  oracleFreshness?: string
+  kycPolicySummary?: string
+  sourceConfidence?: number
+  publishStatus: ProofPublishStatus
+  unavailableReasons: string[]
+}
+
+export interface ContractAnchorSummary {
+  assetId: string
+  assetName: string
+  network: WalletNetworkKey | string
+  visibilityRole?: string
+  isLive: boolean
+  latestProofKey?: string
+  latestSnapshotHash?: string
+  latestPublishStatus?: string
+  latestTxHash?: string
+  latestBlockNumber?: number
+  latestIndexedAt?: string
+  proofHistoryCount: number
+  latestPlanKey?: string
+  latestPlanSessionId?: string
+  latestPlanTxHash?: string
+  latestPlanBlockNumber?: number
+  latestPlanIndexedAt?: string
+}
+
+export interface RwaOpsSummary {
+  pendingPublishCount: number
+  failedPublishCount: number
+  staleProofCount: number
+  maxIndexerLag: number
+  failedJobCount: number
+  proofQueue: AssetProofSnapshot[]
+  attesterStatus: AttesterRegistryStatus[]
+  sourceHealth: SourceHealthStatus[]
+  jobHealth: OpsJobRun[]
+  indexerHealth: IndexerStatusItem[]
+  contractAnchors: ContractAnchorSummary[]
 }
 
 export interface AssetAnalysisCard {
