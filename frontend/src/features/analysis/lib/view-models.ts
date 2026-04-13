@@ -14,15 +14,15 @@ export function formatRelativeTime(value: string) {
 }
 
 export function modeLabel(mode: AnalysisMode) {
-  return mode === 'multi-option'
-    ? 'Multi-option comparison'
-    : 'Single decision analysis'
+  return mode === 'strategy-compare' || mode === 'multi-option'
+    ? 'Strategy compare'
+    : 'Single-asset allocation'
 }
 
 export function modeSummary(mode: AnalysisMode) {
-  return mode === 'multi-option'
-    ? 'Compare trade-offs across several viable paths.'
-    : 'Go deep on one decision before committing.'
+  return mode === 'strategy-compare' || mode === 'multi-option'
+    ? 'Compare eligible RWA paths, execution friction, and monitoring trade-offs.'
+    : 'Go deep on one target asset from wallet eligibility through execution.'
 }
 
 export function statusMeta(status: SessionStatus | string) {
@@ -35,6 +35,9 @@ export function statusMeta(status: SessionStatus | string) {
     ANALYZING: { label: 'Analyzing', tone: 'gold' },
     READY_FOR_REPORT: { label: 'Ready for report', tone: 'info' },
     REPORTING: { label: 'Drafting report', tone: 'gold' },
+    READY_FOR_EXECUTION: { label: 'Ready for execution', tone: 'success' },
+    EXECUTING: { label: 'Executing', tone: 'gold' },
+    MONITORING: { label: 'Monitoring', tone: 'info' },
     COMPLETED: { label: 'Completed', tone: 'success' },
     FAILED: { label: 'Failed', tone: 'danger' },
   }
@@ -146,6 +149,13 @@ export function reportState(
   report?: AnalysisReport,
 ) {
   if (session.status !== 'COMPLETED') {
+    if (
+      session.status === 'READY_FOR_EXECUTION' ||
+      session.status === 'EXECUTING' ||
+      session.status === 'MONITORING'
+    ) {
+      return { label: 'Execution-ready', tone: 'success' as const }
+    }
     return { label: 'Draft', tone: 'neutral' as const }
   }
 
@@ -177,7 +187,12 @@ export function continuePath(session: AnalysisSession) {
     return `/sessions/${session.id}/clarify`
   }
 
-  if (session.status === 'COMPLETED') {
+  if (
+    session.status === 'READY_FOR_EXECUTION' ||
+    session.status === 'EXECUTING' ||
+    session.status === 'MONITORING' ||
+    session.status === 'COMPLETED'
+  ) {
     return reportPath(session.id)
   }
 

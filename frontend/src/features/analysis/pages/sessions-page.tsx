@@ -23,6 +23,7 @@ import {
   sessionConfidence,
   sessionPath,
 } from '@/features/analysis/lib/view-models'
+import type { AnalysisMode } from '@/types'
 
 function SessionOverflow({
   onDelete,
@@ -65,7 +66,7 @@ export function SessionsPage() {
   })
 
   const duplicateMutation = useMutation({
-    mutationFn: (payload: { mode: 'single-option' | 'multi-option'; problemStatement: string }) =>
+    mutationFn: (payload: { mode: AnalysisMode; problemStatement: string }) =>
       adapter.analysis.create({
         mode: payload.mode,
         locale: 'en',
@@ -166,13 +167,16 @@ export function SessionsPage() {
         />
         <Select value={mode} onChange={(event) => setMode(event.target.value)}>
           <option value="all">All modes</option>
-          <option value="single-option">Single decision</option>
-          <option value="multi-option">Multi-option</option>
+          <option value="single-asset-allocation">Single-asset allocation</option>
+          <option value="strategy-compare">Strategy compare</option>
         </Select>
         <Select value={status} onChange={(event) => setStatus(event.target.value)}>
           <option value="all">All statuses</option>
           <option value="CLARIFYING">Clarifying</option>
           <option value="ANALYZING">Analyzing</option>
+          <option value="READY_FOR_EXECUTION">Ready for execution</option>
+          <option value="EXECUTING">Executing</option>
+          <option value="MONITORING">Monitoring</option>
           <option value="COMPLETED">Completed</option>
           <option value="FAILED">Failed</option>
         </Select>

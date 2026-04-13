@@ -23,7 +23,11 @@ from app.orchestrator.engine import AnalysisOrchestrator
 from app.persistence.memory import InMemorySessionRepository
 from app.rwa.catalog import build_asset_library, build_chain_config
 from app.services.audit import AuditLogService
+from app.services.eligibility import EligibilityService
+from app.services.execution import ExecutionService
+from app.services.monitoring import MonitoringService
 from app.services.sessions import SessionService
+from app.services.wallets import WalletService
 from app.adapters.llm_analysis import OpenAICompatibleAnalysisAdapter
 from app.adapters.llm_analysis import MockAnalysisAdapter
 from app.config import Settings
@@ -84,6 +88,16 @@ def build_services():
     repository = RepositoryWithAudit()
     audit_log_service = AuditLogService(repository)
     session_service = SessionService(repository, audit_log_service)
+    wallet_service = WalletService()
+    eligibility_service = EligibilityService()
+    execution_service = ExecutionService(
+        session_service=session_service,
+        eligibility_service=eligibility_service,
+    )
+    monitoring_service = MonitoringService(
+        session_service=session_service,
+        wallet_service=wallet_service,
+    )
     orchestrator = AnalysisOrchestrator(
         repository=repository,
         audit_log_service=audit_log_service,
@@ -96,6 +110,10 @@ def build_services():
         session_service=session_service,
         audit_log_service=audit_log_service,
         orchestrator=orchestrator,
+        wallet_service=wallet_service,
+        eligibility_service=eligibility_service,
+        execution_service=execution_service,
+        monitoring_service=monitoring_service,
     )
 
 

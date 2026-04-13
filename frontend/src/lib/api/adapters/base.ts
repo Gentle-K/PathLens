@@ -8,20 +8,26 @@ import type {
   CreateSessionPayload,
   DashboardOverview,
   DataVizBundle,
+  ExecutionPlan,
+  ExecutionQuote,
   FileItem,
   FileUploadPayload,
+  PositionSnapshot,
   LoginPayload,
   ModeDefinition,
   NotificationItem,
   PaginatedResponse,
   RecordAttestationPayload,
   RequestMeta,
+  ReportAnchorRecord,
   ResourceRecord,
   Role,
+  RwaAssetTemplate,
   SettingsPayload,
   SubmitAnswersPayload,
   User,
   UserProfile,
+  WalletSummary,
 } from '@/types'
 import type { DebugSessionDetail, DebugSessionSummary } from '@/lib/api/adapters/genius-backend'
 
@@ -37,6 +43,78 @@ export interface ApiAdapter {
   }
   rwa: {
     getBootstrap(): Promise<RwaBootstrap>
+    getWalletSummary(address: string, network?: 'testnet' | 'mainnet' | ''): Promise<WalletSummary>
+    getWalletPositions(address: string, network?: 'testnet' | 'mainnet' | ''): Promise<PositionSnapshot[]>
+    getEligibleCatalog(params: {
+      address: string
+      sessionId?: string
+      network?: 'testnet' | 'mainnet' | ''
+    }): Promise<{
+      eligible: Array<{ asset: RwaAssetTemplate; decision: import('@/types').EligibilityDecision }>
+      conditional: Array<{ asset: RwaAssetTemplate; decision: import('@/types').EligibilityDecision }>
+      blocked: Array<{ asset: RwaAssetTemplate; decision: import('@/types').EligibilityDecision }>
+    }>
+    getQuote(payload: {
+      sessionId?: string
+      sourceAsset: string
+      targetAsset: string
+      amount: number
+      walletAddress?: string
+      safeAddress?: string
+      sourceChain?: string
+      routePreferences?: Record<string, string>
+    }): Promise<ExecutionQuote>
+    simulate(payload: {
+      sessionId?: string
+      sourceAsset: string
+      targetAsset: string
+      amount: number
+      walletAddress?: string
+      safeAddress?: string
+      sourceChain?: string
+      includeAttestation?: boolean
+    }): Promise<{
+      quote: ExecutionQuote
+      requiredApprovals: Array<Record<string, unknown>>
+      possibleFailureReasons: string[]
+      complianceBlockers: string[]
+      warnings: string[]
+    }>
+    execute(payload: {
+      sessionId: string
+      sourceAsset: string
+      targetAsset: string
+      amount: number
+      walletAddress?: string
+      safeAddress?: string
+      sourceChain?: string
+      includeAttestation?: boolean
+      generateOnly?: boolean
+    }): Promise<{
+      executionPlan: ExecutionPlan
+      txReceipts: import('@/types').TransactionReceiptRecord[]
+      reportAnchorRecords: ReportAnchorRecord[]
+    }>
+    monitor(sessionId: string): Promise<{
+      positionSnapshots: PositionSnapshot[]
+      currentBalance: number
+      latestNavOrPrice: number
+      costBasis: number
+      unrealizedPnl: number
+      accruedYield: number
+      nextRedemptionWindow?: string
+      oracleStalenessFlag: boolean
+      kycChangeFlag: boolean
+      alertFlags: string[]
+    }>
+    anchorReport(payload: {
+      reportId: string
+      network: 'testnet' | 'mainnet'
+      transactionHash?: string
+      submittedBy?: string
+      blockNumber?: number
+      note?: string
+    }): Promise<ReportAnchorRecord>
   }
   dashboard: {
     getOverview(): Promise<DashboardOverview>

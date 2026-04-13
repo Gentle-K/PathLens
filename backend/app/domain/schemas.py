@@ -19,10 +19,17 @@ from app.domain.models import (
 from app.domain.rwa import (
     AssetTemplate,
     DemoScenarioDefinition,
+    EligibilityDecision,
+    ExecutionPlan,
+    ExecutionQuote,
     HashKeyChainConfig,
     KycOnchainResult,
     OracleSnapshot,
+    PositionSnapshot,
+    ReportAnchorRecord,
     RwaIntakeContext,
+    TransactionReceiptRecord,
+    WalletBalance,
 )
 
 
@@ -134,6 +141,22 @@ class KycCheckResponse(BaseModel):
     result: KycOnchainResult
 
 
+class WalletSummaryResponse(BaseModel):
+    address: str
+    network: str
+    balances: list[WalletBalance] = Field(default_factory=list)
+    kyc: KycOnchainResult
+    safe_detected: bool = False
+    last_sync_at: str
+
+
+class WalletPositionsResponse(BaseModel):
+    address: str
+    network: str
+    positions: list[PositionSnapshot] = Field(default_factory=list)
+    last_sync_at: str
+
+
 class FrontendBootstrapResponse(BaseModel):
     app_name: str
     supported_modes: list[str]
@@ -183,6 +206,82 @@ class RwaAnalyzeResponse(BaseModel):
     report: AnalysisReport
     evidence: list[EvidenceItem] = Field(default_factory=list)
     multi_horizon_simulations: dict[str, list] = Field(default_factory=dict)
+
+
+class EligibleCatalogBucketItem(BaseModel):
+    asset: AssetTemplate
+    decision: EligibilityDecision
+
+
+class EligibleCatalogResponse(BaseModel):
+    address: str
+    session_id: str = ""
+    eligible: list[EligibleCatalogBucketItem] = Field(default_factory=list)
+    conditional: list[EligibleCatalogBucketItem] = Field(default_factory=list)
+    blocked: list[EligibleCatalogBucketItem] = Field(default_factory=list)
+
+
+class RwaQuoteRequest(BaseModel):
+    source_asset: str = Field(min_length=1)
+    target_asset: str = Field(min_length=1)
+    amount: float = Field(gt=0)
+    wallet_address: str = ""
+    safe_address: str = ""
+    source_chain: str = "hashkey"
+    route_preferences: dict[str, str] = Field(default_factory=dict)
+    session_id: str = ""
+
+
+class RwaQuoteResponse(BaseModel):
+    quote: ExecutionQuote
+
+
+class RwaSimulateRequest(RwaQuoteRequest):
+    include_attestation: bool = True
+
+
+class RwaSimulateResponse(BaseModel):
+    quote: ExecutionQuote
+    required_approvals: list[dict] = Field(default_factory=list)
+    possible_failure_reasons: list[str] = Field(default_factory=list)
+    compliance_blockers: list[str] = Field(default_factory=list)
+    warnings: list[str] = Field(default_factory=list)
+
+
+class RwaExecuteRequest(RwaSimulateRequest):
+    generate_only: bool = True
+
+
+class RwaExecuteResponse(BaseModel):
+    execution_plan: ExecutionPlan
+    tx_receipts: list[TransactionReceiptRecord] = Field(default_factory=list)
+    report_anchor_records: list[ReportAnchorRecord] = Field(default_factory=list)
+
+
+class RwaMonitorResponse(BaseModel):
+    session_id: str
+    position_snapshots: list[PositionSnapshot] = Field(default_factory=list)
+    current_balance: float = 0.0
+    latest_nav_or_price: float = 0.0
+    cost_basis: float = 0.0
+    unrealized_pnl: float = 0.0
+    accrued_yield: float = 0.0
+    next_redemption_window: str = ""
+    oracle_staleness_flag: bool = False
+    kyc_change_flag: bool = False
+    alert_flags: list[str] = Field(default_factory=list)
+
+
+class ReportAnchorRequest(BaseModel):
+    network: str = Field(min_length=1)
+    transaction_hash: str = ""
+    submitted_by: str = ""
+    block_number: int | None = None
+    note: str = ""
+
+
+class ReportAnchorResponse(BaseModel):
+    record: ReportAnchorRecord
 
 
 class RwaClarifyRequest(BaseModel):

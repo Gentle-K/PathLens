@@ -1,10 +1,12 @@
 import { useMutation, useQuery } from '@tanstack/react-query'
 import {
   ArrowRight,
+  Building2,
   Clock3,
   FileText,
   LoaderCircle,
   Sparkles,
+  Wallet,
 } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
@@ -21,11 +23,14 @@ import {
   SessionCard,
   StickyActionBar,
 } from '@/components/product/decision-ui'
+import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Input, Select, Textarea } from '@/components/ui/field'
 import { useApiAdapter } from '@/lib/api/use-api-adapter'
 import { useAppStore } from '@/lib/store/app-store'
+import { shortAddress } from '@/lib/web3/hashkey'
+import { useHashKeyWallet } from '@/lib/web3/use-hashkey-wallet'
 import {
   getLocalStorageItem,
   removeLocalStorageItem,
@@ -44,16 +49,16 @@ import type { AnalysisMode, CreateSessionPayload, RwaIntakeContext } from '@/typ
 
 const DRAFT_KEY = 'ga-new-analysis-draft'
 
-const examplePrompts: Record<AnalysisMode, string[]> = {
-  'single-option': [
-    'Should I join a study abroad exchange?',
-    'Should I buy a car or continue with public transport?',
-    'Should I leave my current job this quarter?',
+const examplePrompts: Record<string, string[]> = {
+  'single-asset-allocation': [
+    'Allocate idle USDT from my wallet into one eligible HashKey Chain RWA sleeve.',
+    'Should I move treasury cash from stablecoins into a tokenized MMF on HashKey Chain?',
+    'Assess whether one silver RWA fits my current wallet and KYC profile.',
   ],
-  'multi-option': [
-    'Should I apply to graduate school now, work first, or defer for a year?',
-    'Should I rent, buy, or keep living with family for 12 more months?',
-    'Should I keep freelancing, join a startup, or take a corporate role?',
+  'strategy-compare': [
+    'Compare USDC, tokenized MMF, and silver RWA for a 30-day HashKey Chain allocation.',
+    'Which eligible RWA route best fits my wallet, liquidity window, and target yield?',
+    'Compare several HashKey Chain RWA sleeves for a balanced allocation and execution plan.',
   ],
 }
 
@@ -79,8 +84,14 @@ export function ModeSelectionPage() {
   const adapter = useApiAdapter()
   const navigate = useNavigate()
   const locale = useAppStore((state) => state.locale)
-  const [mode, setMode] = useState<AnalysisMode>('single-option')
+  const bootstrapQuery = useQuery({
+    queryKey: ['analysis', 'bootstrap', 'wallet-first'],
+    queryFn: () => adapter.rwa.getBootstrap(),
+  })
+  const wallet = useHashKeyWallet(bootstrapQuery.data?.chainConfig)
+  const [mode, setMode] = useState<AnalysisMode>('single-asset-allocation')
   const [problem, setProblem] = useState('')
+  const [safeAddress, setSafeAddress] = useState('')
   const [showConstraints, setShowConstraints] = useState(true)
   const [budgetRange, setBudgetRange] = useState('$8k - $15k')
   const [timeHorizon, setTimeHorizon] = useState('6-12 months')
@@ -161,6 +172,27 @@ export function ModeSelectionPage() {
     queryKey: ['analysis', 'catalog', 'new-analysis'],
     queryFn: () => fetchAnalysisCatalog(adapter),
   })
+  const effectiveAddress = wallet.walletAddress || safeAddress.trim()
+  const walletSummaryQuery = useQuery({
+    queryKey: ['analysis', 'wallet-summary', effectiveAddress],
+    queryFn: () => adapter.rwa.getWalletSummary(effectiveAddress),
+    enabled: Boolean(effectiveAddress),
+  })
+  const walletPositionsQuery = useQuery({
+    queryKey: ['analysis', 'wallet-positions', effectiveAddress],
+    queryFn: () => adapter.rwa.getWalletPositions(effectiveAddress),
+    enabled: Boolean(effectiveAddress),
+  })
+  const eligibleCatalogQuery = useQuery({
+    queryKey: ['analysis', 'eligible-catalog', effectiveAddress],
+    queryFn: () =>
+      adapter.rwa.getEligibleCatalog({
+        address: effectiveAddress,
+        network:
+          walletSummaryQuery.data?.network === 'mainnet' ? 'mainnet' : 'testnet',
+      }),
+    enabled: Boolean(effectiveAddress),
+  })
 
   const createMutation = useMutation({
     mutationFn: (payload: CreateSessionPayload) => adapter.analysis.create(payload),
@@ -219,7 +251,15 @@ export function ModeSelectionPage() {
             : 'balanced',
       liquidityNeed: 't_plus_3',
       minimumKycLevel: accessConstraints.toLowerCase().includes('kyc') ? 1 : 0,
-      walletAddress: '',
+      walletAddress: wallet.walletAddress || '',
+      safeAddress: safeAddress.trim(),
+      walletNetwork:
+        walletSummaryQuery.data?.network === 'mainnet' ? 'mainnet' : 'testnet',
+      kycLevel: walletSummaryQuery.data?.kyc.level,
+      kycStatus: walletSummaryQuery.data?.kyc.status,
+      sourceChain: walletSummaryQuery.data?.network ?? 'hashkey',
+      sourceAsset: walletSummaryQuery.data?.balances[0]?.symbol ?? settlementCurrency,
+      ticketSize: parseBudgetToAmount(budgetRange),
       wantsOnchainAttestation: false,
       additionalConstraints: `${mustHaveGoals}\n${mustAvoidOutcomes}\nTarget chain / asset universe: ${targetChain}\nAccess constraints: ${accessConstraints}`,
     }),
@@ -230,9 +270,15 @@ export function ModeSelectionPage() {
       mustHaveGoals,
       problem,
       riskPreference,
+      safeAddress,
       settlementCurrency,
       targetChain,
       timeHorizon,
+      wallet.walletAddress,
+      walletSummaryQuery.data?.balances,
+      walletSummaryQuery.data?.kyc.level,
+      walletSummaryQuery.data?.kyc.status,
+      walletSummaryQuery.data?.network,
     ],
   )
 
@@ -259,11 +305,88 @@ export function ModeSelectionPage() {
       <div className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
         <div className="space-y-6">
           <SectionCard
+            title="Wallet quick-start"
+            description="Use a connected wallet or pasted Safe address as the primary entry for KYC / SBT reads, positions, and eligible RWA discovery."
+          >
+            <div className="grid gap-4 md:grid-cols-[1.1fr_0.9fr]">
+              <div className="space-y-4 rounded-[24px] border border-border-subtle bg-app-bg-elevated p-4">
+                <div className="flex items-start gap-3">
+                  <div className="inline-flex size-10 items-center justify-center rounded-full bg-primary-soft text-primary">
+                    <Wallet className="size-5" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold text-text-primary">Connect wallet</p>
+                    <p className="mt-1 text-sm leading-6 text-text-secondary">
+                      Read live wallet KYC, balances, and positions before creating the session.
+                    </p>
+                  </div>
+                </div>
+                <div className="flex flex-wrap items-center gap-3">
+                  <Button
+                    onClick={() => void wallet.connectWallet()}
+                    disabled={wallet.isWalletBusy || bootstrapQuery.isLoading}
+                  >
+                    {wallet.isConnected ? `Connected ${wallet.walletLabel}` : 'Connect wallet'}
+                  </Button>
+                  {wallet.walletAddress ? (
+                    <Badge tone="success">{shortAddress(wallet.walletAddress)}</Badge>
+                  ) : null}
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-semibold text-text-primary">Or paste Safe address</label>
+                  <div className="flex gap-3">
+                    <Input
+                      value={safeAddress}
+                      placeholder="0x..."
+                      onChange={(event) => setSafeAddress(event.target.value)}
+                    />
+                    <Button variant="secondary">
+                      <Building2 className="size-4" />
+                      Use Safe
+                    </Button>
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-3 rounded-[24px] border border-border-subtle bg-panel p-4">
+                <p className="text-sm font-semibold text-text-primary">Wallet and eligibility snapshot</p>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <MetricCard
+                    title="KYC / SBT"
+                    value={
+                      walletSummaryQuery.data
+                        ? `L${walletSummaryQuery.data.kyc.level} / ${walletSummaryQuery.data.kyc.status}`
+                        : 'Not loaded'
+                    }
+                    detail="Read from the backend wallet summary endpoint."
+                  />
+                  <MetricCard
+                    title="Detected positions"
+                    value={String(walletPositionsQuery.data?.length ?? 0)}
+                    detail="Current wallet + recognized RWA positions."
+                  />
+                </div>
+                <div className="rounded-[18px] border border-border-subtle bg-bg-surface p-3 text-sm text-text-secondary">
+                  <p className="font-semibold text-text-primary">Eligible catalog</p>
+                  <p className="mt-2">
+                    Eligible {eligibleCatalogQuery.data?.eligible.length ?? 0} / Conditional {eligibleCatalogQuery.data?.conditional.length ?? 0} / Blocked {eligibleCatalogQuery.data?.blocked.length ?? 0}
+                  </p>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {(eligibleCatalogQuery.data?.eligible ?? []).slice(0, 4).map(({ asset }) => (
+                      <Badge key={asset.id} tone="success">{asset.symbol}</Badge>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </SectionCard>
+
+          <SectionCard
             title="Choose analysis mode"
             description="Pick the structure that best matches the decision you need to make."
           >
             <div className="grid gap-4 md:grid-cols-2">
-              {(['single-option', 'multi-option'] as const).map((item) => {
+              {(['single-asset-allocation', 'strategy-compare'] as const).map((item) => {
                 const active = item === mode
                 return (
                   <button
@@ -322,7 +445,7 @@ export function ModeSelectionPage() {
               </div>
 
               <div className="flex flex-wrap gap-2">
-                {examplePrompts[mode].map((example) => (
+                {(examplePrompts[mode] ?? examplePrompts['single-asset-allocation']).map((example) => (
                   <button
                     key={example}
                     type="button"

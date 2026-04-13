@@ -39,6 +39,8 @@ import {
 
 const reportSections = [
   { id: 'summary', label: 'Executive summary' },
+  { id: 'eligibility', label: 'Eligibility summary' },
+  { id: 'asset-facts', label: 'Asset facts' },
   { id: 'goal', label: 'Decision goal' },
   { id: 'assumptions', label: 'Key assumptions' },
   { id: 'facts', label: 'Confirmed facts' },
@@ -49,6 +51,9 @@ const reportSections = [
   { id: 'calculations', label: 'Key calculations' },
   { id: 'charts', label: 'Charts' },
   { id: 'evidence', label: 'Evidence references' },
+  { id: 'execution', label: 'Execution plan' },
+  { id: 'monitoring', label: 'Monitoring checklist' },
+  { id: 'receipts', label: 'Onchain receipts' },
   { id: 'unknowns', label: 'Unknowns' },
   { id: 'recommendation', label: 'Recommendation' },
   { id: 'boundary', label: 'Boundary note' },
@@ -225,6 +230,12 @@ export function ReportPage() {
                 <RefreshCw className="size-4" />
                 Re-open clarification
               </Button>
+              <Button variant="secondary" onClick={() => void navigate(`/sessions/${resolvedId}/execute`)}>
+                Review execution plan
+              </Button>
+              <Button onClick={() => void navigate(`/sessions/${resolvedId}/execute`)}>
+                Execute on HashKey Chain
+              </Button>
               <Button variant="secondary" onClick={() => void handleExport()}>
                 <FileDown className="size-4" />
                 Export
@@ -313,6 +324,53 @@ export function ReportPage() {
         </ReportSection>
 
         <ReportSection
+          id="eligibility"
+          title="Eligibility summary"
+          description="Wallet KYC, investor type, jurisdiction, and ticket constraints are summarized before execution."
+        >
+          <div className="grid gap-3 md:grid-cols-2">
+            {(report.eligibilitySummary ?? []).map((item) => (
+              <Card key={item.id} className="space-y-3 p-4">
+                <div className="flex items-center justify-between gap-3">
+                  <p className="font-semibold text-text-primary">{item.assetName}</p>
+                  <Badge tone={item.status === 'eligible' ? 'success' : item.status === 'conditional' ? 'gold' : 'warning'}>
+                    {item.status}
+                  </Badge>
+                </div>
+                <p className="text-sm text-text-secondary">{item.reasons[0] ?? 'No blocker detected.'}</p>
+                {(item.missingRequirements ?? []).length ? (
+                  <p className="text-sm text-warning">Missing: {item.missingRequirements.join(' · ')}</p>
+                ) : null}
+              </Card>
+            ))}
+          </div>
+        </ReportSection>
+
+        <ReportSection
+          id="asset-facts"
+          title="Asset facts"
+          description="Execution-critical facts stay visible next to the recommendation instead of being buried in prose."
+        >
+          <div className="grid gap-3 md:grid-cols-2">
+            {report.assetCards.slice(0, 4).map((asset) => (
+              <Card key={asset.assetId} className="space-y-3 p-4">
+                <div className="flex items-center justify-between gap-3">
+                  <p className="font-semibold text-text-primary">{asset.name}</p>
+                  <Badge tone="neutral">{asset.symbol}</Badge>
+                </div>
+                <div className="grid gap-2 text-sm text-text-secondary sm:grid-cols-2">
+                  <div>Settlement: {asset.settlementAsset || 'N/A'}</div>
+                  <div>KYC: L{asset.requiredKycLevel ?? asset.kycRequiredLevel ?? 0}</div>
+                  <div>Indicative yield: {asset.indicativeYield != null ? `${(asset.indicativeYield * 100).toFixed(2)}%` : 'N/A'}</div>
+                  <div>Oracle: {asset.oracleProvider || 'N/A'}</div>
+                </div>
+                <p className="text-sm leading-6 text-text-secondary">{asset.fitSummary}</p>
+              </Card>
+            ))}
+          </div>
+        </ReportSection>
+
+        <ReportSection
           id="goal"
           title="Decision goal"
           description="The problem definition remains explicit so the recommendation can be audited against the original question."
@@ -325,6 +383,102 @@ export function ReportPage() {
               <Badge tone="neutral">{modeLabel(report.mode)}</Badge>
               <Badge tone="info">Last updated {new Date(session.updatedAt).toLocaleDateString()}</Badge>
             </div>
+          </div>
+        </ReportSection>
+
+        <ReportSection
+          id="execution"
+          title="Execution plan"
+          description="Quote, simulation warnings, and execution steps are wired to the execute page and writeback flow."
+        >
+          {report.executionPlan ? (
+            <div className="space-y-4">
+              <Card className="grid gap-3 p-4 md:grid-cols-4">
+                <div>
+                  <p className="text-xs uppercase tracking-[0.12em] text-text-muted">Target asset</p>
+                  <p className="mt-2 text-sm font-semibold text-text-primary">{report.executionPlan.targetAsset || 'N/A'}</p>
+                </div>
+                <div>
+                  <p className="text-xs uppercase tracking-[0.12em] text-text-muted">Ticket size</p>
+                  <p className="mt-2 text-sm font-semibold text-text-primary">{report.executionPlan.ticketSize}</p>
+                </div>
+                <div>
+                  <p className="text-xs uppercase tracking-[0.12em] text-text-muted">Route</p>
+                  <p className="mt-2 text-sm font-semibold text-text-primary">{report.executionPlan.quote?.routeType ?? 'N/A'}</p>
+                </div>
+                <div>
+                  <p className="text-xs uppercase tracking-[0.12em] text-text-muted">Expected amount</p>
+                  <p className="mt-2 text-sm font-semibold text-text-primary">{report.executionPlan.quote?.expectedAmountOut ?? 'N/A'}</p>
+                </div>
+              </Card>
+              <div className="space-y-3">
+                {report.executionPlan.steps.map((step) => (
+                  <Card key={step.id} className="space-y-2 p-4">
+                    <div className="flex items-center justify-between gap-3">
+                      <p className="font-semibold text-text-primary">{step.stepIndex}. {step.title}</p>
+                      <Badge tone="neutral">{step.stepType}</Badge>
+                    </div>
+                    <p className="text-sm text-text-secondary">{step.description}</p>
+                    {(step.warnings ?? []).length ? (
+                      <p className="text-sm text-warning">{step.warnings.join(' · ')}</p>
+                    ) : null}
+                  </Card>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <EmptyState
+              title="Execution plan will populate after the backend execute call"
+              description="Open the execution page to fetch the latest quote, simulation, bundle, and writeback state."
+            />
+          )}
+        </ReportSection>
+
+        <ReportSection
+          id="monitoring"
+          title="Monitoring checklist"
+          description="P0 monitoring is baseline and derived from wallet positions, oracle freshness, and execution records."
+        >
+          <div className="grid gap-3 md:grid-cols-2">
+            {(report.positionSnapshots ?? []).map((item) => (
+              <Card key={item.id} className="space-y-2 p-4">
+                <p className="font-semibold text-text-primary">{item.assetName}</p>
+                <p className="text-sm text-text-secondary">Balance {item.currentBalance} · NAV/price {item.latestNavOrPrice}</p>
+                <p className="text-sm text-text-secondary">PnL {item.unrealizedPnl} · Yield {item.accruedYield}</p>
+                <p className="text-sm text-text-secondary">Next redemption {item.nextRedemptionWindow || 'N/A'}</p>
+              </Card>
+            ))}
+          </div>
+        </ReportSection>
+
+        <ReportSection
+          id="receipts"
+          title="Onchain receipts and anchor records"
+          description="Every attestation and related receipt should remain visible on the report and session detail pages."
+        >
+          <div className="space-y-3">
+            {(report.transactionReceipts ?? []).map((receipt) => (
+              <Card key={receipt.id} className="flex flex-wrap items-center justify-between gap-3 p-4">
+                <div>
+                  <p className="font-semibold text-text-primary">{receipt.txHash}</p>
+                  <p className="text-sm text-text-secondary">{receipt.txStatus} · block {receipt.blockNumber ?? 'pending'}</p>
+                </div>
+                {receipt.explorerUrl ? (
+                  <a href={receipt.explorerUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-sm text-primary">
+                    Explorer <ExternalLink className="size-4" />
+                  </a>
+                ) : null}
+              </Card>
+            ))}
+            {(report.reportAnchorRecords ?? []).map((record) => (
+              <Card key={record.id} className="space-y-2 p-4">
+                <div className="flex items-center justify-between gap-3">
+                  <p className="font-semibold text-text-primary">{record.status}</p>
+                  <Badge tone="info">{record.chainId ?? 'N/A'}</Badge>
+                </div>
+                <p className="text-sm text-text-secondary">{record.note || record.attestationHash}</p>
+              </Card>
+            ))}
           </div>
         </ReportSection>
 

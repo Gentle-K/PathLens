@@ -116,7 +116,12 @@ export function AnalysisSessionPage() {
   }, [sessionId, sessionQuery.data])
 
   useEffect(() => {
-    if (sessionQuery.data?.status === 'COMPLETED') {
+    if (
+      sessionQuery.data?.status === 'READY_FOR_EXECUTION' ||
+      sessionQuery.data?.status === 'EXECUTING' ||
+      sessionQuery.data?.status === 'MONITORING' ||
+      sessionQuery.data?.status === 'COMPLETED'
+    ) {
       void navigate(`/reports/${sessionId}`, { replace: true })
     }
   }, [navigate, sessionId, sessionQuery.data?.status])

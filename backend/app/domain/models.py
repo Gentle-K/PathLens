@@ -17,18 +17,24 @@ from app.domain.rwa import (
     EvidenceFactType,
     EvidenceFreshness,
     EvidenceGovernance,
+    ExecutionLifecycleStatus,
+    ExecutionPlan,
+    EligibilityDecision,
     HashKeyChainConfig,
     HoldingPeriodSimulation,
     KycOnchainResult,
     MarketDataSnapshot,
     MethodologyReference,
     PortfolioAllocation,
+    PositionSnapshot,
+    ReportAnchorRecord,
     ReserveBackingSummary,
     RecommendationReason,
     ReanalysisDiff,
     RwaIntakeContext,
     SourceProvenanceRef,
     StressScenario,
+    TransactionReceiptRecord,
     TxDraft,
 )
 
@@ -38,8 +44,24 @@ def utcnow() -> datetime:
 
 
 class AnalysisMode(str, Enum):
-    SINGLE_DECISION = "single_decision"
-    MULTI_OPTION = "multi_option"
+    SINGLE_ASSET_ALLOCATION = "single_asset_allocation"
+    STRATEGY_COMPARE = "strategy_compare"
+    SINGLE_DECISION = SINGLE_ASSET_ALLOCATION
+    MULTI_OPTION = STRATEGY_COMPARE
+
+    @classmethod
+    def _missing_(cls, value: object) -> "AnalysisMode" | None:
+        aliases = {
+            "single_decision": cls.SINGLE_ASSET_ALLOCATION,
+            "single-option": cls.SINGLE_ASSET_ALLOCATION,
+            "single_asset_allocation": cls.SINGLE_ASSET_ALLOCATION,
+            "multi_option": cls.STRATEGY_COMPARE,
+            "multi-option": cls.STRATEGY_COMPARE,
+            "strategy_compare": cls.STRATEGY_COMPARE,
+        }
+        if isinstance(value, str):
+            return aliases.get(value.strip().lower())
+        return None
 
 
 class SessionStatus(str, Enum):
@@ -48,6 +70,9 @@ class SessionStatus(str, Enum):
     ANALYZING = "ANALYZING"
     READY_FOR_REPORT = "READY_FOR_REPORT"
     REPORTING = "REPORTING"
+    READY_FOR_EXECUTION = "READY_FOR_EXECUTION"
+    EXECUTING = "EXECUTING"
+    MONITORING = "MONITORING"
     COMPLETED = "COMPLETED"
     FAILED = "FAILED"
 
@@ -109,6 +134,8 @@ class CalculationTask(BaseModel):
     failure_reason: str = ""
     user_visible: bool = True
     semantic_signature: str = ""
+    report_section_keys: list[str] = Field(default_factory=list)
+    execution_step_ids: list[str] = Field(default_factory=list)
 
 
 class ChartTask(BaseModel):
@@ -137,6 +164,14 @@ class EvidenceItem(BaseModel):
     fact_type: EvidenceFactType = EvidenceFactType.OFFCHAIN_DISCLOSED_FACT
     freshness: EvidenceFreshness = Field(default_factory=EvidenceFreshness)
     conflict_keys: list[str] = Field(default_factory=list)
+    contract_address: str = ""
+    chain_id: int | None = None
+    oracle_provider: str = ""
+    proof_type: str = ""
+    last_verified_at: datetime | None = None
+    included_in_execution_plan: bool = False
+    report_section_keys: list[str] = Field(default_factory=list)
+    execution_step_ids: list[str] = Field(default_factory=list)
 
 
 class ChartArtifact(BaseModel):
@@ -252,6 +287,11 @@ class AnalysisReport(BaseModel):
     methodology_references: list[MethodologyReference] = Field(default_factory=list)
     tx_draft: TxDraft | None = None
     attestation_draft: AttestationDraft | None = None
+    eligibility_summary: list[EligibilityDecision] = Field(default_factory=list)
+    execution_plan: ExecutionPlan | None = None
+    transaction_receipts: list[TransactionReceiptRecord] = Field(default_factory=list)
+    report_anchor_records: list[ReportAnchorRecord] = Field(default_factory=list)
+    position_snapshots: list[PositionSnapshot] = Field(default_factory=list)
 
 
 class SessionEvent(BaseModel):
@@ -280,6 +320,21 @@ class AnalysisSession(BaseModel):
     problem_statement: str
     intake_context: RwaIntakeContext = Field(default_factory=RwaIntakeContext)
     status: SessionStatus = SessionStatus.INIT
+    wallet_address: str = ""
+    safe_address: str = ""
+    kyc_level: int | None = None
+    kyc_status: str = ""
+    investor_type: str = ""
+    jurisdiction: str = ""
+    source_chain: str = ""
+    source_asset: str = ""
+    ticket_size: float | None = None
+    liquidity_urgency: str = ""
+    lockup_tolerance: str = ""
+    target_yield: float | None = None
+    max_drawdown_tolerance: float | None = None
+    execution_status: ExecutionLifecycleStatus = ExecutionLifecycleStatus.NOT_READY
+    last_onchain_sync_at: datetime | None = None
     clarification_questions: list[ClarificationQuestion] = Field(default_factory=list)
     answers: list[UserAnswer] = Field(default_factory=list)
     search_tasks: list[SearchTask] = Field(default_factory=list)
@@ -288,6 +343,11 @@ class AnalysisSession(BaseModel):
     evidence_items: list[EvidenceItem] = Field(default_factory=list)
     chart_artifacts: list[ChartArtifact] = Field(default_factory=list)
     major_conclusions: list[MajorConclusionItem] = Field(default_factory=list)
+    eligibility_decisions: list[EligibilityDecision] = Field(default_factory=list)
+    execution_plan: ExecutionPlan | None = None
+    transaction_receipts: list[TransactionReceiptRecord] = Field(default_factory=list)
+    report_anchor_records: list[ReportAnchorRecord] = Field(default_factory=list)
+    position_snapshots: list[PositionSnapshot] = Field(default_factory=list)
     report: AnalysisReport | None = None
     report_snapshots: list[ComparableReportSnapshot] = Field(default_factory=list)
     analysis_rounds_completed: int = 0
@@ -305,4 +365,29 @@ class AnalysisSession(BaseModel):
     updated_at: datetime = Field(default_factory=utcnow)
 
     def touch(self) -> None:
+        if self.wallet_address:
+            self.intake_context.wallet_address = self.wallet_address
+        elif self.intake_context.wallet_address:
+            self.wallet_address = self.intake_context.wallet_address
+
+        if self.safe_address:
+            self.intake_context.safe_address = self.safe_address
+        elif self.intake_context.safe_address:
+            self.safe_address = self.intake_context.safe_address
+
+        if self.ticket_size is None and self.intake_context.ticket_size is not None:
+            self.ticket_size = self.intake_context.ticket_size
+        elif self.ticket_size is not None:
+            self.intake_context.ticket_size = self.ticket_size
+
+        if self.source_chain:
+            self.intake_context.source_chain = self.source_chain
+        elif self.intake_context.source_chain:
+            self.source_chain = self.intake_context.source_chain
+
+        if self.source_asset:
+            self.intake_context.source_asset = self.source_asset
+        elif self.intake_context.source_asset:
+            self.source_asset = self.intake_context.source_asset
+
         self.updated_at = utcnow()

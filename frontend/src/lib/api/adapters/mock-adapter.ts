@@ -904,6 +904,30 @@ export const mockApiAdapter: ApiAdapter = {
       await wait(120)
       return structuredClone(mockRwaBootstrap)
     },
+    async getWalletSummary() {
+      throw new Error('Wallet summary is REST-only in the HashKey Chain RWA workbench.')
+    },
+    async getWalletPositions() {
+      throw new Error('Wallet positions are REST-only in the HashKey Chain RWA workbench.')
+    },
+    async getEligibleCatalog() {
+      throw new Error('Eligible catalog is REST-only in the HashKey Chain RWA workbench.')
+    },
+    async getQuote() {
+      throw new Error('Quote is REST-only in the HashKey Chain RWA workbench.')
+    },
+    async simulate() {
+      throw new Error('Simulation is REST-only in the HashKey Chain RWA workbench.')
+    },
+    async execute() {
+      throw new Error('Execution is REST-only in the HashKey Chain RWA workbench.')
+    },
+    async monitor() {
+      throw new Error('Monitoring is REST-only in the HashKey Chain RWA workbench.')
+    },
+    async anchorReport() {
+      throw new Error('Report anchoring is REST-only in the HashKey Chain RWA workbench.')
+    },
   },
   dashboard: {
     async getOverview() {

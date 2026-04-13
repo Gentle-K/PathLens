@@ -41,7 +41,11 @@ export function SessionDetailPage() {
   const reportQuery = useQuery({
     queryKey: ['analysis', sessionId, 'detail-report'],
     queryFn: () => adapter.analysis.getReport(sessionId),
-    enabled: sessionQuery.data?.status === 'COMPLETED',
+    enabled:
+      sessionQuery.data?.status === 'READY_FOR_EXECUTION' ||
+      sessionQuery.data?.status === 'EXECUTING' ||
+      sessionQuery.data?.status === 'MONITORING' ||
+      sessionQuery.data?.status === 'COMPLETED',
   })
 
   if (sessionQuery.isLoading) {
@@ -94,7 +98,12 @@ export function SessionDetailPage() {
               Back to sessions
             </Button>
             <Button onClick={() => void navigate(continuePath(session))}>
-              {session.status === 'COMPLETED' ? 'Open report' : 'Continue analysis'}
+              {session.status === 'READY_FOR_EXECUTION' ||
+              session.status === 'EXECUTING' ||
+              session.status === 'MONITORING' ||
+              session.status === 'COMPLETED'
+                ? 'Open report'
+                : 'Continue analysis'}
               <ArrowRight className="size-4" />
             </Button>
           </>
@@ -166,7 +175,13 @@ export function SessionDetailPage() {
               />
             </div>
             <PreviewNote icon={<CircleHelp className="mt-0.5 size-4 shrink-0 text-info" />}>
-              Next action: {session.status === 'COMPLETED' ? 'Review the final report and unresolved uncertainty list.' : 'Continue the session to close blockers and raise confidence.'}
+              Next action:{' '}
+              {session.status === 'READY_FOR_EXECUTION' ||
+              session.status === 'EXECUTING' ||
+              session.status === 'MONITORING' ||
+              session.status === 'COMPLETED'
+                ? 'Review the report, execution plan, and monitoring state.'
+                : 'Continue the session to close blockers and raise confidence.'}
             </PreviewNote>
           </SectionCard>
 

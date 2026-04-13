@@ -5,6 +5,10 @@ export const endpoints = {
     oracleSnapshots: (network: 'testnet' | 'mainnet') => `/api/oracle/snapshots?network=${network}`,
     walletKyc: (walletAddress: string, network: 'testnet' | 'mainnet') =>
       `/api/kyc/${walletAddress}?network=${network}`,
+    walletSummary: (address: string, network = '') =>
+      `/api/wallet/summary?address=${encodeURIComponent(address)}${network ? `&network=${network}` : ''}`,
+    walletPositions: (address: string, network = '') =>
+      `/api/wallet/positions?address=${encodeURIComponent(address)}${network ? `&network=${network}` : ''}`,
     logout: '/api/auth/logout',
     sessions: '/api/sessions',
     mySessions: '/api/my/sessions',
@@ -13,6 +17,13 @@ export const endpoints = {
     sessionStep: (sessionId: string) => `/api/sessions/${sessionId}/step`,
     sessionAttestation: (sessionId: string) => `/api/sessions/${sessionId}/attestation`,
     sessionRequestMoreFollowUp: (sessionId: string) => `/api/sessions/${sessionId}/request-more-follow-up`,
+    reportAnchor: (reportId: string) => `/api/reports/${reportId}/anchor`,
+    rwaEligibleCatalog: (address: string, sessionId = '', network = '') =>
+      `/api/rwa/eligible-catalog?address=${encodeURIComponent(address)}${sessionId ? `&session_id=${encodeURIComponent(sessionId)}` : ''}${network ? `&network=${network}` : ''}`,
+    rwaQuote: '/api/rwa/quote',
+    rwaSimulate: '/api/rwa/simulate',
+    rwaExecute: '/api/rwa/execute',
+    rwaMonitor: (sessionId: string) => `/api/rwa/monitor?session_id=${encodeURIComponent(sessionId)}`,
     debugAuthMe: '/api/debug/auth/me',
     debugLogs: '/api/debug/logs',
     debugLogDetail: (logId: string) => `/api/debug/logs/${logId}`,

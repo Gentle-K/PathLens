@@ -5,6 +5,7 @@ from typing import Protocol
 from app.adapters.llm_analysis import LLMInvocationError
 from app.domain.models import (
     AnalysisLoopPlan,
+    AnalysisMode,
     AnalysisReport,
     AnalysisSession,
     CalculationTask,
@@ -61,7 +62,10 @@ class AnalysisOrchestrator:
         self.chart_adapter = chart_adapter
 
     def supported_modes(self) -> list[str]:
-        return ["single_decision", "multi_option"]
+        return [
+            AnalysisMode.SINGLE_ASSET_ALLOCATION.value,
+            AnalysisMode.STRATEGY_COMPARE.value,
+        ]
 
     def supported_statuses(self) -> list[str]:
         return [status.value for status in SessionStatus]
@@ -127,6 +131,17 @@ class AnalysisOrchestrator:
 
             if session.status == SessionStatus.REPORTING:
                 return self._complete_session(session.session_id)
+
+            if session.status in {
+                SessionStatus.READY_FOR_EXECUTION,
+                SessionStatus.EXECUTING,
+                SessionStatus.MONITORING,
+            }:
+                return self._build_response(
+                    session.session_id,
+                    NextAction.COMPLETE,
+                    "The report and execution context are already available.",
+                )
 
             if session.status == SessionStatus.COMPLETED:
                 return self._build_response(
@@ -341,8 +356,25 @@ class AnalysisOrchestrator:
         if session is None:
             raise ValueError(f"Session {session_id} not found.")
 
-        session.status = SessionStatus.COMPLETED
-        session.activity_status = "completed"
+        executable = bool(
+            session.report
+            and (
+                session.report.execution_plan is not None
+                or session.report.tx_draft is not None
+                or session.report.attestation_draft is not None
+                or session.intake_context.wants_onchain_attestation
+            )
+        )
+        session.status = (
+            SessionStatus.READY_FOR_EXECUTION
+            if executable
+            else SessionStatus.COMPLETED
+        )
+        session.activity_status = (
+            "ready_for_execution"
+            if executable
+            else "completed"
+        )
         session.events.append(
             SessionEvent(
                 kind="session_completed",
@@ -360,8 +392,8 @@ class AnalysisOrchestrator:
         )
         return self._build_response(
             session.session_id,
-            NextAction.COMPLETE,
-            "The final report is ready.",
+            NextAction.PREVIEW_REPORT if executable else NextAction.COMPLETE,
+            "The final report is ready." if not executable else "The report is ready for execution review.",
         )
 
     def _apply_loop_plan(

@@ -49,7 +49,13 @@ export function Sidebar({ collapsed }: SidebarProps) {
   const activeSessionsCount = sessions.filter(
     (item) => item.status === 'CLARIFYING' || item.status === 'ANALYZING',
   ).length
-  const reportCount = sessions.filter((item) => item.status === 'COMPLETED').length
+  const reportCount = sessions.filter(
+    (item) =>
+      item.status === 'READY_FOR_EXECUTION' ||
+      item.status === 'EXECUTING' ||
+      item.status === 'MONITORING' ||
+      item.status === 'COMPLETED',
+  ).length
   const latestSync = sessions[0]?.updatedAt
 
   return (

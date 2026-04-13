@@ -42,13 +42,22 @@ export function ProgressPage() {
     queryKey: ['analysis', sessionId, 'progress'],
     queryFn: () => adapter.analysis.getProgress(sessionId),
     refetchInterval: (query) =>
-      query.state.data?.status === 'COMPLETED' || query.state.data?.status === 'FAILED'
+      query.state.data?.status === 'READY_FOR_EXECUTION' ||
+      query.state.data?.status === 'EXECUTING' ||
+      query.state.data?.status === 'MONITORING' ||
+      query.state.data?.status === 'COMPLETED' ||
+      query.state.data?.status === 'FAILED'
         ? false
         : 1400,
   })
 
   useEffect(() => {
-    if (progressQuery.data?.status === 'COMPLETED') {
+    if (
+      progressQuery.data?.status === 'READY_FOR_EXECUTION' ||
+      progressQuery.data?.status === 'EXECUTING' ||
+      progressQuery.data?.status === 'MONITORING' ||
+      progressQuery.data?.status === 'COMPLETED'
+    ) {
       void navigate(`/reports/${sessionId}`, { replace: true })
     }
   }, [navigate, progressQuery.data?.status, sessionId])
@@ -139,8 +148,18 @@ export function ProgressPage() {
       >
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
           {stepLabels.map((label, index) => {
-            const completed = index < stepIndex || progress.status === 'COMPLETED'
-            const active = index === stepIndex && progress.status !== 'COMPLETED'
+            const completed =
+              index < stepIndex ||
+              progress.status === 'READY_FOR_EXECUTION' ||
+              progress.status === 'EXECUTING' ||
+              progress.status === 'MONITORING' ||
+              progress.status === 'COMPLETED'
+            const active =
+              index === stepIndex &&
+              progress.status !== 'READY_FOR_EXECUTION' &&
+              progress.status !== 'EXECUTING' &&
+              progress.status !== 'MONITORING' &&
+              progress.status !== 'COMPLETED'
 
             return (
               <div

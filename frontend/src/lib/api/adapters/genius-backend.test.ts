@@ -288,7 +288,7 @@ describe('genius backend contract mapping', () => {
     const session = mapBackendSession(buildBackendSession())
 
     expect(session.id).toBe('sess-backend-1')
-    expect(session.mode).toBe('single-option')
+    expect(session.mode).toBe('single-asset-allocation')
     expect(session.questions[0]?.fieldType).toBe('single-choice')
     expect(session.calculations[0]?.formulaExpression).toBe('tuition + rent + travel')
     expect(session.calculations[0]?.result).toBe('23000')

@@ -71,7 +71,7 @@ export function EvidencePage() {
       <PageHeader
         eyebrow="Evidence"
         title="Evidence library"
-        description="Inspect the source summaries supporting current analyses, including freshness, extracted facts, source classification, and where each source is used."
+        description="Inspect source summaries, chain proofs, oracle references, and where each evidence item is used in the report and execution plan."
       />
 
       <FilterBar>
@@ -183,10 +183,10 @@ export function EvidencePage() {
         }
       >
         {selectedEvidence ? (
-          <div className="grid gap-4 md:grid-cols-2">
-            <div className="space-y-3 rounded-[20px] border border-border-subtle bg-app-bg-elevated p-4">
-              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-text-muted">
-                Extracted facts
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="space-y-3 rounded-[20px] border border-border-subtle bg-app-bg-elevated p-4">
+                <p className="text-xs font-semibold uppercase tracking-[0.12em] text-text-muted">
+                  Extracted facts
               </p>
               <ul className="space-y-2 text-sm leading-6 text-text-secondary">
                 {selectedEvidence.item.extractedFacts.map((fact) => (
@@ -194,11 +194,11 @@ export function EvidencePage() {
                 ))}
               </ul>
             </div>
-            <div className="space-y-3 rounded-[20px] border border-border-subtle bg-bg-surface p-4">
-              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-text-muted">
-                Usage and freshness
-              </p>
-              <div className="space-y-2 text-sm leading-6 text-text-secondary">
+              <div className="space-y-3 rounded-[20px] border border-border-subtle bg-bg-surface p-4">
+                <p className="text-xs font-semibold uppercase tracking-[0.12em] text-text-muted">
+                  Usage and freshness
+                </p>
+                <div className="space-y-2 text-sm leading-6 text-text-secondary">
                 <p>Session: {selectedEvidence.session.problemStatement}</p>
                 <p>
                   Linked conclusions:{' '}
@@ -221,9 +221,63 @@ export function EvidencePage() {
                   Freshness warning:{' '}
                   {selectedEvidence.item.freshness?.staleWarning ?? 'No explicit warning'}
                 </p>
+                </div>
+              </div>
+              <div className="space-y-3 rounded-[20px] border border-border-subtle bg-bg-surface p-4">
+                <p className="text-xs font-semibold uppercase tracking-[0.12em] text-text-muted">
+                  Proof and onchain context
+                </p>
+                <div className="space-y-2 text-sm leading-6 text-text-secondary">
+                  <p>Proof type: {selectedEvidence.item.proofType ?? 'Not classified'}</p>
+                  <p>Oracle provider: {selectedEvidence.item.oracleProvider ?? 'N/A'}</p>
+                  <p>Chain: {selectedEvidence.item.chainId ?? 'N/A'}</p>
+                  <p>Contract: {selectedEvidence.item.contractAddress ?? 'N/A'}</p>
+                  <p>
+                    Last verified:{' '}
+                    {selectedEvidence.item.lastVerifiedAt
+                      ? new Date(selectedEvidence.item.lastVerifiedAt).toLocaleString()
+                      : 'N/A'}
+                  </p>
+                  <p>
+                    Included in execution plan:{' '}
+                    {selectedEvidence.item.includedInExecutionPlan ? 'Yes' : 'No'}
+                  </p>
+                </div>
+              </div>
+              <div className="space-y-3 rounded-[20px] border border-border-subtle bg-app-bg-elevated p-4">
+                <p className="text-xs font-semibold uppercase tracking-[0.12em] text-text-muted">
+                  Linked report and execution references
+                </p>
+                <div className="space-y-3 text-sm text-text-secondary">
+                  <p>
+                    Report sections:{' '}
+                    {selectedEvidence.item.reportSectionKeys?.length
+                      ? selectedEvidence.item.reportSectionKeys.join(' · ')
+                      : 'Not linked'}
+                  </p>
+                  <p>
+                    Execution steps:{' '}
+                    {selectedEvidence.item.executionStepIds?.length
+                      ? selectedEvidence.item.executionStepIds.join(' · ')
+                      : 'Not linked'}
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    <a
+                      href={`/reports/${selectedEvidence.session.id}`}
+                      className="inline-flex items-center gap-2 rounded-full border border-border-subtle bg-bg-surface px-3 py-1.5 text-sm text-text-primary transition hover:border-border-strong hover:bg-panel-strong"
+                    >
+                      Open report
+                    </a>
+                    <a
+                      href={`/sessions/${selectedEvidence.session.id}/execute`}
+                      className="inline-flex items-center gap-2 rounded-full border border-border-subtle bg-bg-surface px-3 py-1.5 text-sm text-text-primary transition hover:border-border-strong hover:bg-panel-strong"
+                    >
+                      Open execute page
+                    </a>
+                  </div>
+                </div>
               </div>
             </div>
-          </div>
         ) : null}
         <div className="flex justify-end">
           <Button variant="secondary" onClick={() => setSelectedId(null)}>

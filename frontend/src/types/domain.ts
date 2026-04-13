@@ -4,7 +4,11 @@ export type LanguageCode = 'zh' | 'en'
 export type ApiMode = 'mock' | 'rest'
 export type DisplayDensity = 'cozy' | 'compact'
 
-export type AnalysisMode = 'single-option' | 'multi-option'
+export type AnalysisMode =
+  | 'single-asset-allocation'
+  | 'strategy-compare'
+  | 'single-option'
+  | 'multi-option'
 export type AssetType =
   | 'stablecoin'
   | 'mmf'
@@ -18,6 +22,9 @@ export type SessionStatus =
   | 'ANALYZING'
   | 'READY_FOR_REPORT'
   | 'REPORTING'
+  | 'READY_FOR_EXECUTION'
+  | 'EXECUTING'
+  | 'MONITORING'
   | 'COMPLETED'
   | 'FAILED'
 
@@ -43,6 +50,16 @@ export type DataSourceTag =
   | 'user_assumption'
 
 export type KycStatus = 'none' | 'approved' | 'revoked' | 'unavailable'
+export type EligibilityStatus = 'eligible' | 'conditional' | 'blocked'
+export type ExecutionLifecycleStatus =
+  | 'NOT_READY'
+  | 'READY'
+  | 'SIMULATED'
+  | 'BUNDLE_READY'
+  | 'EXECUTING'
+  | 'MONITORING'
+  | 'FAILED'
+export type TransactionStatus = 'pending' | 'submitted' | 'confirmed' | 'failed'
 
 export interface OracleSnapshotBackend {
   feedId: string
@@ -266,9 +283,22 @@ export interface RwaIntakeContext {
   liquidityNeed: LiquidityNeed
   minimumKycLevel: number
   walletAddress?: string
+  safeAddress?: string
   walletNetwork?: WalletNetworkKey | ''
   walletKycLevelOnchain?: number
   walletKycVerified?: boolean
+  kycLevel?: number
+  kycStatus?: string
+  investorType?: string
+  jurisdiction?: string
+  sourceChain?: string
+  sourceAsset?: string
+  ticketSize?: number
+  liquidityUrgency?: string
+  lockupTolerance?: string
+  targetYield?: number
+  maxDrawdownTolerance?: number
+  custodyPreference?: string
   wantsOnchainAttestation: boolean
   additionalConstraints?: string
   includeNonProductionAssets?: boolean
@@ -293,7 +323,25 @@ export interface RwaAssetTemplate {
   custody?: string
   chainId: number
   contractAddress?: string
+  protocolName?: string
+  permissioningStandard?: string
+  requiredKycLevel?: number
+  eligibleInvestorTypes?: string[]
+  restrictedJurisdictions?: string[]
+  minSubscriptionAmount?: number
+  redemptionWindow?: string
   settlementAsset: string
+  oracleProvider?: string
+  oracleContract?: string
+  lastOracleTimestamp?: string
+  navOrPrice?: number
+  indicativeYield?: number
+  reserveSummary?: string
+  custodySummary?: string
+  bridgeSupport?: string[]
+  proofRefs?: string[]
+  secondaryMarketAvailable?: boolean
+  riskFlags?: string[]
   executionStyle: string
   benchmarkApy: number
   expectedReturnLow: number
@@ -418,6 +466,14 @@ export interface EvidenceItem {
     staleWarning?: string
   }
   conflictKeys?: string[]
+  contractAddress?: string
+  chainId?: number
+  oracleProvider?: string
+  proofType?: string
+  lastVerifiedAt?: string
+  includedInExecutionPlan?: boolean
+  reportSectionKeys?: string[]
+  executionStepIds?: string[]
 }
 
 export interface CalculationTask {
@@ -434,6 +490,8 @@ export interface CalculationTask {
   validationState?: 'pending' | 'validated' | 'rejected'
   failureReason?: string
   userVisible?: boolean
+  reportSectionKeys?: string[]
+  executionStepIds?: string[]
   createdAt: string
 }
 
@@ -634,6 +692,8 @@ export interface AttestationDraft {
   reportHash: string
   portfolioHash: string
   attestationHash: string
+  evidenceHash?: string
+  executionPlanHash?: string
   createdAt: string
   network?: WalletNetworkKey | string
   contractAddress?: string
@@ -647,6 +707,159 @@ export interface AttestationDraft {
   blockNumber?: number
 }
 
+export interface WalletBalance {
+  symbol: string
+  amount: number
+  chainId: number
+  contractAddress?: string
+  usdValue: number
+  price: number
+}
+
+export interface WalletSummary {
+  address: string
+  network: WalletNetworkKey | string
+  balances: WalletBalance[]
+  kyc: KycOnchainResult
+  safeDetected: boolean
+  lastSyncAt: string
+}
+
+export interface EligibilityDecision {
+  id: string
+  assetId: string
+  assetName: string
+  chainId: number
+  contractAddress?: string
+  status: EligibilityStatus
+  reasons: string[]
+  missingRequirements: string[]
+  nextActions: string[]
+  checkedAt: string
+}
+
+export interface ExecutionApproval {
+  approvalType: string
+  tokenSymbol?: string
+  spender?: string
+  amount?: number
+  note?: string
+}
+
+export interface ExecutionQuote {
+  sourceAsset: string
+  targetAsset: string
+  amountIn: number
+  expectedAmountOut: number
+  feeAmount: number
+  feeBps: number
+  gasEstimate: number
+  gasEstimateUsd: number
+  etaSeconds: number
+  routeType: string
+  warnings: string[]
+}
+
+export interface ExecutionStep {
+  id: string
+  stepIndex: number
+  title: string
+  description: string
+  stepType: string
+  routeKind: string
+  assetId?: string
+  targetContract?: string
+  explorerUrl?: string
+  chainId?: number
+  estimatedFeeUsd: number
+  expectedAmount?: number
+  requiresSignature: boolean
+  requiresWallet: boolean
+  requiresSafe: boolean
+  complianceBlockers: string[]
+  requiredApprovals: ExecutionApproval[]
+  warnings: string[]
+  txRequest: Record<string, unknown>
+  offchainActions: string[]
+  status: string
+}
+
+export interface ExecutionPlan {
+  id: string
+  sessionId: string
+  generatedAt: string
+  walletAddress?: string
+  safeAddress?: string
+  sourceChain?: string
+  sourceAsset?: string
+  targetAsset?: string
+  ticketSize: number
+  status: ExecutionLifecycleStatus
+  quote?: ExecutionQuote
+  warnings: string[]
+  simulationWarnings: string[]
+  possibleFailureReasons: string[]
+  complianceBlockers: string[]
+  requiredApprovals: ExecutionApproval[]
+  steps: ExecutionStep[]
+  txBundle: Array<Record<string, unknown>>
+  eligibility: EligibilityDecision[]
+  canExecuteOnchain: boolean
+  planHash?: string
+}
+
+export interface TransactionReceiptRecord {
+  id: string
+  txHash: string
+  txStatus: TransactionStatus
+  blockNumber?: number
+  chainId?: number
+  executedAt: string
+  walletAddress?: string
+  safeAddress?: string
+  relatedExecutionStepId?: string
+  explorerUrl?: string
+  receiptPayload?: Record<string, unknown>
+  failureReason?: string
+  retryHint?: string
+}
+
+export interface ReportAnchorRecord {
+  id: string
+  reportHash: string
+  evidenceHash: string
+  executionPlanHash: string
+  attestationHash: string
+  status: string
+  chainId?: number
+  contractAddress?: string
+  transactionHash?: string
+  blockNumber?: number
+  explorerUrl?: string
+  anchoredAt?: string
+  note?: string
+}
+
+export interface PositionSnapshot {
+  id: string
+  assetId: string
+  assetName: string
+  chainId: number
+  contractAddress?: string
+  walletAddress?: string
+  safeAddress?: string
+  currentBalance: number
+  latestNavOrPrice: number
+  currentValue: number
+  costBasis: number
+  unrealizedPnl: number
+  accruedYield: number
+  nextRedemptionWindow?: string
+  oracleStalenessFlag: boolean
+  kycChangeFlag: boolean
+  asOf: string
+}
+
 export interface AssetAnalysisCard {
   assetId: string
   symbol: string
@@ -656,6 +869,25 @@ export interface AssetAnalysisCard {
   custody?: string
   chainId: number
   contractAddress?: string
+  protocolName?: string
+  permissioningStandard?: string
+  requiredKycLevel?: number
+  eligibleInvestorTypes?: string[]
+  restrictedJurisdictions?: string[]
+  minSubscriptionAmount?: number
+  redemptionWindow?: string
+  settlementAsset?: string
+  oracleProvider?: string
+  oracleContract?: string
+  lastOracleTimestamp?: string
+  navOrPrice?: number
+  indicativeYield?: number
+  reserveSummary?: string
+  custodySummary?: string
+  bridgeSupport?: string[]
+  proofRefs?: string[]
+  secondaryMarketAvailable?: boolean
+  riskFlags?: string[]
   expectedReturnLow: number
   expectedReturnBase: number
   expectedReturnHigh: number
@@ -963,6 +1195,11 @@ export interface AnalysisReport {
   methodologyReferences?: MethodologyReference[]
   txDraft?: TxDraft
   attestationDraft?: AttestationDraft
+  eligibilitySummary?: EligibilityDecision[]
+  executionPlan?: ExecutionPlan
+  transactionReceipts?: TransactionReceiptRecord[]
+  reportAnchorRecords?: ReportAnchorRecord[]
+  positionSnapshots?: PositionSnapshot[]
   exportedAt?: string
 }
 
@@ -997,6 +1234,21 @@ export interface AnalysisSessionSummary {
   locale?: LanguageCode
   problemStatement: string
   status: SessionStatus
+  walletAddress?: string
+  safeAddress?: string
+  kycLevel?: number
+  kycStatus?: string
+  investorType?: string
+  jurisdiction?: string
+  sourceChain?: string
+  sourceAsset?: string
+  ticketSize?: number
+  liquidityUrgency?: string
+  lockupTolerance?: string
+  targetYield?: number
+  maxDrawdownTolerance?: number
+  executionStatus?: ExecutionLifecycleStatus
+  lastOnchainSyncAt?: string
   createdAt: string
   updatedAt: string
   lastInsight: string
@@ -1021,6 +1273,11 @@ export interface AnalysisSession extends AnalysisSessionSummary {
   calculations: CalculationTask[]
   chartTasks?: ChartTask[]
   chartArtifacts?: ChartArtifact[]
+  eligibilityDecisions?: EligibilityDecision[]
+  executionPlan?: ExecutionPlan
+  transactionReceipts?: TransactionReceiptRecord[]
+  reportAnchorRecords?: ReportAnchorRecord[]
+  positionSnapshots?: PositionSnapshot[]
 }
 
 export interface DashboardMetric {

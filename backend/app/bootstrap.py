@@ -9,7 +9,11 @@ from app.config import Settings
 from app.orchestrator.engine import AnalysisOrchestrator
 from app.persistence.sqlite import SQLiteSessionRepository
 from app.services.audit import AuditLogService
+from app.services.eligibility import EligibilityService
+from app.services.execution import ExecutionService
+from app.services.monitoring import MonitoringService
 from app.services.sessions import SessionService
+from app.services.wallets import WalletService
 
 
 @dataclass
@@ -17,6 +21,10 @@ class AppServices:
     session_service: SessionService
     audit_log_service: AuditLogService
     orchestrator: AnalysisOrchestrator
+    wallet_service: WalletService
+    eligibility_service: EligibilityService
+    execution_service: ExecutionService
+    monitoring_service: MonitoringService
 
 
 _services: AppServices | None = None
@@ -112,6 +120,16 @@ def get_app_services() -> AppServices:
             audit_log_service,
             follow_up_round_limit=settings.clarification_follow_up_round_limit,
         )
+        wallet_service = WalletService()
+        eligibility_service = EligibilityService()
+        execution_service = ExecutionService(
+            session_service=session_service,
+            eligibility_service=eligibility_service,
+        )
+        monitoring_service = MonitoringService(
+            session_service=session_service,
+            wallet_service=wallet_service,
+        )
         orchestrator = AnalysisOrchestrator(
             repository=repository,
             audit_log_service=audit_log_service,
@@ -124,5 +142,9 @@ def get_app_services() -> AppServices:
             session_service=session_service,
             audit_log_service=audit_log_service,
             orchestrator=orchestrator,
+            wallet_service=wallet_service,
+            eligibility_service=eligibility_service,
+            execution_service=execution_service,
+            monitoring_service=monitoring_service,
         )
     return _services

@@ -20,12 +20,21 @@ export default defineConfig({
     screenshot: 'only-on-failure',
     video: 'retain-on-failure',
   },
-  webServer: {
-    command: 'npm run dev -- --mode test --host 127.0.0.1 --port 4173',
-    url: 'http://127.0.0.1:4173',
-    reuseExistingServer: true,
-    timeout: 120_000,
-  },
+  webServer: [
+    {
+      command:
+        '/Users/kk./Desktop/Gay/.venv-backend/bin/python -m uvicorn app.main:app --app-dir /Users/kk./Desktop/Gay/backend --host 127.0.0.1 --port 8000',
+      url: 'http://127.0.0.1:8000/health',
+      reuseExistingServer: true,
+      timeout: 120_000,
+    },
+    {
+      command: 'npm run dev -- --mode test --host 127.0.0.1 --port 4173',
+      url: 'http://127.0.0.1:4173',
+      reuseExistingServer: true,
+      timeout: 120_000,
+    },
+  ],
   projects: [
     {
       name: 'chromium',

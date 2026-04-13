@@ -13,6 +13,11 @@ import type {
   ChartTask,
   ClarificationQuestion,
   ConfidenceBand,
+  EligibilityDecision,
+  ExecutionApproval,
+  ExecutionPlan,
+  ExecutionQuote,
+  ExecutionStep,
   HashKeyChainConfig,
   HoldingPeriodSimulation,
   MarketDataSnapshot,
@@ -22,7 +27,9 @@ import type {
   OracleSnapshotBackend,
   OracleFeedConfig,
   PortfolioAllocation,
+  PositionSnapshot,
   ReportTable,
+  ReportAnchorRecord,
   ReserveBackingSummary,
   RiskBreakdownItem,
   RiskVector,
@@ -33,9 +40,11 @@ import type {
   SearchTask,
   SourceProvenanceRef,
   StressScenario,
+  TransactionReceiptRecord,
   TxDraft,
   User,
   UserAnswer,
+  WalletBalance,
 } from '@/types'
 import { createBrowserBoundUser } from '@/lib/auth/browser-account'
 import { i18n } from '@/lib/i18n'
@@ -285,9 +294,22 @@ export interface BackendRwaIntakeContext {
   liquidity_need: 'instant' | 't_plus_3' | 'locked'
   minimum_kyc_level: number
   wallet_address?: string
+  safe_address?: string
   wallet_network?: 'testnet' | 'mainnet' | ''
   wallet_kyc_level_onchain?: number
   wallet_kyc_verified?: boolean
+  kyc_level?: number
+  kyc_status?: string
+  investor_type?: string
+  jurisdiction?: string
+  source_chain?: string
+  source_asset?: string
+  ticket_size?: number | null
+  liquidity_urgency?: string
+  lockup_tolerance?: string
+  target_yield?: number | null
+  max_drawdown_tolerance?: number | null
+  custody_preference?: string
   wants_onchain_attestation: boolean
   additional_constraints?: string
   include_non_production_assets?: boolean
@@ -306,7 +328,25 @@ export interface BackendAssetTemplate {
   custody?: string
   chain_id: number
   contract_address?: string
+  protocol_name?: string
+  permissioning_standard?: string
+  required_kyc_level?: number | null
+  eligible_investor_types?: string[]
+  restricted_jurisdictions?: string[]
+  min_subscription_amount?: number
+  redemption_window?: string
   settlement_asset: string
+  oracle_provider?: string
+  oracle_contract?: string
+  last_oracle_timestamp?: string | null
+  nav_or_price?: number | null
+  indicative_yield?: number | null
+  reserve_summary?: string
+  custody_summary?: string
+  bridge_support?: string[]
+  proof_refs?: string[]
+  secondary_market_available?: boolean
+  risk_flags?: string[]
   execution_style: string
   benchmark_apy: number
   expected_return_low: number
@@ -403,6 +443,8 @@ export interface BackendCalculationTask {
   failure_reason?: string
   user_visible?: boolean
   semantic_signature?: string
+  report_section_keys?: string[]
+  execution_step_ids?: string[]
 }
 
 export interface BackendChartTask {
@@ -431,6 +473,39 @@ export interface BackendEvidenceItem {
   fact_type?: string
   freshness?: BackendEvidenceFreshness
   conflict_keys?: string[]
+  contract_address?: string
+  chain_id?: number | null
+  oracle_provider?: string
+  proof_type?: string
+  last_verified_at?: string | null
+  included_in_execution_plan?: boolean
+  report_section_keys?: string[]
+  execution_step_ids?: string[]
+}
+
+export interface BackendWalletBalance {
+  symbol: string
+  amount: number
+  chain_id: number
+  contract_address?: string
+  usd_value: number
+  price: number
+}
+
+export interface BackendWalletSummaryResponse {
+  address: string
+  network: string
+  balances: BackendWalletBalance[]
+  kyc: BackendKycOnchainResult
+  safe_detected: boolean
+  last_sync_at: string
+}
+
+export interface BackendWalletPositionsResponse {
+  address: string
+  network: string
+  positions: BackendPositionSnapshot[]
+  last_sync_at: string
 }
 
 export interface BackendKycOnchainResult {
@@ -639,6 +714,8 @@ export interface BackendAttestationDraft {
   report_hash: string
   portfolio_hash: string
   attestation_hash: string
+  evidence_hash?: string
+  execution_plan_hash?: string
   created_at: string
   network: 'testnet' | 'mainnet' | string
   contract_address?: string
@@ -652,6 +729,190 @@ export interface BackendAttestationDraft {
   block_number?: number | null
 }
 
+export interface BackendEligibilityDecision {
+  decision_id: string
+  asset_id: string
+  asset_name: string
+  chain_id: number
+  contract_address?: string
+  status: 'eligible' | 'conditional' | 'blocked'
+  reasons?: string[]
+  missing_requirements?: string[]
+  next_actions?: string[]
+  checked_at: string
+}
+
+export interface BackendExecutionApproval {
+  approval_type: string
+  token_symbol?: string
+  spender?: string
+  amount?: number | null
+  note?: string
+}
+
+export interface BackendExecutionQuote {
+  source_asset: string
+  target_asset: string
+  amount_in: number
+  expected_amount_out: number
+  fee_amount: number
+  fee_bps: number
+  gas_estimate: number
+  gas_estimate_usd: number
+  eta_seconds: number
+  route_type: string
+  warnings?: string[]
+}
+
+export interface BackendExecutionStep {
+  execution_step_id: string
+  step_index: number
+  title: string
+  description: string
+  step_type: string
+  route_kind: string
+  asset_id?: string
+  target_contract?: string
+  explorer_url?: string
+  chain_id?: number | null
+  estimated_fee_usd: number
+  expected_amount?: number | null
+  requires_signature?: boolean
+  requires_wallet?: boolean
+  requires_safe?: boolean
+  compliance_blockers?: string[]
+  required_approvals?: BackendExecutionApproval[]
+  warnings?: string[]
+  tx_request?: Record<string, unknown>
+  offchain_actions?: string[]
+  status?: string
+}
+
+export interface BackendExecutionPlan {
+  execution_plan_id: string
+  session_id?: string
+  generated_at: string
+  wallet_address?: string
+  safe_address?: string
+  source_chain?: string
+  source_asset?: string
+  target_asset?: string
+  ticket_size: number
+  status: string
+  quote?: BackendExecutionQuote | null
+  warnings?: string[]
+  simulation_warnings?: string[]
+  possible_failure_reasons?: string[]
+  compliance_blockers?: string[]
+  required_approvals?: BackendExecutionApproval[]
+  steps?: BackendExecutionStep[]
+  tx_bundle?: Array<Record<string, unknown>>
+  eligibility?: BackendEligibilityDecision[]
+  can_execute_onchain: boolean
+  plan_hash?: string
+}
+
+export interface BackendTransactionReceiptRecord {
+  receipt_id: string
+  tx_hash: string
+  tx_status: 'pending' | 'submitted' | 'confirmed' | 'failed'
+  block_number?: number | null
+  chain_id?: number | null
+  executed_at: string
+  wallet_address?: string
+  safe_address?: string
+  related_execution_step_id?: string
+  explorer_url?: string
+  receipt_payload?: Record<string, unknown>
+  failure_reason?: string
+  retry_hint?: string
+}
+
+export interface BackendReportAnchorRecord {
+  anchor_id: string
+  report_hash: string
+  evidence_hash: string
+  execution_plan_hash: string
+  attestation_hash: string
+  status: string
+  chain_id?: number | null
+  contract_address?: string
+  transaction_hash?: string
+  block_number?: number | null
+  explorer_url?: string
+  anchored_at?: string | null
+  note?: string
+}
+
+export interface BackendPositionSnapshot {
+  snapshot_id: string
+  asset_id: string
+  asset_name: string
+  chain_id: number
+  contract_address?: string
+  wallet_address?: string
+  safe_address?: string
+  current_balance: number
+  latest_nav_or_price: number
+  current_value: number
+  cost_basis: number
+  unrealized_pnl: number
+  accrued_yield: number
+  next_redemption_window?: string
+  oracle_staleness_flag: boolean
+  kyc_change_flag: boolean
+  as_of: string
+}
+
+export interface BackendEligibleCatalogBucketItem {
+  asset: BackendAssetTemplate
+  decision: BackendEligibilityDecision
+}
+
+export interface BackendEligibleCatalogResponse {
+  address: string
+  session_id?: string
+  eligible?: BackendEligibleCatalogBucketItem[]
+  conditional?: BackendEligibleCatalogBucketItem[]
+  blocked?: BackendEligibleCatalogBucketItem[]
+}
+
+export interface BackendRwaQuoteResponse {
+  quote: BackendExecutionQuote
+}
+
+export interface BackendRwaSimulateResponse {
+  quote: BackendExecutionQuote
+  required_approvals?: Array<Record<string, unknown>>
+  possible_failure_reasons?: string[]
+  compliance_blockers?: string[]
+  warnings?: string[]
+}
+
+export interface BackendRwaExecuteResponse {
+  execution_plan: BackendExecutionPlan
+  tx_receipts?: BackendTransactionReceiptRecord[]
+  report_anchor_records?: BackendReportAnchorRecord[]
+}
+
+export interface BackendRwaMonitorResponse {
+  session_id: string
+  position_snapshots?: BackendPositionSnapshot[]
+  current_balance: number
+  latest_nav_or_price: number
+  cost_basis: number
+  unrealized_pnl: number
+  accrued_yield: number
+  next_redemption_window?: string
+  oracle_staleness_flag: boolean
+  kyc_change_flag: boolean
+  alert_flags?: string[]
+}
+
+export interface BackendReportAnchorResponse {
+  record: BackendReportAnchorRecord
+}
+
 export interface BackendAssetAnalysisCard {
   asset_id: string
   symbol: string
@@ -661,6 +922,25 @@ export interface BackendAssetAnalysisCard {
   custody?: string
   chain_id: number
   contract_address?: string
+  protocol_name?: string
+  permissioning_standard?: string
+  required_kyc_level?: number | null
+  eligible_investor_types?: string[]
+  restricted_jurisdictions?: string[]
+  min_subscription_amount?: number
+  redemption_window?: string
+  settlement_asset?: string
+  oracle_provider?: string
+  oracle_contract?: string
+  last_oracle_timestamp?: string | null
+  nav_or_price?: number | null
+  indicative_yield?: number | null
+  reserve_summary?: string
+  custody_summary?: string
+  bridge_support?: string[]
+  proof_refs?: string[]
+  secondary_market_available?: boolean
+  risk_flags?: string[]
   expected_return_low: number
   expected_return_base: number
   expected_return_high: number
@@ -767,6 +1047,11 @@ export interface BackendReport {
   methodology_references?: BackendMethodologyReference[]
   tx_draft?: BackendTxDraft | null
   attestation_draft?: BackendAttestationDraft | null
+  eligibility_summary?: BackendEligibilityDecision[]
+  execution_plan?: BackendExecutionPlan | null
+  transaction_receipts?: BackendTransactionReceiptRecord[]
+  report_anchor_records?: BackendReportAnchorRecord[]
+  position_snapshots?: BackendPositionSnapshot[]
 }
 
 export interface BackendSessionEvent {
@@ -778,7 +1063,11 @@ export interface BackendSessionEvent {
 export interface BackendSession {
   session_id: string
   owner_client_id: string
-  mode: 'single_decision' | 'multi_option'
+  mode:
+    | 'single_decision'
+    | 'multi_option'
+    | 'single_asset_allocation'
+    | 'strategy_compare'
   locale?: 'zh' | 'en'
   problem_statement: string
   intake_context: BackendRwaIntakeContext
@@ -788,8 +1077,26 @@ export interface BackendSession {
     | 'ANALYZING'
     | 'READY_FOR_REPORT'
     | 'REPORTING'
+    | 'READY_FOR_EXECUTION'
+    | 'EXECUTING'
+    | 'MONITORING'
     | 'COMPLETED'
     | 'FAILED'
+  wallet_address?: string
+  safe_address?: string
+  kyc_level?: number | null
+  kyc_status?: string
+  investor_type?: string
+  jurisdiction?: string
+  source_chain?: string
+  source_asset?: string
+  ticket_size?: number | null
+  liquidity_urgency?: string
+  lockup_tolerance?: string
+  target_yield?: number | null
+  max_drawdown_tolerance?: number | null
+  execution_status?: string
+  last_onchain_sync_at?: string | null
   clarification_questions: BackendClarificationQuestion[]
   answers: BackendUserAnswer[]
   search_tasks: BackendSearchTask[]
@@ -798,6 +1105,11 @@ export interface BackendSession {
   evidence_items: BackendEvidenceItem[]
   chart_artifacts: BackendChartArtifact[]
   major_conclusions: BackendMajorConclusionItem[]
+  eligibility_decisions?: BackendEligibilityDecision[]
+  execution_plan?: BackendExecutionPlan | null
+  transaction_receipts?: BackendTransactionReceiptRecord[]
+  report_anchor_records?: BackendReportAnchorRecord[]
+  position_snapshots?: BackendPositionSnapshot[]
   report: BackendReport | null
   analysis_rounds_completed: number
   follow_up_round_limit: number
@@ -987,9 +1299,27 @@ export function mapRwaIntakeContext(
     liquidityNeed: context?.liquidity_need ?? 't_plus_3',
     minimumKycLevel: context?.minimum_kyc_level ?? 0,
     walletAddress: context?.wallet_address ?? '',
+    safeAddress: context?.safe_address ?? '',
     walletNetwork: context?.wallet_network ?? '',
     walletKycLevelOnchain: context?.wallet_kyc_level_onchain,
     walletKycVerified: context?.wallet_kyc_verified,
+    kycLevel: context?.kyc_level ?? undefined,
+    kycStatus: context?.kyc_status ?? '',
+    investorType: context?.investor_type ?? '',
+    jurisdiction: context?.jurisdiction ?? '',
+    sourceChain: context?.source_chain ?? '',
+    sourceAsset: context?.source_asset ?? '',
+    ticketSize:
+      typeof context?.ticket_size === 'number' ? context.ticket_size : undefined,
+    liquidityUrgency: context?.liquidity_urgency ?? '',
+    lockupTolerance: context?.lockup_tolerance ?? '',
+    targetYield:
+      typeof context?.target_yield === 'number' ? context.target_yield : undefined,
+    maxDrawdownTolerance:
+      typeof context?.max_drawdown_tolerance === 'number'
+        ? context.max_drawdown_tolerance
+        : undefined,
+    custodyPreference: context?.custody_preference ?? '',
     wantsOnchainAttestation: context?.wants_onchain_attestation ?? true,
     additionalConstraints: context?.additional_constraints ?? '',
     includeNonProductionAssets:
@@ -1015,9 +1345,22 @@ export function toBackendIntakeContext(
     liquidity_need: context.liquidityNeed,
     minimum_kyc_level: context.minimumKycLevel,
     wallet_address: context.walletAddress || '',
+    safe_address: context.safeAddress || '',
     wallet_network: context.walletNetwork || '',
     wallet_kyc_level_onchain: context.walletKycLevelOnchain,
     wallet_kyc_verified: context.walletKycVerified,
+    kyc_level: context.kycLevel,
+    kyc_status: context.kycStatus || '',
+    investor_type: context.investorType || '',
+    jurisdiction: context.jurisdiction || '',
+    source_chain: context.sourceChain || '',
+    source_asset: context.sourceAsset || '',
+    ticket_size: context.ticketSize,
+    liquidity_urgency: context.liquidityUrgency || '',
+    lockup_tolerance: context.lockupTolerance || '',
+    target_yield: context.targetYield,
+    max_drawdown_tolerance: context.maxDrawdownTolerance,
+    custody_preference: context.custodyPreference || '',
     wants_onchain_attestation: context.wantsOnchainAttestation,
     additional_constraints: context.additionalConstraints || '',
     include_non_production_assets: context.includeNonProductionAssets,
@@ -1167,7 +1510,7 @@ function mapDemoScenario(
   }
 }
 
-function mapAssetTemplate(asset: BackendAssetTemplate): RwaAssetTemplate {
+export function mapAssetTemplate(asset: BackendAssetTemplate): RwaAssetTemplate {
   return {
     id: asset.asset_id,
     symbol: asset.symbol,
@@ -1178,7 +1521,32 @@ function mapAssetTemplate(asset: BackendAssetTemplate): RwaAssetTemplate {
     custody: asset.custody ?? '',
     chainId: asset.chain_id,
     contractAddress: asset.contract_address ?? '',
+    protocolName: asset.protocol_name ?? '',
+    permissioningStandard: asset.permissioning_standard ?? '',
+    requiredKycLevel:
+      typeof asset.required_kyc_level === 'number'
+        ? asset.required_kyc_level
+        : undefined,
+    eligibleInvestorTypes: asset.eligible_investor_types ?? [],
+    restrictedJurisdictions: asset.restricted_jurisdictions ?? [],
+    minSubscriptionAmount: asset.min_subscription_amount ?? undefined,
+    redemptionWindow: asset.redemption_window ?? '',
     settlementAsset: asset.settlement_asset,
+    oracleProvider: asset.oracle_provider ?? '',
+    oracleContract: asset.oracle_contract ?? '',
+    lastOracleTimestamp: asset.last_oracle_timestamp ?? undefined,
+    navOrPrice:
+      typeof asset.nav_or_price === 'number' ? asset.nav_or_price : undefined,
+    indicativeYield:
+      typeof asset.indicative_yield === 'number'
+        ? asset.indicative_yield
+        : undefined,
+    reserveSummary: asset.reserve_summary ?? '',
+    custodySummary: asset.custody_summary ?? '',
+    bridgeSupport: asset.bridge_support ?? [],
+    proofRefs: asset.proof_refs ?? [],
+    secondaryMarketAvailable: Boolean(asset.secondary_market_available),
+    riskFlags: asset.risk_flags ?? [],
     executionStyle: asset.execution_style,
     benchmarkApy: asset.benchmark_apy,
     expectedReturnLow: asset.expected_return_low,
@@ -1320,6 +1688,8 @@ function mapAttestationDraft(
     reportHash: draft.report_hash,
     portfolioHash: draft.portfolio_hash,
     attestationHash: draft.attestation_hash,
+    evidenceHash: draft.evidence_hash ?? '',
+    executionPlanHash: draft.execution_plan_hash ?? '',
     createdAt: draft.created_at,
     network: draft.network,
     contractAddress: draft.contract_address ?? '',
@@ -1331,6 +1701,211 @@ function mapAttestationDraft(
     submittedBy: draft.submitted_by ?? '',
     submittedAt: draft.submitted_at ?? undefined,
     blockNumber: draft.block_number ?? undefined,
+  }
+}
+
+export function mapWalletBalance(balance: BackendWalletBalance): WalletBalance {
+  return {
+    symbol: balance.symbol,
+    amount: balance.amount,
+    chainId: balance.chain_id,
+    contractAddress: balance.contract_address ?? '',
+    usdValue: balance.usd_value,
+    price: balance.price,
+  }
+}
+
+export function mapEligibilityDecision(
+  decision: BackendEligibilityDecision,
+): EligibilityDecision {
+  return {
+    id: decision.decision_id,
+    assetId: decision.asset_id,
+    assetName: decision.asset_name,
+    chainId: decision.chain_id,
+    contractAddress: decision.contract_address ?? '',
+    status: decision.status,
+    reasons: decision.reasons ?? [],
+    missingRequirements: decision.missing_requirements ?? [],
+    nextActions: decision.next_actions ?? [],
+    checkedAt: decision.checked_at,
+  }
+}
+
+export function mapExecutionApproval(
+  approval: BackendExecutionApproval,
+): ExecutionApproval {
+  return {
+    approvalType: approval.approval_type,
+    tokenSymbol: approval.token_symbol ?? '',
+    spender: approval.spender ?? '',
+    amount:
+      typeof approval.amount === 'number' ? approval.amount : undefined,
+    note: approval.note ?? '',
+  }
+}
+
+export function mapExecutionQuote(
+  quote?: BackendExecutionQuote | null,
+): ExecutionQuote | undefined {
+  if (!quote) {
+    return undefined
+  }
+
+  return {
+    sourceAsset: quote.source_asset,
+    targetAsset: quote.target_asset,
+    amountIn: quote.amount_in,
+    expectedAmountOut: quote.expected_amount_out,
+    feeAmount: quote.fee_amount,
+    feeBps: quote.fee_bps,
+    gasEstimate: quote.gas_estimate,
+    gasEstimateUsd: quote.gas_estimate_usd,
+    etaSeconds: quote.eta_seconds,
+    routeType: quote.route_type,
+    warnings: quote.warnings ?? [],
+  }
+}
+
+export function mapExecutionStep(step: BackendExecutionStep): ExecutionStep {
+  return {
+    id: step.execution_step_id,
+    stepIndex: step.step_index,
+    title: step.title,
+    description: step.description,
+    stepType: step.step_type,
+    routeKind: step.route_kind,
+    assetId: step.asset_id ?? '',
+    targetContract: step.target_contract ?? '',
+    explorerUrl: step.explorer_url ?? '',
+    chainId:
+      typeof step.chain_id === 'number' ? step.chain_id : undefined,
+    estimatedFeeUsd: step.estimated_fee_usd,
+    expectedAmount:
+      typeof step.expected_amount === 'number'
+        ? step.expected_amount
+        : undefined,
+    requiresSignature: step.requires_signature ?? true,
+    requiresWallet: step.requires_wallet ?? true,
+    requiresSafe: step.requires_safe ?? false,
+    complianceBlockers: step.compliance_blockers ?? [],
+    requiredApprovals: (step.required_approvals ?? []).map(mapExecutionApproval),
+    warnings: step.warnings ?? [],
+    txRequest: step.tx_request ?? {},
+    offchainActions: step.offchain_actions ?? [],
+    status: step.status ?? 'pending',
+  }
+}
+
+export function mapExecutionPlan(
+  plan?: BackendExecutionPlan | null,
+): ExecutionPlan | undefined {
+  if (!plan) {
+    return undefined
+  }
+
+  return {
+    id: plan.execution_plan_id,
+    sessionId: plan.session_id ?? '',
+    generatedAt: plan.generated_at,
+    walletAddress: plan.wallet_address ?? '',
+    safeAddress: plan.safe_address ?? '',
+    sourceChain: plan.source_chain ?? '',
+    sourceAsset: plan.source_asset ?? '',
+    targetAsset: plan.target_asset ?? '',
+    ticketSize: plan.ticket_size,
+    status:
+      plan.status === 'READY' ||
+      plan.status === 'SIMULATED' ||
+      plan.status === 'BUNDLE_READY' ||
+      plan.status === 'EXECUTING' ||
+      plan.status === 'MONITORING' ||
+      plan.status === 'FAILED'
+        ? plan.status
+        : 'NOT_READY',
+    quote: mapExecutionQuote(plan.quote),
+    warnings: plan.warnings ?? [],
+    simulationWarnings: plan.simulation_warnings ?? [],
+    possibleFailureReasons: plan.possible_failure_reasons ?? [],
+    complianceBlockers: plan.compliance_blockers ?? [],
+    requiredApprovals: (plan.required_approvals ?? []).map(mapExecutionApproval),
+    steps: (plan.steps ?? []).map(mapExecutionStep),
+    txBundle: plan.tx_bundle ?? [],
+    eligibility: (plan.eligibility ?? []).map(mapEligibilityDecision),
+    canExecuteOnchain: Boolean(plan.can_execute_onchain),
+    planHash: plan.plan_hash ?? '',
+  }
+}
+
+export function mapTransactionReceipt(
+  receipt: BackendTransactionReceiptRecord,
+): TransactionReceiptRecord {
+  return {
+    id: receipt.receipt_id,
+    txHash: receipt.tx_hash,
+    txStatus: receipt.tx_status,
+    blockNumber:
+      typeof receipt.block_number === 'number'
+        ? receipt.block_number
+        : undefined,
+    chainId:
+      typeof receipt.chain_id === 'number' ? receipt.chain_id : undefined,
+    executedAt: receipt.executed_at,
+    walletAddress: receipt.wallet_address ?? '',
+    safeAddress: receipt.safe_address ?? '',
+    relatedExecutionStepId: receipt.related_execution_step_id ?? '',
+    explorerUrl: receipt.explorer_url ?? '',
+    receiptPayload: receipt.receipt_payload ?? {},
+    failureReason: receipt.failure_reason ?? '',
+    retryHint: receipt.retry_hint ?? '',
+  }
+}
+
+export function mapReportAnchorRecord(
+  record: BackendReportAnchorRecord,
+): ReportAnchorRecord {
+  return {
+    id: record.anchor_id,
+    reportHash: record.report_hash,
+    evidenceHash: record.evidence_hash,
+    executionPlanHash: record.execution_plan_hash,
+    attestationHash: record.attestation_hash,
+    status: record.status,
+    chainId:
+      typeof record.chain_id === 'number' ? record.chain_id : undefined,
+    contractAddress: record.contract_address ?? '',
+    transactionHash: record.transaction_hash ?? '',
+    blockNumber:
+      typeof record.block_number === 'number'
+        ? record.block_number
+        : undefined,
+    explorerUrl: record.explorer_url ?? '',
+    anchoredAt: record.anchored_at ?? undefined,
+    note: record.note ?? '',
+  }
+}
+
+export function mapPositionSnapshot(
+  snapshot: BackendPositionSnapshot,
+): PositionSnapshot {
+  return {
+    id: snapshot.snapshot_id,
+    assetId: snapshot.asset_id,
+    assetName: snapshot.asset_name,
+    chainId: snapshot.chain_id,
+    contractAddress: snapshot.contract_address ?? '',
+    walletAddress: snapshot.wallet_address ?? '',
+    safeAddress: snapshot.safe_address ?? '',
+    currentBalance: snapshot.current_balance,
+    latestNavOrPrice: snapshot.latest_nav_or_price,
+    currentValue: snapshot.current_value,
+    costBasis: snapshot.cost_basis,
+    unrealizedPnl: snapshot.unrealized_pnl,
+    accruedYield: snapshot.accrued_yield,
+    nextRedemptionWindow: snapshot.next_redemption_window ?? '',
+    oracleStalenessFlag: Boolean(snapshot.oracle_staleness_flag),
+    kycChangeFlag: Boolean(snapshot.kyc_change_flag),
+    asOf: snapshot.as_of,
   }
 }
 
@@ -1435,6 +2010,32 @@ function mapAssetAnalysisCard(
     custody: card.custody ?? '',
     chainId: card.chain_id,
     contractAddress: card.contract_address ?? '',
+    protocolName: card.protocol_name ?? '',
+    permissioningStandard: card.permissioning_standard ?? '',
+    requiredKycLevel:
+      typeof card.required_kyc_level === 'number'
+        ? card.required_kyc_level
+        : undefined,
+    eligibleInvestorTypes: card.eligible_investor_types ?? [],
+    restrictedJurisdictions: card.restricted_jurisdictions ?? [],
+    minSubscriptionAmount: card.min_subscription_amount ?? undefined,
+    redemptionWindow: card.redemption_window ?? '',
+    settlementAsset: card.settlement_asset ?? '',
+    oracleProvider: card.oracle_provider ?? '',
+    oracleContract: card.oracle_contract ?? '',
+    lastOracleTimestamp: card.last_oracle_timestamp ?? undefined,
+    navOrPrice:
+      typeof card.nav_or_price === 'number' ? card.nav_or_price : undefined,
+    indicativeYield:
+      typeof card.indicative_yield === 'number'
+        ? card.indicative_yield
+        : undefined,
+    reserveSummary: card.reserve_summary ?? '',
+    custodySummary: card.custody_summary ?? '',
+    bridgeSupport: card.bridge_support ?? [],
+    proofRefs: card.proof_refs ?? [],
+    secondaryMarketAvailable: Boolean(card.secondary_market_available),
+    riskFlags: card.risk_flags ?? [],
     expectedReturnLow: card.expected_return_low,
     expectedReturnBase: card.expected_return_base,
     expectedReturnHigh: card.expected_return_high,
@@ -1515,6 +2116,15 @@ function mapEvidenceItem(
         }
       : undefined,
     conflictKeys: item.conflict_keys ?? [],
+    contractAddress: item.contract_address ?? '',
+    chainId:
+      typeof item.chain_id === 'number' ? item.chain_id : undefined,
+    oracleProvider: item.oracle_provider ?? '',
+    proofType: item.proof_type ?? '',
+    lastVerifiedAt: item.last_verified_at ?? undefined,
+    includedInExecutionPlan: Boolean(item.included_in_execution_plan),
+    reportSectionKeys: item.report_section_keys ?? [],
+    executionStepIds: item.execution_step_ids ?? [],
   }
 }
 
@@ -1850,6 +2460,8 @@ function mapBackendCalculationTask(
         : 'pending',
     failureReason: task.failure_reason ?? undefined,
     userVisible: task.user_visible ?? task.status === 'completed',
+    reportSectionKeys: task.report_section_keys ?? [],
+    executionStepIds: task.execution_step_ids ?? [],
     createdAt: fallbackCreatedAt,
   }
 }
@@ -2135,7 +2747,10 @@ export function createBackendPseudoUser(): User {
 export function mapBackendMode(
   mode: BackendSession['mode'] | string,
 ): AnalysisMode {
-  return mode === 'multi_option' ? 'multi-option' : 'single-option'
+  if (mode === 'multi_option' || mode === 'strategy_compare') {
+    return 'strategy-compare'
+  }
+  return 'single-asset-allocation'
 }
 
 export function mapModeDefinitions(
@@ -2149,38 +2764,38 @@ export function mapModeDefinitions(
     return {
       id,
       title:
-        id === 'single-option'
+        id === 'single-asset-allocation'
           ? isZh
-            ? '单资产尽调'
-            : 'Single-asset diligence'
+            ? '单资产配置'
+            : 'Single-asset allocation'
           : isZh
-            ? '多资产配置'
-            : 'Multi-asset allocation',
+            ? '策略比较'
+            : 'Strategy compare',
       subtitle:
-        id === 'single-option'
+        id === 'single-asset-allocation'
           ? isZh
-            ? '围绕单个 RWA / 稳定币 / 收益资产做风险拆解与可执行草案。'
-            : 'Diligence one RWA, stablecoin, or yield product with risk decomposition.'
+            ? '围绕单个 HashKey Chain RWA 目标资产生成资格结论、分析和执行计划。'
+            : 'Generate eligibility, analysis, and an execution plan for one target asset.'
           : isZh
-            ? '输出 RWA 对比矩阵、持有期模拟、推荐权重与证据链。'
-            : 'Produce comparison matrix, simulations, recommended weights, and evidence links.',
+            ? '比较多条 RWA 配置路径，输出对比矩阵、模拟和推荐执行路径。'
+            : 'Compare RWA strategies with matrix, simulations, and execution posture.',
       description:
-        id === 'single-option'
+        id === 'single-asset-allocation'
           ? isZh
-            ? '适合审查某个稳定币、MMF、贵金属或房地产类 RWA 的收益、流动性、KYC 与执行步骤。'
-            : 'Best for diligencing a single stablecoin, MMF, precious-metal, or real-estate style RWA.'
+            ? '适合从钱包与仓位出发审查某个稳定币、MMF、贵金属或其他 RWA 的可投性与执行步骤。'
+            : 'Best for wallet-first diligence of one stablecoin, MMF, precious-metal, or other RWA.'
           : isZh
-            ? '适合做 HashKey Chain 上的多资产配置，比较收益、风险、流动性和门槛。'
+            ? '适合做 HashKey Chain 上的多路径配置比较，比较收益、风险、流动性、资格与执行成本。'
             : 'Best for portfolio-style comparisons across HashKey Chain assets.',
       valueLens:
-        id === 'single-option'
+        id === 'single-asset-allocation'
           ? isZh
-            ? ['RiskVector', '流动性', 'KYC 门槛', '执行草案']
-            : ['RiskVector', 'Liquidity', 'KYC gating', 'Execution draft']
+            ? ['资格结论', '资产事实', '模拟结果', '执行计划']
+            : ['Eligibility', 'Asset facts', 'Simulation', 'Execution plan']
           : isZh
-            ? ['对比矩阵', '持有期模拟', '推荐权重', '证据面板']
-            : ['Comparison matrix', 'Holding simulation', 'Suggested weights', 'Evidence panel'],
-      icon: id === 'single-option' ? 'sparkles' : 'git-compare',
+            ? ['策略对比', '持有期模拟', '推荐权重', '监控清单']
+            : ['Strategy comparison', 'Holding simulation', 'Weights', 'Monitoring'],
+      icon: id === 'single-asset-allocation' ? 'sparkles' : 'git-compare',
     }
   })
 }
@@ -2192,6 +2807,35 @@ export function mapBackendSession(session: BackendSession): AnalysisSession {
     locale: session.locale,
     problemStatement: session.problem_statement,
     status: session.status,
+    walletAddress: session.wallet_address ?? '',
+    safeAddress: session.safe_address ?? '',
+    kycLevel:
+      typeof session.kyc_level === 'number' ? session.kyc_level : undefined,
+    kycStatus: session.kyc_status ?? '',
+    investorType: session.investor_type ?? '',
+    jurisdiction: session.jurisdiction ?? '',
+    sourceChain: session.source_chain ?? '',
+    sourceAsset: session.source_asset ?? '',
+    ticketSize:
+      typeof session.ticket_size === 'number' ? session.ticket_size : undefined,
+    liquidityUrgency: session.liquidity_urgency ?? '',
+    lockupTolerance: session.lockup_tolerance ?? '',
+    targetYield:
+      typeof session.target_yield === 'number' ? session.target_yield : undefined,
+    maxDrawdownTolerance:
+      typeof session.max_drawdown_tolerance === 'number'
+        ? session.max_drawdown_tolerance
+        : undefined,
+    executionStatus:
+      session.execution_status === 'READY' ||
+      session.execution_status === 'SIMULATED' ||
+      session.execution_status === 'BUNDLE_READY' ||
+      session.execution_status === 'EXECUTING' ||
+      session.execution_status === 'MONITORING' ||
+      session.execution_status === 'FAILED'
+        ? session.execution_status
+        : 'NOT_READY',
+    lastOnchainSyncAt: session.last_onchain_sync_at ?? undefined,
     createdAt: session.created_at,
     updatedAt: session.updated_at,
     errorMessage: session.error_message ?? undefined,
@@ -2247,6 +2891,11 @@ export function mapBackendSession(session: BackendSession): AnalysisSession {
     chartArtifacts: session.chart_artifacts.map((artifact) =>
       mapBackendChart(artifact, session.session_id),
     ),
+    eligibilityDecisions: (session.eligibility_decisions ?? []).map(mapEligibilityDecision),
+    executionPlan: mapExecutionPlan(session.execution_plan),
+    transactionReceipts: (session.transaction_receipts ?? []).map(mapTransactionReceipt),
+    reportAnchorRecords: (session.report_anchor_records ?? []).map(mapReportAnchorRecord),
+    positionSnapshots: (session.position_snapshots ?? []).map(mapPositionSnapshot),
   }
 }
 
@@ -2292,7 +2941,10 @@ function buildHighlights(session: BackendSession) {
     ]
   }
 
-  if (mode === 'single-option' && budgetSummary) {
+  if (
+    (mode === 'single-asset-allocation' || mode === 'single-option') &&
+    budgetSummary
+  ) {
     return [
       {
         id: 'budget-range',
@@ -2321,7 +2973,10 @@ function buildHighlights(session: BackendSession) {
     ]
   }
 
-  if (mode === 'multi-option' && optionProfiles.length > 0) {
+  if (
+    (mode === 'strategy-compare' || mode === 'multi-option') &&
+    optionProfiles.length > 0
+  ) {
     const bestOption = [...optionProfiles]
       .sort((left, right) => (right.score ?? 0) - (left.score ?? 0))
       .at(0)
@@ -2426,13 +3081,18 @@ export function mapBackendReport(session: BackendSession): AnalysisReport {
     methodologyReferences: (report?.methodology_references ?? []).map(mapMethodologyReference),
     txDraft: mapTxDraft(report?.tx_draft),
     attestationDraft: mapAttestationDraft(report?.attestation_draft),
+    eligibilitySummary: (report?.eligibility_summary ?? []).map(mapEligibilityDecision),
+    executionPlan: mapExecutionPlan(report?.execution_plan),
+    transactionReceipts: (report?.transaction_receipts ?? []).map(mapTransactionReceipt),
+    reportAnchorRecords: (report?.report_anchor_records ?? []).map(mapReportAnchorRecord),
+    positionSnapshots: (report?.position_snapshots ?? []).map(mapPositionSnapshot),
   }
 }
 
 function buildStages(mode: AnalysisMode): AnalysisProgress['stages'] {
   const isZh = isChineseLocale()
 
-  if (mode === 'multi-option') {
+  if (mode === 'strategy-compare' || mode === 'multi-option') {
     return [
       {
         id: 'clarify',
@@ -2548,6 +3208,15 @@ function resolveActiveStageIndex(
     return 2
   }
 
+  if (
+    status === 'READY_FOR_EXECUTION' ||
+    status === 'EXECUTING' ||
+    status === 'MONITORING' ||
+    status === 'COMPLETED'
+  ) {
+    return 4
+  }
+
   return 4
 }
 
@@ -2557,13 +3226,19 @@ export function mapBackendProgress(
 ): AnalysisProgress {
   const activityStatus = step?.activity_status ?? session.activity_status
   const mode = mapBackendMode(session.mode)
+  const currentStatus = step?.status ?? session.status
+  const terminal =
+    currentStatus === 'READY_FOR_EXECUTION' ||
+    currentStatus === 'EXECUTING' ||
+    currentStatus === 'MONITORING' ||
+    currentStatus === 'COMPLETED'
   const activeStageIndex = resolveActiveStageIndex(
-    step?.status ?? session.status,
+    currentStatus,
     activityStatus,
   )
   const stages: AnalysisProgress['stages'] = buildStages(mode).map((stage, index) => {
     const status: AnalysisProgress['stages'][number]['status'] =
-      (step?.status ?? session.status) === 'COMPLETED'
+      terminal
         ? 'completed'
         : index < activeStageIndex
           ? 'completed'
@@ -2579,9 +3254,9 @@ export function mapBackendProgress(
 
   return {
     sessionId: session.session_id,
-    status: step?.status ?? session.status,
+    status: currentStatus,
     overallProgress:
-      (step?.status ?? session.status) === 'COMPLETED'
+      terminal
         ? 100
         : Math.round(((activeStageIndex + 1) / stages.length) * 100),
     currentStepLabel:

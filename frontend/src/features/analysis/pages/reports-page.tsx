@@ -54,7 +54,13 @@ export function ReportsPage() {
     })
   }, [catalogQuery.data, filter])
 
-  const completedReports = reportEntries.filter(({ session }) => session?.status === 'COMPLETED')
+  const completedReports = reportEntries.filter(
+    ({ session }) =>
+      session?.status === 'READY_FOR_EXECUTION' ||
+      session?.status === 'EXECUTING' ||
+      session?.status === 'MONITORING' ||
+      session?.status === 'COMPLETED',
+  )
   const avgEvidence =
     completedReports.reduce((sum, entry) => sum + entry.report.evidence.length, 0) /
       (completedReports.length || 1)
@@ -148,7 +154,9 @@ export function ReportsPage() {
                       <div className="flex flex-wrap items-center gap-2">
                         <Badge tone={state.tone}>{state.label}</Badge>
                         <Badge tone="neutral">
-                          {session.mode === 'multi-option' ? 'Multi-option' : 'Single decision'}
+                          {session.mode === 'strategy-compare' || session.mode === 'multi-option'
+                            ? 'Strategy compare'
+                            : 'Single-asset allocation'}
                         </Badge>
                         <ConfidenceBadge confidence={confidence} />
                       </div>

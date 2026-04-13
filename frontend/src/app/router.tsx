@@ -49,6 +49,11 @@ const ReportDetailPage = lazy(() =>
     default: module.ReportPage,
   })),
 )
+const ExecutionPage = lazy(() =>
+  import('@/features/analysis/pages/execution-page').then((module) => ({
+    default: module.ExecutionPage,
+  })),
+)
 const EvidencePage = lazy(() =>
   import('@/features/analysis/pages/evidence-page').then((module) => ({
     default: module.EvidencePage,
@@ -106,7 +111,7 @@ function withRouteSuspense(element: ReactNode) {
 function LegacySessionRedirect({
   mode,
 }: {
-  mode: 'detail' | 'clarify' | 'analyzing' | 'report'
+  mode: 'detail' | 'clarify' | 'analyzing' | 'report' | 'execute'
 }) {
   const { sessionId = '' } = useParams()
 
@@ -115,6 +120,8 @@ function LegacySessionRedirect({
       ? `/sessions/${sessionId}/clarify`
       : mode === 'analyzing'
         ? `/sessions/${sessionId}/analyzing`
+        : mode === 'execute'
+          ? `/sessions/${sessionId}/execute`
         : mode === 'report'
           ? `/reports/${sessionId}`
           : `/sessions/${sessionId}`
@@ -154,6 +161,10 @@ export const router = createBrowserRouter([
             path: '/reports/:reportId',
             element: withRouteSuspense(<ReportDetailPage />),
           },
+          {
+            path: '/sessions/:sessionId/execute',
+            element: withRouteSuspense(<ExecutionPage />),
+          },
           { path: '/evidence', element: withRouteSuspense(<EvidencePage />) },
           {
             path: '/calculations',
@@ -185,7 +196,7 @@ export const router = createBrowserRouter([
           },
           {
             path: '/analysis/session/:sessionId/execute',
-            element: <LegacySessionRedirect mode="report" />,
+            element: <LegacySessionRedirect mode="execute" />,
           },
           { path: '/resources/analyses', element: <Navigate to="/sessions" replace /> },
           { path: '/profile', element: <Navigate to="/settings" replace /> },

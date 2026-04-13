@@ -51,7 +51,7 @@ class SessionApiFlowTests(unittest.TestCase):
                 answer_value="I want the lower-risk path and need a conservative recommendation.",
             )
 
-            self.assertEqual("COMPLETED", completed["status"])
+            self.assertEqual("READY_FOR_EXECUTION", completed["status"])
             self.assertIn("report", completed)
             self.assertIn("markdown", completed["report"])
             self.assertTrue(completed["report"]["markdown"])
@@ -78,7 +78,7 @@ class SessionApiFlowTests(unittest.TestCase):
                 session_id,
                 answer_value="Keep liquidity inside T+3 and preserve evidence traceability.",
             )
-            self.assertEqual("COMPLETED", completed["status"])
+            self.assertEqual("READY_FOR_EXECUTION", completed["status"])
             self.assertIn("attestation_draft", completed["report"])
 
             record_response = client.post(

@@ -101,6 +101,29 @@ class KycStatus(str, Enum):
     UNAVAILABLE = "unavailable"
 
 
+class EligibilityStatus(str, Enum):
+    ELIGIBLE = "eligible"
+    CONDITIONAL = "conditional"
+    BLOCKED = "blocked"
+
+
+class ExecutionLifecycleStatus(str, Enum):
+    NOT_READY = "NOT_READY"
+    READY = "READY"
+    SIMULATED = "SIMULATED"
+    BUNDLE_READY = "BUNDLE_READY"
+    EXECUTING = "EXECUTING"
+    MONITORING = "MONITORING"
+    FAILED = "FAILED"
+
+
+class TransactionStatus(str, Enum):
+    PENDING = "pending"
+    SUBMITTED = "submitted"
+    CONFIRMED = "confirmed"
+    FAILED = "failed"
+
+
 class HashKeyChainConfig(BaseModel):
     ecosystem_name: str = "HashKey Chain"
     native_token_symbol: str = "HSK"
@@ -157,9 +180,22 @@ class RwaIntakeContext(BaseModel):
     liquidity_need: LiquidityNeed = LiquidityNeed.T_PLUS_3
     minimum_kyc_level: int = 0
     wallet_address: str = ""
+    safe_address: str = ""
     wallet_network: str = ""
     wallet_kyc_level_onchain: int | None = None
     wallet_kyc_verified: bool | None = None
+    kyc_level: int | None = None
+    kyc_status: str = ""
+    investor_type: str = ""
+    jurisdiction: str = ""
+    source_chain: str = ""
+    source_asset: str = ""
+    ticket_size: float | None = None
+    liquidity_urgency: str = ""
+    lockup_tolerance: str = ""
+    target_yield: float | None = None
+    max_drawdown_tolerance: float | None = None
+    custody_preference: str = ""
     wants_onchain_attestation: bool = True
     additional_constraints: str = ""
     include_non_production_assets: bool = False
@@ -203,7 +239,25 @@ class AssetTemplate(BaseModel):
     custody: str = ""
     chain_id: int
     contract_address: str = ""
+    protocol_name: str = ""
+    permissioning_standard: str = ""
+    required_kyc_level: int | None = None
+    eligible_investor_types: list[str] = Field(default_factory=list)
+    restricted_jurisdictions: list[str] = Field(default_factory=list)
+    min_subscription_amount: float = 0.0
+    redemption_window: str = ""
     settlement_asset: str = "USDT"
+    oracle_provider: str = ""
+    oracle_contract: str = ""
+    last_oracle_timestamp: datetime | None = None
+    nav_or_price: float | None = None
+    indicative_yield: float | None = None
+    reserve_summary: str = ""
+    custody_summary: str = ""
+    bridge_support: list[str] = Field(default_factory=list)
+    proof_refs: list[str] = Field(default_factory=list)
+    secondary_market_available: bool = False
+    risk_flags: list[str] = Field(default_factory=list)
     execution_style: str = "erc20"
     benchmark_apy: float = 0.0
     expected_return_low: float = 0.0
@@ -447,6 +501,109 @@ class RecommendationReason(BaseModel):
     sensitivity_summary: list[SensitivitySummary] = Field(default_factory=list)
 
 
+class ExecutionApproval(BaseModel):
+    approval_type: str
+    token_symbol: str = ""
+    spender: str = ""
+    amount: float | None = None
+    note: str = ""
+
+
+class ExecutionQuote(BaseModel):
+    source_asset: str
+    target_asset: str
+    amount_in: float
+    expected_amount_out: float
+    fee_amount: float
+    fee_bps: float
+    gas_estimate: int
+    gas_estimate_usd: float
+    eta_seconds: int
+    route_type: str = "erc20"
+    warnings: list[str] = Field(default_factory=list)
+
+
+class EligibilityDecision(BaseModel):
+    decision_id: str = Field(default_factory=lambda: str(__import__("uuid").uuid4()))
+    asset_id: str
+    asset_name: str
+    chain_id: int
+    contract_address: str = ""
+    status: EligibilityStatus = EligibilityStatus.BLOCKED
+    reasons: list[str] = Field(default_factory=list)
+    missing_requirements: list[str] = Field(default_factory=list)
+    next_actions: list[str] = Field(default_factory=list)
+    checked_at: datetime = Field(default_factory=utcnow)
+
+
+class PositionSnapshot(BaseModel):
+    snapshot_id: str = Field(default_factory=lambda: str(__import__("uuid").uuid4()))
+    asset_id: str
+    asset_name: str
+    chain_id: int
+    contract_address: str = ""
+    wallet_address: str = ""
+    safe_address: str = ""
+    current_balance: float = 0.0
+    latest_nav_or_price: float = 0.0
+    current_value: float = 0.0
+    cost_basis: float = 0.0
+    unrealized_pnl: float = 0.0
+    accrued_yield: float = 0.0
+    next_redemption_window: str = ""
+    oracle_staleness_flag: bool = False
+    kyc_change_flag: bool = False
+    as_of: datetime = Field(default_factory=utcnow)
+
+
+class ExecutionStep(BaseModel):
+    execution_step_id: str = Field(default_factory=lambda: str(__import__("uuid").uuid4()))
+    step_index: int = 1
+    title: str
+    description: str
+    step_type: str
+    route_kind: str = "erc20"
+    asset_id: str = ""
+    target_contract: str = ""
+    explorer_url: str = ""
+    chain_id: int | None = None
+    estimated_fee_usd: float = 0.0
+    expected_amount: float | None = None
+    requires_signature: bool = True
+    requires_wallet: bool = True
+    requires_safe: bool = False
+    compliance_blockers: list[str] = Field(default_factory=list)
+    required_approvals: list[ExecutionApproval] = Field(default_factory=list)
+    warnings: list[str] = Field(default_factory=list)
+    tx_request: dict[str, Any] = Field(default_factory=dict)
+    offchain_actions: list[str] = Field(default_factory=list)
+    status: str = "pending"
+
+
+class ExecutionPlan(BaseModel):
+    execution_plan_id: str = Field(default_factory=lambda: str(__import__("uuid").uuid4()))
+    session_id: str = ""
+    generated_at: datetime = Field(default_factory=utcnow)
+    wallet_address: str = ""
+    safe_address: str = ""
+    source_chain: str = ""
+    source_asset: str = ""
+    target_asset: str = ""
+    ticket_size: float = 0.0
+    status: ExecutionLifecycleStatus = ExecutionLifecycleStatus.NOT_READY
+    quote: ExecutionQuote | None = None
+    warnings: list[str] = Field(default_factory=list)
+    simulation_warnings: list[str] = Field(default_factory=list)
+    possible_failure_reasons: list[str] = Field(default_factory=list)
+    compliance_blockers: list[str] = Field(default_factory=list)
+    required_approvals: list[ExecutionApproval] = Field(default_factory=list)
+    steps: list[ExecutionStep] = Field(default_factory=list)
+    tx_bundle: list[dict[str, Any]] = Field(default_factory=list)
+    eligibility: list[EligibilityDecision] = Field(default_factory=list)
+    can_execute_onchain: bool = False
+    plan_hash: str = ""
+
+
 class TxDraftStep(BaseModel):
     step: int
     title: str
@@ -474,6 +631,8 @@ class AttestationDraft(BaseModel):
     report_hash: str
     portfolio_hash: str
     attestation_hash: str
+    evidence_hash: str = ""
+    execution_plan_hash: str = ""
     created_at: datetime = Field(default_factory=utcnow)
     network: str = ""
     contract_address: str = ""
@@ -487,6 +646,38 @@ class AttestationDraft(BaseModel):
     block_number: int | None = None
 
 
+class TransactionReceiptRecord(BaseModel):
+    receipt_id: str = Field(default_factory=lambda: str(__import__("uuid").uuid4()))
+    tx_hash: str
+    tx_status: TransactionStatus = TransactionStatus.SUBMITTED
+    block_number: int | None = None
+    chain_id: int | None = None
+    executed_at: datetime = Field(default_factory=utcnow)
+    wallet_address: str = ""
+    safe_address: str = ""
+    related_execution_step_id: str = ""
+    explorer_url: str = ""
+    receipt_payload: dict[str, Any] = Field(default_factory=dict)
+    failure_reason: str = ""
+    retry_hint: str = ""
+
+
+class ReportAnchorRecord(BaseModel):
+    anchor_id: str = Field(default_factory=lambda: str(__import__("uuid").uuid4()))
+    report_hash: str
+    evidence_hash: str
+    execution_plan_hash: str
+    attestation_hash: str
+    status: str = "draft"
+    chain_id: int | None = None
+    contract_address: str = ""
+    transaction_hash: str = ""
+    block_number: int | None = None
+    explorer_url: str = ""
+    anchored_at: datetime | None = None
+    note: str = ""
+
+
 class AssetAnalysisCard(BaseModel):
     asset_id: str
     symbol: str
@@ -496,6 +687,25 @@ class AssetAnalysisCard(BaseModel):
     custody: str = ""
     chain_id: int
     contract_address: str = ""
+    protocol_name: str = ""
+    permissioning_standard: str = ""
+    required_kyc_level: int | None = None
+    eligible_investor_types: list[str] = Field(default_factory=list)
+    restricted_jurisdictions: list[str] = Field(default_factory=list)
+    min_subscription_amount: float = 0.0
+    redemption_window: str = ""
+    settlement_asset: str = "USDT"
+    oracle_provider: str = ""
+    oracle_contract: str = ""
+    last_oracle_timestamp: datetime | None = None
+    nav_or_price: float | None = None
+    indicative_yield: float | None = None
+    reserve_summary: str = ""
+    custody_summary: str = ""
+    bridge_support: list[str] = Field(default_factory=list)
+    proof_refs: list[str] = Field(default_factory=list)
+    secondary_market_available: bool = False
+    risk_flags: list[str] = Field(default_factory=list)
     expected_return_low: float
     expected_return_base: float
     expected_return_high: float
@@ -666,6 +876,15 @@ class KycOnchainResult(BaseModel):
     explorer_url: str = ""
     fetched_at: datetime = Field(default_factory=utcnow)
     note: str = ""
+
+
+class WalletBalance(BaseModel):
+    symbol: str
+    amount: float
+    chain_id: int
+    contract_address: str = ""
+    usd_value: float = 0.0
+    price: float = 0.0
 
 
 class EvidencePanelItem(BaseModel):

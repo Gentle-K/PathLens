@@ -18,10 +18,10 @@ describe('ModeSelectionPage', () => {
     })
 
     expect(
-      await screen.findByRole('heading', { name: 'Single decision analysis' }),
+      await screen.findByRole('heading', { name: 'Single-asset allocation' }),
     ).toBeInTheDocument()
     expect(
-      await screen.findByRole('heading', { name: 'Multi-option comparison' }),
+      await screen.findByRole('heading', { name: 'Strategy compare' }),
     ).toBeInTheDocument()
   })
 
@@ -35,13 +35,15 @@ describe('ModeSelectionPage', () => {
 
     await user.click(
       await screen.findByRole('button', {
-        name: 'Should I join a study abroad exchange?',
+        name: 'Allocate idle USDT from my wallet into one eligible HashKey Chain RWA sleeve.',
       }),
     )
 
     expect(
       screen.getByLabelText('What decision are you trying to make?'),
-    ).toHaveValue('Should I join a study abroad exchange?')
+    ).toHaveValue(
+      'Allocate idle USDT from my wallet into one eligible HashKey Chain RWA sleeve.',
+    )
   })
 
   it('keeps the start button disabled until the user enters a question', async () => {

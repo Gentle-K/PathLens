@@ -11,7 +11,13 @@ export async function fetchAnalysisCatalog(
 ): Promise<AnalysisCatalog> {
   const sessions = (await adapter.analysis.list({ page: 1, pageSize: 100 })).items
 
-  const completedSessions = sessions.filter((session) => session.status === 'COMPLETED')
+  const completedSessions = sessions.filter(
+    (session) =>
+      session.status === 'READY_FOR_EXECUTION' ||
+      session.status === 'EXECUTING' ||
+      session.status === 'MONITORING' ||
+      session.status === 'COMPLETED',
+  )
   const reports = await Promise.all(
     completedSessions.map(async (session) => [
       session.id,
@@ -27,7 +33,7 @@ export async function fetchAnalysisCatalog(
 
 export function flattenEvidence(catalog: AnalysisCatalog) {
   return catalog.sessions.flatMap((session) =>
-    session.evidence.map((item) => ({
+    mergeEvidence(session, catalog.reportsBySession[session.id]).map((item) => ({
       item,
       session,
       report: catalog.reportsBySession[session.id],
@@ -37,7 +43,7 @@ export function flattenEvidence(catalog: AnalysisCatalog) {
 
 export function flattenCalculations(catalog: AnalysisCatalog) {
   return catalog.sessions.flatMap((session) =>
-    session.calculations.map((task) => ({
+    mergeCalculations(session, catalog.reportsBySession[session.id]).map((task) => ({
       task,
       session,
       report: catalog.reportsBySession[session.id],

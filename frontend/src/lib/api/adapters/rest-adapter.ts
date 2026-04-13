@@ -6,21 +6,38 @@ import {
   type BackendAuditLogEntry,
   type BackendAuditLogListResponse,
   type BackendDebugSessionListResponse,
+  type BackendEligibleCatalogBucketItem,
   type BackendPersonalDataDeletionResponse,
   type BackendUserAnswer,
   type BackendBootstrapResponse,
+  type BackendEligibleCatalogResponse,
+  type BackendReportAnchorResponse,
+  type BackendRwaExecuteResponse,
+  type BackendRwaMonitorResponse,
+  type BackendRwaQuoteResponse,
+  type BackendRwaSimulateResponse,
   type BackendSession,
   type BackendSessionStepResponse,
+  type BackendWalletPositionsResponse,
+  type BackendWalletSummaryResponse,
   type BackendRequestMoreFollowUpResponse,
   backendSessionToResourceRecord,
   createBackendPseudoUser,
+  mapAssetTemplate,
   mapAuditLogEntry,
   mapDebugSessionSummary,
   mapBackendProgress,
   mapBackendReport,
   mapBackendSession,
+  mapEligibilityDecision,
+  mapExecutionPlan,
+  mapExecutionQuote,
+  mapPositionSnapshot,
+  mapReportAnchorRecord,
   mapModeDefinitions,
   mapRwaBootstrap,
+  mapTransactionReceipt,
+  mapWalletBalance,
   toBackendIntakeContext,
   toBackendAnswers,
 } from '@/lib/api/adapters/genius-backend'
@@ -40,7 +57,9 @@ import type {
 const bootstrapPromises = new Map<LanguageCode, Promise<BackendBootstrapResponse>>()
 
 function toBackendMode(mode: AnalysisMode) {
-  return mode === 'multi-option' ? 'multi_option' : 'single_decision'
+  return mode === 'strategy-compare' || mode === 'multi-option'
+    ? 'strategy_compare'
+    : 'single_asset_allocation'
 }
 
 async function getBootstrap(force = false) {
@@ -138,7 +157,11 @@ async function buildDashboardOverview() {
   }
 
   const completed = liveSessions.filter(
-    (session) => session.status === 'COMPLETED',
+    (session) =>
+      session.status === 'READY_FOR_EXECUTION' ||
+      session.status === 'EXECUTING' ||
+      session.status === 'MONITORING' ||
+      session.status === 'COMPLETED',
   ).length
   const clarifying = liveSessions.filter(
     (session) => session.status === 'CLARIFYING',
@@ -160,7 +183,7 @@ async function buildDashboardOverview() {
         label: 'Completed loops',
         value: String(completed),
         change: completed ? '+1' : '0',
-        detail: 'Sessions that reached COMPLETED on the backend.',
+        detail: 'Sessions that already produced a report and execution context.',
       },
       {
         id: 'backend-clarifying',
@@ -197,7 +220,12 @@ async function ensureReportReady(sessionId: string) {
       break
     }
 
-    if (session.status === 'COMPLETED') {
+    if (
+      session.status === 'READY_FOR_EXECUTION' ||
+      session.status === 'EXECUTING' ||
+      session.status === 'MONITORING' ||
+      session.status === 'COMPLETED'
+    ) {
       break
     }
 
@@ -255,6 +283,152 @@ export const restApiAdapter: ApiAdapter = {
     async getBootstrap() {
       const bootstrap = await getBootstrap()
       return mapRwaBootstrap(bootstrap)
+    },
+    async getWalletSummary(address, network = '') {
+      const payload = await apiClient.request<BackendWalletSummaryResponse>(
+        endpoints.backend.walletSummary(address, network),
+      )
+      return {
+        address: payload.address,
+        network: payload.network,
+        balances: (payload.balances ?? []).map(mapWalletBalance),
+        kyc: {
+          walletAddress: payload.kyc.wallet_address,
+          network: payload.kyc.network,
+          contractAddress: payload.kyc.contract_address ?? '',
+          status: payload.kyc.status,
+          isHuman: Boolean(payload.kyc.is_human),
+          level: payload.kyc.level,
+          sourceUrl: payload.kyc.source_url ?? '',
+          explorerUrl: payload.kyc.explorer_url ?? '',
+          fetchedAt: payload.kyc.fetched_at,
+          note: payload.kyc.note ?? '',
+        },
+        safeDetected: Boolean(payload.safe_detected),
+        lastSyncAt: payload.last_sync_at,
+      }
+    },
+    async getWalletPositions(address, network = '') {
+      const payload = await apiClient.request<BackendWalletPositionsResponse>(
+        endpoints.backend.walletPositions(address, network),
+      )
+      return (payload.positions ?? []).map(mapPositionSnapshot)
+    },
+    async getEligibleCatalog({ address, sessionId = '', network = '' }) {
+      const payload = await apiClient.request<BackendEligibleCatalogResponse>(
+        endpoints.backend.rwaEligibleCatalog(address, sessionId, network),
+      )
+      const mapBucket = (items: BackendEligibleCatalogBucketItem[] = []) =>
+        items.map((item) => ({
+          asset: mapAssetTemplate(item.asset),
+          decision: mapEligibilityDecision(item.decision),
+        }))
+      return {
+        eligible: mapBucket(payload.eligible),
+        conditional: mapBucket(payload.conditional),
+        blocked: mapBucket(payload.blocked),
+      }
+    },
+    async getQuote(payload) {
+      const response = await apiClient.request<BackendRwaQuoteResponse>(
+        endpoints.backend.rwaQuote,
+        {
+          method: 'POST',
+          body: JSON.stringify({
+            session_id: payload.sessionId ?? '',
+            source_asset: payload.sourceAsset,
+            target_asset: payload.targetAsset,
+            amount: payload.amount,
+            wallet_address: payload.walletAddress ?? '',
+            safe_address: payload.safeAddress ?? '',
+            source_chain: payload.sourceChain ?? 'hashkey',
+            route_preferences: payload.routePreferences ?? {},
+          }),
+        },
+      )
+      return mapExecutionQuote(response.quote)!
+    },
+    async simulate(payload) {
+      const response = await apiClient.request<BackendRwaSimulateResponse>(
+        endpoints.backend.rwaSimulate,
+        {
+          method: 'POST',
+          body: JSON.stringify({
+            session_id: payload.sessionId ?? '',
+            source_asset: payload.sourceAsset,
+            target_asset: payload.targetAsset,
+            amount: payload.amount,
+            wallet_address: payload.walletAddress ?? '',
+            safe_address: payload.safeAddress ?? '',
+            source_chain: payload.sourceChain ?? 'hashkey',
+            include_attestation: payload.includeAttestation ?? true,
+          }),
+        },
+      )
+      return {
+        quote: mapExecutionQuote(response.quote)!,
+        requiredApprovals: response.required_approvals ?? [],
+        possibleFailureReasons: response.possible_failure_reasons ?? [],
+        complianceBlockers: response.compliance_blockers ?? [],
+        warnings: response.warnings ?? [],
+      }
+    },
+    async execute(payload) {
+      const response = await apiClient.request<BackendRwaExecuteResponse>(
+        endpoints.backend.rwaExecute,
+        {
+          method: 'POST',
+          body: JSON.stringify({
+            session_id: payload.sessionId,
+            source_asset: payload.sourceAsset,
+            target_asset: payload.targetAsset,
+            amount: payload.amount,
+            wallet_address: payload.walletAddress ?? '',
+            safe_address: payload.safeAddress ?? '',
+            source_chain: payload.sourceChain ?? 'hashkey',
+            include_attestation: payload.includeAttestation ?? true,
+            generate_only: payload.generateOnly ?? true,
+          }),
+        },
+      )
+      return {
+        executionPlan: mapExecutionPlan(response.execution_plan)!,
+        txReceipts: (response.tx_receipts ?? []).map(mapTransactionReceipt),
+        reportAnchorRecords: (response.report_anchor_records ?? []).map(mapReportAnchorRecord),
+      }
+    },
+    async monitor(sessionId) {
+      const response = await apiClient.request<BackendRwaMonitorResponse>(
+        endpoints.backend.rwaMonitor(sessionId),
+      )
+      return {
+        positionSnapshots: (response.position_snapshots ?? []).map(mapPositionSnapshot),
+        currentBalance: response.current_balance,
+        latestNavOrPrice: response.latest_nav_or_price,
+        costBasis: response.cost_basis,
+        unrealizedPnl: response.unrealized_pnl,
+        accruedYield: response.accrued_yield,
+        nextRedemptionWindow: response.next_redemption_window ?? '',
+        oracleStalenessFlag: Boolean(response.oracle_staleness_flag),
+        kycChangeFlag: Boolean(response.kyc_change_flag),
+        alertFlags: response.alert_flags ?? [],
+      }
+    },
+    async anchorReport(payload) {
+      const response = await apiClient.request<BackendReportAnchorResponse>(
+        endpoints.backend.reportAnchor(payload.reportId),
+        {
+          method: 'POST',
+          body: JSON.stringify({
+            network: payload.network,
+            transaction_hash: payload.transactionHash ?? '',
+            submitted_by: payload.submittedBy ?? '',
+            block_number: payload.blockNumber,
+            note: payload.note ?? '',
+          }),
+        },
+      )
+      return mapReportAnchorRecord(response.record)
     },
   },
   dashboard: {

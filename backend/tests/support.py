@@ -15,7 +15,11 @@ from app.main import create_app
 from app.orchestrator.engine import AnalysisOrchestrator
 from app.persistence.memory import InMemorySessionRepository
 from app.services.audit import AuditLogService
+from app.services.eligibility import EligibilityService
+from app.services.execution import ExecutionService
+from app.services.monitoring import MonitoringService
 from app.services.sessions import SessionService
+from app.services.wallets import WalletService
 
 
 def build_test_services(
@@ -34,6 +38,16 @@ def build_test_services(
         audit_log_service,
         follow_up_round_limit=follow_up_round_limit,
     )
+    wallet_service = WalletService()
+    eligibility_service = EligibilityService()
+    execution_service = ExecutionService(
+        session_service=session_service,
+        eligibility_service=eligibility_service,
+    )
+    monitoring_service = MonitoringService(
+        session_service=session_service,
+        wallet_service=wallet_service,
+    )
     orchestrator = AnalysisOrchestrator(
         repository=repo,
         audit_log_service=audit_log_service,
@@ -46,6 +60,10 @@ def build_test_services(
         session_service=session_service,
         audit_log_service=audit_log_service,
         orchestrator=orchestrator,
+        wallet_service=wallet_service,
+        eligibility_service=eligibility_service,
+        execution_service=execution_service,
+        monitoring_service=monitoring_service,
     )
 
 
@@ -59,6 +77,9 @@ def patched_test_client(
     with ExitStack() as stack:
         stack.enter_context(
             patch("app.api.routes.get_app_services", return_value=services)
+        )
+        stack.enter_context(
+            patch("app.api.rwa_routes.get_app_services", return_value=services)
         )
         stack.enter_context(
             patch(
@@ -82,13 +103,19 @@ def complete_session_via_api(
     answer_value: str,
     max_rounds: int = 10,
 ) -> dict:
+    terminal_report_statuses = {
+        "READY_FOR_EXECUTION",
+        "EXECUTING",
+        "MONITORING",
+        "COMPLETED",
+    }
     for _ in range(max_rounds):
         session_response = client.get(f"/api/sessions/{session_id}")
         if session_response.status_code != 200:
             raise AssertionError(session_response.text)
         session = session_response.json()
         status = session["status"]
-        if status == "COMPLETED":
+        if status in terminal_report_statuses:
             return session
         if status == "FAILED":
             raise AssertionError(session.get("error_message", "session failed"))

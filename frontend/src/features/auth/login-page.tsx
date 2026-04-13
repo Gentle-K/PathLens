@@ -1,10 +1,13 @@
-import { useMutation } from '@tanstack/react-query'
+import { useMutation, useQuery } from '@tanstack/react-query'
 import {
   ArrowRight,
+  Building2,
   CheckCircle2,
   FileSearch,
+  Mail,
   ShieldCheck,
   Sigma,
+  Wallet,
 } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
@@ -15,9 +18,12 @@ import { Input } from '@/components/ui/field'
 import { Badge } from '@/components/ui/badge'
 import { useApiAdapter } from '@/lib/api/use-api-adapter'
 import { useAppStore } from '@/lib/store/app-store'
+import { shortAddress } from '@/lib/web3/hashkey'
+import { useHashKeyWallet } from '@/lib/web3/use-hashkey-wallet'
 
 const initialForm = {
   email: '',
+  safeAddress: '',
 }
 
 export function LoginPage() {
@@ -27,6 +33,11 @@ export function LoginPage() {
   const [form, setForm] = useState(initialForm)
   const [inlineError, setInlineError] = useState('')
   const [infoMessage, setInfoMessage] = useState('')
+  const bootstrapQuery = useQuery({
+    queryKey: ['auth', 'wallet-bootstrap'],
+    queryFn: () => adapter.rwa.getBootstrap(),
+  })
+  const wallet = useHashKeyWallet(bootstrapQuery.data?.chainConfig)
 
   const mutation = useMutation({
     mutationFn: adapter.auth.login,
@@ -82,6 +93,55 @@ export function LoginPage() {
       password: 'email-access',
       mfaCode: '',
     })
+  }
+
+  const handleWalletContinue = async () => {
+    setInlineError('')
+    setInfoMessage('')
+    try {
+      const nextState = await wallet.connectWallet()
+      setAuthSession({
+        accessToken: `wallet:${nextState.address}`,
+        refreshToken: `wallet:${nextState.address}`,
+        currentUser: {
+          id: `wallet:${nextState.address}`,
+          name: `Wallet ${shortAddress(nextState.address)}`,
+          email: `${nextState.address.toLowerCase()}@wallet.local`,
+          title: 'Connected wallet',
+          locale: 'en',
+          roles: ['analyst'],
+          lastActiveAt: new Date().toISOString(),
+        },
+      })
+      void navigate('/new-analysis')
+    } catch (error) {
+      setInlineError((error as Error).message)
+    }
+  }
+
+  const handleSafeContinue = () => {
+    const safeAddress = form.safeAddress.trim()
+    setInlineError('')
+    setInfoMessage('')
+    if (!/^0x[a-fA-F0-9]{40}$/.test(safeAddress)) {
+      setInlineError('Enter a valid Safe address.')
+      return
+    }
+
+    setAuthSession({
+      accessToken: `safe:${safeAddress}`,
+      refreshToken: `safe:${safeAddress}`,
+      currentUser: {
+        id: `safe:${safeAddress}`,
+        name: `Safe ${shortAddress(safeAddress)}`,
+        email: `${safeAddress.toLowerCase()}@safe.local`,
+        title: 'Safe workspace',
+        locale: 'en',
+        roles: ['analyst'],
+        lastActiveAt: new Date().toISOString(),
+      },
+    })
+    void navigate('/new-analysis')
   }
 
   const handleDemo = async () => {
@@ -190,16 +250,72 @@ export function LoginPage() {
             <div className="space-y-3">
               <p className="apple-kicker">Access</p>
               <h2 className="text-[2rem] font-semibold tracking-[-0.05em] text-text-primary">Continue to your workspace</h2>
-              <p className="text-sm leading-6 text-text-secondary">
-                Use email access for your own workspace, or open the curated demo to review realistic sessions and report output.
+                  <p className="text-sm leading-6 text-text-secondary">
+                Connect a wallet or enter a Safe to start the HashKey Chain RWA flow. Email access remains available as a secondary entry.
               </p>
             </div>
 
             <div className="mt-6 space-y-4">
+              <div className="rounded-[22px] border border-border-subtle bg-app-bg-elevated p-4">
+                <div className="flex items-start gap-3">
+                  <div className="mt-0.5 inline-flex size-10 items-center justify-center rounded-full bg-primary-soft text-primary">
+                    <Wallet className="size-5" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-semibold text-text-primary">Primary entry: wallet</p>
+                    <p className="mt-1 text-sm leading-6 text-text-secondary">
+                      Connect an EOA to read KYC / SBT, detect balances, and drive the execute flow from the same wallet context.
+                    </p>
+                  </div>
+                </div>
+                <Button
+                  className="mt-4 w-full"
+                  disabled={wallet.isWalletBusy || bootstrapQuery.isLoading}
+                  onClick={() => void handleWalletContinue()}
+                >
+                  {wallet.isConnected
+                    ? `Continue as ${wallet.walletLabel}`
+                    : wallet.isWalletBusy
+                      ? 'Connecting wallet...'
+                      : 'Connect wallet'}
+                  <ArrowRight className="size-4" />
+                </Button>
+              </div>
+
+              <div className="rounded-[22px] border border-border-subtle bg-app-bg-elevated p-4">
+                <div className="flex items-start gap-3">
+                  <div className="mt-0.5 inline-flex size-10 items-center justify-center rounded-full bg-primary-soft text-primary">
+                    <Building2 className="size-5" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-semibold text-text-primary">Primary entry: Safe</p>
+                    <p className="mt-1 text-sm leading-6 text-text-secondary">
+                      P0 uses address-based Safe entry for read + bundle generation. Proposal and multisig approval stay out of scope for this phase.
+                    </p>
+                  </div>
+                </div>
+                <div className="mt-4 flex gap-3">
+                  <Input
+                    aria-label="Safe address"
+                    placeholder="0x..."
+                    value={form.safeAddress}
+                    onChange={(event) =>
+                      setForm((current) => ({ ...current, safeAddress: event.target.value }))
+                    }
+                  />
+                  <Button variant="secondary" onClick={handleSafeContinue}>
+                    Use Safe
+                  </Button>
+                </div>
+              </div>
+
               <div className="space-y-2">
-                <label htmlFor="email" className="text-sm font-semibold text-text-primary">
-                  Work email
-                </label>
+                <div className="flex items-center gap-2">
+                  <Mail className="size-4 text-text-muted" />
+                  <label htmlFor="email" className="text-sm font-semibold text-text-primary">
+                    Secondary entry: work email
+                  </label>
+                </div>
                 <Input
                   id="email"
                   type="email"
@@ -211,7 +327,7 @@ export function LoginPage() {
                   }
                 />
                 <p className="text-xs text-text-muted">
-                  Access sessions remain browser-scoped in this release build. No password entry is shown unless the product supports it.
+                  Email access remains browser-scoped in this release build. Use it when wallet / Safe context is not required.
                 </p>
               </div>
 

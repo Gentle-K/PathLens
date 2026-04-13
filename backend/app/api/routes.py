@@ -17,11 +17,15 @@ from app.domain.schemas import (
     OracleSnapshotResponse,
     PersonalDataDeletionResponse,
     RecordAttestationRequest,
+    ReportAnchorRequest,
+    ReportAnchorResponse,
     RequestMoreFollowUpResponse,
     SessionCreateRequest,
     SessionResponse,
     SessionSummaryResponse,
     SessionStepResponse,
+    WalletPositionsResponse,
+    WalletSummaryResponse,
 )
 from app.i18n import normalize_locale
 from app.rwa.catalog import build_asset_library, build_chain_config
@@ -414,3 +418,110 @@ def check_kyc(
         network=network,
     )
     return KycCheckResponse(result=result)
+
+
+@router.get("/api/wallet/summary", response_model=WalletSummaryResponse)
+def get_wallet_summary(
+    address: str,
+    request: Request,
+    response: Response,
+    network: str = "",
+) -> WalletSummaryResponse:
+    services = get_app_services()
+    ensure_client_cookie(request, response)
+    settings = Settings.from_env()
+    chain_config = build_chain_config(settings)
+    locale = resolve_request_locale(request)
+    asset_library = build_asset_library(chain_config, locale=locale)
+    resolved_network, balances, kyc, safe_detected, synced_at = services.wallet_service.build_wallet_summary(
+        address=address,
+        chain_config=chain_config,
+        assets=asset_library,
+        network=network,
+    )
+    return WalletSummaryResponse(
+        address=address,
+        network=resolved_network,
+        balances=balances,
+        kyc=kyc,
+        safe_detected=safe_detected,
+        last_sync_at=synced_at.isoformat(),
+    )
+
+
+@router.get("/api/wallet/positions", response_model=WalletPositionsResponse)
+def get_wallet_positions(
+    address: str,
+    request: Request,
+    response: Response,
+    network: str = "",
+) -> WalletPositionsResponse:
+    services = get_app_services()
+    ensure_client_cookie(request, response)
+    settings = Settings.from_env()
+    chain_config = build_chain_config(settings)
+    locale = resolve_request_locale(request)
+    asset_library = build_asset_library(chain_config, locale=locale)
+    resolved_network, positions, synced_at = services.wallet_service.build_wallet_positions(
+        address=address,
+        chain_config=chain_config,
+        assets=asset_library,
+        network=network,
+    )
+    return WalletPositionsResponse(
+        address=address,
+        network=resolved_network,
+        positions=positions,
+        last_sync_at=synced_at.isoformat(),
+    )
+
+
+@router.post("/api/reports/{report_id}/anchor", response_model=ReportAnchorResponse)
+def anchor_report(
+    report_id: str,
+    payload: ReportAnchorRequest,
+    request: Request,
+    response: Response,
+) -> ReportAnchorResponse:
+    services = get_app_services()
+    client_id = ensure_client_cookie(request, response)
+    session = services.session_service.get_session(report_id)
+    if session is None or session.report is None:
+        raise HTTPException(status_code=404, detail="Report not found.")
+    assert_session_owner(SessionResponse.model_validate(session), client_id)
+
+    if session.report.attestation_draft is not None:
+        draft = session.report.attestation_draft
+        if not draft.evidence_hash:
+            draft.evidence_hash = services.execution_service.compute_evidence_hash(session)
+        if not draft.execution_plan_hash and session.execution_plan is not None:
+            draft.execution_plan_hash = session.execution_plan.plan_hash
+        services.session_service.repository.save(session)
+
+    if payload.transaction_hash:
+        updated = services.session_service.record_attestation(
+            report_id,
+            network=payload.network,
+            transaction_hash=payload.transaction_hash,
+            submitted_by=payload.submitted_by,
+            block_number=payload.block_number,
+        )
+        if updated is None or not updated.report_anchor_records:
+            raise HTTPException(status_code=400, detail="Unable to write back report anchor.")
+        return ReportAnchorResponse(record=updated.report_anchor_records[-1])
+
+    settings = Settings.from_env()
+    chain_config = build_chain_config(settings)
+    record = services.execution_service.build_report_anchor_record(
+        session=session,
+        chain_config=chain_config,
+        network=payload.network,
+        transaction_hash="",
+        submitted_by=payload.submitted_by,
+        block_number=None,
+        note=payload.note,
+    )
+    updated = services.session_service.record_report_anchor(report_id, record)
+    if updated is None:
+        raise HTTPException(status_code=400, detail="Unable to store report anchor draft.")
+    return ReportAnchorResponse(record=record)

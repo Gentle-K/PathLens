@@ -116,7 +116,7 @@ class OrchestratorStateMachineTests(unittest.TestCase):
         self.assertEqual("ask_user", step.next_action.value)
         self.assertIn("unanswered", step.prompt_to_user.lower())
 
-    def test_valid_full_lifecycle_reaches_completed(self):
+    def test_valid_full_lifecycle_reaches_ready_for_execution(self):
         services = build_test_services(analysis_adapter=DeterministicPlanningAdapter())
         session = services.session_service.create_session(
             mode=AnalysisMode.MULTI_OPTION,
@@ -138,9 +138,9 @@ class OrchestratorStateMachineTests(unittest.TestCase):
 
         self.assertEqual("ANALYZING", step2.status.value)
         self.assertEqual("READY_FOR_REPORT", step3.status.value)
-        self.assertEqual("COMPLETED", step4.status.value)
+        self.assertEqual("READY_FOR_EXECUTION", step4.status.value)
         self.assertIsNotNone(final_session.report)
-        self.assertEqual("completed", final_session.activity_status)
+        self.assertEqual("ready_for_execution", final_session.activity_status)
 
     def test_reporting_status_completes_on_next_advance(self):
         services = build_test_services(analysis_adapter=DeterministicPlanningAdapter())

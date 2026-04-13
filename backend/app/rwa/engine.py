@@ -32,6 +32,11 @@ from app.domain.rwa import (
     ExcludedAssetReason,
     HashKeyChainConfig,
     HoldingPeriodSimulation,
+    EligibilityDecision,
+    ExecutionLifecycleStatus,
+    ExecutionPlan,
+    ExecutionQuote,
+    ExecutionStep,
     KycOnchainResult,
     LiquidityNeed,
     LiveReadiness,
@@ -66,6 +71,7 @@ from app.rwa.demo import (
 )
 from app.rwa.evidence import build_evidence_governance, enrich_report_evidence
 from app.rwa.risk_model import allocation_reason, build_risk_profiles, methodology_references
+from app.services.eligibility import EligibilityService
 
 logger = logging.getLogger(__name__)
 
@@ -708,6 +714,21 @@ def build_catalog_evidence(
                 ),
                 extracted_facts=facts,
                 confidence=0.82,
+                contract_address=asset.contract_address,
+                chain_id=asset.chain_id,
+                oracle_provider=asset.oracle_provider,
+                proof_type=(
+                    "onchain_contract"
+                    if asset.onchain_verified and index == 1
+                    else ("issuer_disclosure" if asset.issuer_disclosed else "reference")
+                ),
+                last_verified_at=asset.last_oracle_timestamp or fetched_at or datetime.now(timezone.utc),
+                included_in_execution_plan=False,
+                report_section_keys=[
+                    "eligibility-summary",
+                    "asset-facts",
+                    "oracle-and-proof-sources",
+                ],
                 fact_type=(
                     asset.onchain_verified and index == 1
                     and EvidenceFactType.ONCHAIN_VERIFIED_FACT
@@ -752,6 +773,25 @@ def build_asset_cards(
                 custody=asset.custody,
                 chain_id=asset.chain_id,
                 contract_address=asset.contract_address,
+                protocol_name=asset.protocol_name,
+                permissioning_standard=asset.permissioning_standard,
+                required_kyc_level=asset.required_kyc_level,
+                eligible_investor_types=list(asset.eligible_investor_types),
+                restricted_jurisdictions=list(asset.restricted_jurisdictions),
+                min_subscription_amount=asset.min_subscription_amount,
+                redemption_window=asset.redemption_window,
+                settlement_asset=asset.settlement_asset,
+                oracle_provider=asset.oracle_provider,
+                oracle_contract=asset.oracle_contract,
+                last_oracle_timestamp=asset.last_oracle_timestamp,
+                nav_or_price=asset.nav_or_price,
+                indicative_yield=asset.indicative_yield,
+                reserve_summary=asset.reserve_summary,
+                custody_summary=asset.custody_summary,
+                bridge_support=list(asset.bridge_support),
+                proof_refs=list(asset.proof_refs),
+                secondary_market_available=asset.secondary_market_available,
+                risk_flags=list(asset.risk_flags),
                 expected_return_low=asset.expected_return_low,
                 expected_return_base=asset.expected_return_base,
                 expected_return_high=asset.expected_return_high,
@@ -2003,6 +2043,103 @@ def build_attestation_draft(
     )
 
 
+def _compute_evidence_hash(evidence: list[EvidenceItem]) -> str:
+    payload = [
+        {
+            "asset_id": item.asset_id,
+            "source_url": item.source_url,
+            "summary": item.summary,
+            "contract_address": item.contract_address,
+            "proof_type": item.proof_type,
+        }
+        for item in evidence
+    ]
+    return hashlib.sha256(
+        json.dumps(payload, sort_keys=True, ensure_ascii=False, default=str).encode("utf-8")
+    ).hexdigest()
+
+
+def _build_provisional_execution_plan(
+    *,
+    working_context: RwaIntakeContext,
+    tx_draft: TxDraft,
+    warnings: list[str],
+    eligibility: list[EligibilityDecision],
+    attestation_draft: AttestationDraft,
+) -> ExecutionPlan:
+    steps = [
+        ExecutionStep(
+            step_index=index,
+            title=step.title,
+            description=step.description,
+            step_type=step.action_type,
+            route_kind="erc20" if tx_draft.can_execute_onchain else "issuer_portal",
+            target_contract=step.target_contract,
+            explorer_url=step.explorer_url,
+            chain_id=tx_draft.chain_id,
+            estimated_fee_usd=step.estimated_fee_usd,
+            warnings=[step.caution] if step.caution else [],
+            status="planned",
+        )
+        for index, step in enumerate(tx_draft.steps, start=1)
+    ]
+    blocked = [
+        reason
+        for decision in eligibility
+        if decision.status == decision.status.BLOCKED
+        for reason in (decision.reasons + decision.missing_requirements)
+    ]
+    if attestation_draft.contract_address:
+        steps.append(
+            ExecutionStep(
+                step_index=len(steps) + 1,
+                title="Anchor report onchain",
+                description="Write the report and execution plan integrity hashes into the Plan Registry flow.",
+                step_type="attestation",
+                route_kind="erc20",
+                target_contract=attestation_draft.contract_address,
+                explorer_url=attestation_draft.explorer_url,
+                chain_id=attestation_draft.chain_id,
+                estimated_fee_usd=1.1,
+                warnings=["Attestation confirms integrity and provenance, not settlement finality."],
+                status="planned",
+            )
+        )
+
+    plan = ExecutionPlan(
+        wallet_address=working_context.wallet_address,
+        safe_address=working_context.safe_address,
+        source_chain=working_context.source_chain or working_context.wallet_network or "hashkey",
+        source_asset=working_context.source_asset or working_context.base_currency,
+        target_asset=next((decision.asset_id for decision in eligibility if decision.status != decision.status.BLOCKED), ""),
+        ticket_size=working_context.ticket_size or working_context.investment_amount,
+        status=ExecutionLifecycleStatus.READY if blocked else ExecutionLifecycleStatus.BUNDLE_READY,
+        quote=ExecutionQuote(
+            source_asset=working_context.source_asset or working_context.base_currency,
+            target_asset=next((decision.asset_id for decision in eligibility if decision.status != decision.status.BLOCKED), ""),
+            amount_in=working_context.ticket_size or working_context.investment_amount,
+            expected_amount_out=working_context.ticket_size or working_context.investment_amount,
+            fee_amount=round(tx_draft.total_estimated_fee_usd, 6),
+            fee_bps=0,
+            gas_estimate=0,
+            gas_estimate_usd=round(tx_draft.total_estimated_fee_usd, 6),
+            eta_seconds=90,
+            route_type="erc20" if tx_draft.can_execute_onchain else "issuer_portal",
+            warnings=list(tx_draft.risk_warnings),
+        ),
+        warnings=list(warnings),
+        simulation_warnings=list(tx_draft.risk_warnings),
+        compliance_blockers=blocked,
+        steps=steps,
+        eligibility=eligibility,
+        can_execute_onchain=tx_draft.can_execute_onchain,
+    )
+    plan.plan_hash = hashlib.sha256(
+        json.dumps(plan.model_dump(mode="json"), sort_keys=True, ensure_ascii=False).encode("utf-8")
+    ).hexdigest()
+    return plan
+
+
 def _recommendation_lines(
     context: RwaIntakeContext,
     allocations: list[PortfolioAllocation],
@@ -2235,6 +2372,29 @@ def build_rwa_report(
         selected_assets,
         reference_time=evidence_reference_time,
     )
+    eligibility_service = EligibilityService()
+    eligibility_summary = [
+        eligibility_service.evaluate_asset(
+            asset,
+            kyc_snapshot=kyc_snapshot,
+            kyc_level=working_context.kyc_level or working_context.minimum_kyc_level,
+            investor_type=working_context.investor_type,
+            jurisdiction=working_context.jurisdiction,
+            ticket_size=working_context.ticket_size or working_context.investment_amount,
+            source_asset=working_context.source_asset or working_context.base_currency,
+            source_chain=working_context.source_chain or working_context.wallet_network,
+        )
+        for asset in selected_assets
+    ]
+    execution_asset_ids = {
+        decision.asset_id
+        for decision in eligibility_summary
+        if decision.status != decision.status.BLOCKED
+    }
+    for item in evidence:
+        item.included_in_execution_plan = item.asset_id in execution_asset_ids
+        if item.included_in_execution_plan:
+            item.execution_step_ids = ["provisional-execution"]
     option_profiles = build_option_profiles(asset_cards, simulations, locale=locale)
     tables = build_comparison_tables(asset_cards, simulations, locale=locale)
     comparison_matrix = build_comparison_matrix(
@@ -2441,7 +2601,17 @@ def build_rwa_report(
         evidence_governance=evidence_governance,
         methodology_references=methodology_references(),
         tx_draft=tx_draft,
+        eligibility_summary=eligibility_summary,
     )
     report.attestation_draft = build_attestation_draft(markdown, allocations, chain_config)
+    report.attestation_draft.evidence_hash = _compute_evidence_hash(evidence)
+    report.execution_plan = _build_provisional_execution_plan(
+        working_context=working_context,
+        tx_draft=tx_draft,
+        warnings=warnings,
+        eligibility=eligibility_summary,
+        attestation_draft=report.attestation_draft,
+    )
+    report.attestation_draft.execution_plan_hash = report.execution_plan.plan_hash
 
     return report, evidence
