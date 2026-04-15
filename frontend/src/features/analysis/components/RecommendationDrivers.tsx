@@ -2,17 +2,13 @@ import { useTranslation } from 'react-i18next'
 
 import { Badge } from '@/components/ui/badge'
 import { Card } from '@/components/ui/card'
-import type { LanguageCode, RecommendationReason } from '@/types'
+import type { RecommendationReason } from '@/types'
 
 interface RecommendationDriversProps {
   reason?: RecommendationReason
-  locale?: LanguageCode
 }
 
-export function RecommendationDrivers({
-  reason,
-  locale: _locale = 'en',
-}: RecommendationDriversProps) {
+export function RecommendationDrivers({ reason }: RecommendationDriversProps) {
   const { t } = useTranslation()
 
   if (!reason) {

@@ -1,4 +1,4 @@
-import { Children, useEffect, useState, type InputHTMLAttributes, type ReactNode } from 'react'
+import { Children, useState, type InputHTMLAttributes, type ReactNode } from 'react'
 import { Dialog, DialogBackdrop, DialogPanel } from '@headlessui/react'
 import { useTranslation } from 'react-i18next'
 import {
@@ -668,8 +668,22 @@ export function SessionRow({
   return (
     <div
       className="grid cursor-pointer gap-4 rounded-[24px] border border-border-subtle bg-panel px-4 py-4 transition hover:border-border-strong hover:bg-panel-strong xl:grid-cols-[2.4fr_1fr_1fr_1fr_1.8fr_1.3fr_0.8fr_0.8fr_auto]"
-      onClick={onOpen}
+      onClick={(event) => {
+        if (
+          event.target instanceof HTMLElement &&
+          event.target.closest('[data-session-row-action="true"]')
+        ) {
+          return
+        }
+        onOpen?.()
+      }}
       onKeyDown={(event) => {
+        if (
+          event.target instanceof HTMLElement &&
+          event.target.closest('[data-session-row-action="true"]')
+        ) {
+          return
+        }
         if (event.key === 'Enter' || event.key === ' ') {
           event.preventDefault()
           onOpen?.()
@@ -693,7 +707,7 @@ export function SessionRow({
       </div>
       <div className="text-sm text-text-secondary">{evidenceCount}</div>
       <div className="text-sm text-text-secondary">{calculationCount ?? session.calculations.length}</div>
-      <div className="flex flex-wrap items-center justify-start gap-2" onClick={(event) => event.stopPropagation()}>
+      <div className="flex flex-wrap items-center justify-start gap-2" data-session-row-action="true">
         {actions}
       </div>
     </div>
@@ -715,15 +729,13 @@ export function ClarificationQuestionCard({
   const currentSliderValue = Number(value.selectedOptions[0] ?? question.recommended?.[0] ?? question.min ?? 5)
   const meta = clarificationStateMeta(value, t)
   const summary = clarificationSummary(question, value)
-  const [expanded, setExpanded] = useState(value.answerStatus !== 'answered' || !summary)
-
-  useEffect(() => {
-    if (value.answerStatus === 'answered' && summary) {
-      setExpanded(false)
-      return
-    }
-    setExpanded(true)
-  }, [summary, value.answerStatus])
+  const [expandMode, setExpandMode] = useState<'auto' | 'expanded' | 'collapsed'>('auto')
+  const expanded =
+    expandMode === 'expanded'
+      ? true
+      : expandMode === 'collapsed'
+        ? false
+        : value.answerStatus !== 'answered' || !summary
 
   const updateSelectedOption = (nextValue: string) => {
     if (question.fieldType === 'multi-choice') {
@@ -760,7 +772,17 @@ export function ClarificationQuestionCard({
           </div>
         </div>
         {summary ? (
-          <Button variant="ghost" size="sm" onClick={() => setExpanded((current) => !current)}>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() =>
+              setExpandMode((current) =>
+                current === 'expanded' || (current === 'auto' && expanded)
+                  ? 'collapsed'
+                  : 'expanded',
+              )
+            }
+          >
             {expanded ? t('analysis.decisionUi.clarificationCard.hide') : t('analysis.decisionUi.clarificationCard.edit')}
             <ChevronRight className={cn('size-4 transition', expanded ? 'rotate-90' : '')} />
           </Button>

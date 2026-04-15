@@ -3,17 +3,13 @@ import { useTranslation } from 'react-i18next'
 
 import { Badge } from '@/components/ui/badge'
 import { Card } from '@/components/ui/card'
-import type { ActionIntent, LanguageCode } from '@/types'
+import type { ActionIntent } from '@/types'
 
 interface NextStepPanelProps {
   intents?: ActionIntent[]
-  locale?: LanguageCode
 }
 
-export function NextStepPanel({
-  intents = [],
-  locale: _locale = 'en',
-}: NextStepPanelProps) {
+export function NextStepPanel({ intents = [] }: NextStepPanelProps) {
   const { t } = useTranslation()
 
   if (!intents.length) {
@@ -63,7 +59,7 @@ export function NextStepPanel({
             {intent.checklist.length ? (
               <ul className="mt-3 space-y-2 text-sm leading-7 text-text-secondary">
                 {intent.checklist.map((item) => (
-                  <li key={`${intent.assetId}-${item}`}>• {item}</li>
+                  <li key={`${intent.assetId}-${item}`}>- {item}</li>
                 ))}
               </ul>
             ) : null}

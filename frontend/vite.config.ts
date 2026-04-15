@@ -1,9 +1,10 @@
 import path from 'node:path'
+import { ServerResponse } from 'node:http'
 import { fileURLToPath } from 'node:url'
 
 import tailwindcss from '@tailwindcss/vite'
 import tsconfigPaths from 'vite-tsconfig-paths'
-import { defineConfig, loadEnv } from 'vite'
+import { defineConfig, loadEnv, type ProxyOptions } from 'vite'
 import react from '@vitejs/plugin-react'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
@@ -126,39 +127,25 @@ function manualChunkFor(id: string) {
   }
 }
 
-type ProxyErrorListener = (...args: any[]) => void
-
-function configureApiProxy(proxy: {
-  listeners(event: 'error'): ProxyErrorListener[]
-  removeAllListeners(event: 'error'): void
-  on(event: 'error', listener: ProxyErrorListener): void
-}) {
+const configureApiProxy: NonNullable<ProxyOptions['configure']> = (proxy) => {
   const defaultErrorListeners = proxy.listeners('error')
 
   proxy.removeAllListeners('error')
-  proxy.on('error', (...args: any[]) => {
-    const [error, req, res] = args as [
-      NodeJS.ErrnoException,
-      { url?: string },
-      {
-        headersSent?: boolean
-        writableEnded?: boolean
-        writeHead?: (statusCode: number, headers?: Record<string, string>) => void
-        end?: (chunk?: string) => void
-      } | undefined,
-    ]
+  proxy.on('error', (...args) => {
+    const [error, req, res] = args
+    const errorCode = 'code' in error ? error.code : undefined
 
     const isLogoutRequest = req?.url?.startsWith('/api/auth/logout')
     const isTransportFailure =
-      error?.code === 'ECONNRESET' ||
-      error?.code === 'ECONNREFUSED' ||
+      errorCode === 'ECONNRESET' ||
+      errorCode === 'ECONNREFUSED' ||
       error?.message?.toLowerCase().includes('socket hang up') ||
       error?.message?.toLowerCase().includes('fetch failed')
 
     if (isLogoutRequest && isTransportFailure) {
-      if (res && !res.headersSent && !res.writableEnded) {
-        res.writeHead?.(204, { 'Content-Type': 'application/json' })
-        res.end?.()
+      if (res instanceof ServerResponse && !res.headersSent && !res.writableEnded) {
+        res.writeHead(204, { 'Content-Type': 'application/json' })
+        res.end()
       }
       return
     }

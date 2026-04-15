@@ -278,7 +278,7 @@ class OrchestratorMcpPipelineTests(unittest.TestCase):
         self.assertEqual(1, len(saved_after_mcp.chart_artifacts))
 
         step4 = orchestrator.advance_session(session.session_id)
-        self.assertEqual("COMPLETED", step4.status.value)
+        self.assertEqual("READY_FOR_EXECUTION", step4.status.value)
         saved_final = session_service.get_session(session.session_id)
         self.assertIsNotNone(saved_final)
         self.assertIsNotNone(saved_final.report)

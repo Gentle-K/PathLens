@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Monitor, MoonStar, ShieldCheck, SunMedium, Wallet } from 'lucide-react'
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 
@@ -87,12 +87,24 @@ export function SettingsPage() {
   const themeMode = useAppStore((state) => state.themeMode)
   const walletAddress = useAppStore((state) => state.walletAddress)
   const locale = useAppStore((state) => state.locale)
-  const [riskDefault, setRiskDefault] = useState('balanced')
-  const [dataRetention, setDataRetention] = useState('90')
-  const [preferredCurrency, setPreferredCurrency] = useState('USD')
-  const [preferredNetwork, setPreferredNetwork] = useState('hashkey')
-  const [chartUnit, setChartUnit] = useState('native')
-  const [exportPreference, setExportPreference] = useState('manual')
+  const [riskDefault, setRiskDefault] = useState(() =>
+    normalizeStoredValue(getLocalStorageItem(RISK_KEY), 'balanced', legacyRiskMap),
+  )
+  const [dataRetention, setDataRetention] = useState(() =>
+    normalizeStoredValue(getLocalStorageItem(RETENTION_KEY), '90', legacyRetentionMap),
+  )
+  const [preferredCurrency, setPreferredCurrency] = useState(() =>
+    normalizeStoredValue(getLocalStorageItem(CURRENCY_KEY), 'USD'),
+  )
+  const [preferredNetwork, setPreferredNetwork] = useState(() =>
+    normalizeStoredValue(getLocalStorageItem(NETWORK_KEY), 'hashkey', legacyNetworkMap),
+  )
+  const [chartUnit, setChartUnit] = useState(() =>
+    normalizeStoredValue(getLocalStorageItem(CHART_UNIT_KEY), 'native', legacyChartUnitMap),
+  )
+  const [exportPreference, setExportPreference] = useState(() =>
+    normalizeStoredValue(getLocalStorageItem(EXPORT_KEY), 'manual', legacyExportMap),
+  )
   const hydratedFromServerRef = useRef(false)
 
   const settingsQuery = useQuery({
@@ -103,15 +115,6 @@ export function SettingsPage() {
     queryKey: ['profile'],
     queryFn: adapter.profile.get,
   })
-
-  useEffect(() => {
-    setRiskDefault(normalizeStoredValue(getLocalStorageItem(RISK_KEY), 'balanced', legacyRiskMap))
-    setDataRetention(normalizeStoredValue(getLocalStorageItem(RETENTION_KEY), '90', legacyRetentionMap))
-    setPreferredCurrency(normalizeStoredValue(getLocalStorageItem(CURRENCY_KEY), 'USD'))
-    setPreferredNetwork(normalizeStoredValue(getLocalStorageItem(NETWORK_KEY), 'hashkey', legacyNetworkMap))
-    setChartUnit(normalizeStoredValue(getLocalStorageItem(CHART_UNIT_KEY), 'native', legacyChartUnitMap))
-    setExportPreference(normalizeStoredValue(getLocalStorageItem(EXPORT_KEY), 'manual', legacyExportMap))
-  }, [])
 
   const saveLocalPreferences = (
     nextRisk = riskDefault,

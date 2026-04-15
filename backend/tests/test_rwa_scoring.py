@@ -191,7 +191,10 @@ class BuildReportTests(unittest.TestCase):
         self.assertGreater(len(report.recommendations), 0)
         self.assertGreater(len(report.markdown), 0)
         self.assertIsNotNone(report.attestation_draft)
-        self.assertIn("/address/", report.attestation_draft.explorer_url or "")
+        if report.attestation_draft.ready:
+            self.assertIn("/address/", report.attestation_draft.explorer_url or "")
+        else:
+            self.assertEqual("", report.attestation_draft.explorer_url)
         self.assertEqual("testnet", report.market_snapshots[0].network if report.market_snapshots else "testnet")
         self.assertGreater(len(evidence), 0)
         self.assertGreater(len(report.methodology_references), 0)

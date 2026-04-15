@@ -53,7 +53,30 @@ Use this order during a review:
 1. Open `/assets/{assetId}/proof` and show the latest proof, timeline, source refs, and anchor state.
 2. Open `/sessions/{sessionId}/execute` and show the adapter split, checklist, submit payload, and receipt status.
 3. Open `/portfolio/{address}` and show alert severity ordering, ack/read state, and redemption / yield monitoring.
-4. Finish with the public proof-layer docs in [docs/api/rwa-proof-layer.md](/Users/kk./Desktop/Gay/docs/api/rwa-proof-layer.md) and the embed example in [proof-card-embed.html](/Users/kk./Desktop/Gay/docs/api/proof-card-embed.html).
+4. Finish with the public proof-layer docs in [docs/api/rwa-proof-layer.md](docs/api/rwa-proof-layer.md) and the embed example in [proof-card-embed.html](docs/api/proof-card-embed.html).
+
+## Competition demo runbook
+
+Official demo mode for reviews and judging:
+
+- frontend: `VITE_API_MODE=mock`
+- backend: `ANALYSIS_ADAPTER=mock`
+- goal: every visible route renders successfully with deterministic seeded data
+
+Recommended startup order:
+
+1. Start the backend from [backend/README.md](backend/README.md).
+2. Start the frontend from [frontend/README.md](frontend/README.md).
+3. Open `/login`, enter the demo workspace, and create a session from `/new-analysis`.
+4. Walk the product shell in this order: `/assets` -> `/sessions` -> `/reports` -> `/portfolio` -> `/evidence` -> `/calculations` -> `/settings`.
+5. Use the debug shell for operator views: `/debug/login`, `/debug/logs`, `/debug/sessions`, `/debug/admin/roles`, `/debug/rwa-ops`.
+
+REST-backed proof path for the real backend loop:
+
+1. Switch the frontend to `VITE_API_MODE=rest`.
+2. Create a new session and let it reach `READY_FOR_EXECUTION`.
+3. Open `/sessions/{sessionId}/execute` and confirm `prepare -> receipt -> anchor -> portfolio` is populated from live backend data.
+4. Use `npm run test:smoke` as the release gate for this backend-backed flow.
 
 ## Repository layout
 
@@ -115,7 +138,7 @@ Most important variables:
 - `ASSET_PROOF_REGISTRY_DEPLOYER_PRIVATE_KEY`
 - `ASSET_PROOF_REGISTRY_INITIAL_ATTESTER`
 
-If the plan registry address is blank, the app still produces a deterministic attestation draft but disables the live on-chain write.
+If the plan registry address is blank, the app still produces a deterministic attestation draft, keeps `ready=false`, and omits explorer links until a live contract is configured.
 If the asset proof registry address is blank, proof pages still render deterministic snapshots, but they cannot point to a deployed registry address for later anchoring.
 
 ## Debug ops and indexer
@@ -303,30 +326,25 @@ The result page should show:
 
 ## Tests and verification
 
-Cross-platform entrypoints:
-
-- `python scripts/test_smoke.py`
-- `python scripts/test_full.py`
-- `powershell -ExecutionPolicy Bypass -File scripts/test_smoke.ps1`
-- `powershell -ExecutionPolicy Bypass -File scripts/test_full.ps1`
-- `./scripts/test_smoke.sh`
-- `./scripts/test_full.sh`
-
-Direct commands:
+Release gate commands:
 
 ```bash
-cd backend
-.venv/bin/python3.13 -m pytest tests/integration/test_debug_rwa_ops.py tests/contract/test_rwa_api_contracts.py
-
-cd ../frontend
-npm run lint
-npm run test:unit
-npm run test:contracts
-npm run build
-npm run test:e2e
+node scripts/run_python.mjs scripts/run_backend_tests.py all
+npm run test:smoke
+npm --prefix frontend run lint
+npm --prefix frontend run build
+npm --prefix frontend run test:unit
+npm --prefix frontend run test:e2e
 ```
 
-`npm run test:contracts` uses an in-memory repo-local EVM harness built on `@ethereumjs/vm`, so it does not require Ganache, Hardhat, or Foundry.
+Root convenience commands:
+
+- `npm run test:backend`
+- `npm run test:integration`
+- `npm run test:smoke`
+- `npm run test:e2e`
+
+`frontend/package.json` also keeps `npm run test:contracts` for the repo-local EVM harness built on `@ethereumjs/vm`, but it is not part of the minimum competition release gate.
 
 Training helpers:
 
@@ -339,16 +357,22 @@ python training/scripts/evaluate_predictions.py training/eval/gold_eval_cases.js
 
 ## Verified in this repository
 
-The current codebase was verified with:
+Validated in this repository on `2026-04-15`:
 
-- `.venv/bin/python3.13 -m pytest tests/integration/test_debug_rwa_ops.py tests/contract/test_rwa_api_contracts.py` in `backend/`
-- `npm run lint` in `frontend/`
-- `npm run test:unit` in `frontend/`
-- `npm run test:contracts` in `frontend/`
-- `npm run build` in `frontend/`
-- `npm run test:e2e` in `frontend/`
-- `python scripts/test_smoke.py`
-- `python scripts/test_full.py`
+- `node scripts/run_python.mjs scripts/run_backend_tests.py all`
+- `npm run test:backend`
+- `npm run test:smoke`
+- `npm --prefix frontend run lint`
+- `npm --prefix frontend run build`
+- `npm --prefix frontend run test:unit`
+- `npm --prefix frontend run test:e2e`
+
+Observed results:
+
+- backend: `148 passed, 0 failed, 0 errors`
+- frontend unit: `57 passed, 0 failed`
+- frontend e2e: `11 passed, 0 failed`
+- smoke flow: session completed the lifecycle `CLARIFYING -> ANALYZING -> READY_FOR_REPORT -> READY_FOR_EXECUTION`
 
 ## Notes
 

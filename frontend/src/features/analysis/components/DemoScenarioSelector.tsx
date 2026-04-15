@@ -1,19 +1,17 @@
 import { Badge } from '@/components/ui/badge'
 import { Card } from '@/components/ui/card'
 import { useTranslation } from 'react-i18next'
-import type { DemoScenarioDefinition, LanguageCode } from '@/types'
+import type { DemoScenarioDefinition } from '@/types'
 
 interface DemoScenarioSelectorProps {
   scenarios?: DemoScenarioDefinition[]
   selectedScenarioId?: string
-  locale?: LanguageCode
   onSelect: (scenario: DemoScenarioDefinition | null) => void
 }
 
 export function DemoScenarioSelector({
   scenarios = [],
   selectedScenarioId = '',
-  locale: _locale = 'en',
   onSelect,
 }: DemoScenarioSelectorProps) {
   const { t } = useTranslation()

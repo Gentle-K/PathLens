@@ -199,7 +199,7 @@ const proof = await client.getAssetProof('hsk-usdt', { network: 'testnet' })
 
 ## Proof Card Embed
 
-See [proof-card-embed.html](/Users/kk./Desktop/Gay/docs/api/proof-card-embed.html).
+See [proof-card-embed.html](proof-card-embed.html).
 
 ## Debug Ops
 

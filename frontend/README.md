@@ -121,6 +121,12 @@ The UI never owns orchestration logic. It talks to a typed adapter interface:
 
 This keeps the front-end stable while the real backend evolves.
 
+Official competition demo mode:
+
+- default to `VITE_API_MODE=mock` for full-route product demos
+- keep `VITE_API_MODE=rest` for the backend-backed execution proof path only
+- the route smoke suite covers login, creation, analysis, reports, execution, portfolio, evidence, calculations, settings, and debug surfaces
+
 ## Charts and design system
 
 - All colors come from CSS variables and Tailwind v4 inline theme tokens.
@@ -150,5 +156,6 @@ GitHub Actions runs:
 ## Notes
 
 - The repository root now contains both `backend/` and `frontend/`.
-- The local backend smoke test was verified with a full session lifecycle: `CLARIFYING -> ANALYZING -> READY_FOR_REPORT -> COMPLETED`.
-- `npm run build` can trip a Windows `uv` assertion when invoked through `npm`; `node node_modules/vite/bin/vite.js build` completes cleanly in this environment.
+- The local backend smoke test is verified against the lifecycle `CLARIFYING -> ANALYZING -> READY_FOR_REPORT -> READY_FOR_EXECUTION`.
+- `npm run build` passes in the current Windows validation path.
+- `npm run lint`, `npm run test:unit`, and `npm run test:e2e` are part of the release gate for this repository.

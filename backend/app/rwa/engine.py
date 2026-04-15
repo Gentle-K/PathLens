@@ -2045,7 +2045,7 @@ def build_attestation_draft(
         explorer_url=(
             address_url(chain_config, network, contract_address)
             if contract_address
-            else explorer_url
+            else ""
         ),
         ready=bool(contract_address),
     )

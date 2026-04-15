@@ -3,11 +3,10 @@ import { useTranslation } from 'react-i18next'
 
 import { Badge } from '@/components/ui/badge'
 import { Card } from '@/components/ui/card'
-import type { ComparisonMatrix as ComparisonMatrixData, LanguageCode } from '@/types'
+import type { ComparisonMatrix as ComparisonMatrixData } from '@/types'
 
 interface ComparisonMatrixProps {
   matrix?: ComparisonMatrixData
-  locale?: LanguageCode
 }
 
 function badgeTone(tone: string) {
@@ -25,10 +24,7 @@ function badgeTone(tone: string) {
   }
 }
 
-export function ComparisonMatrix({
-  matrix,
-  locale: _locale = 'en',
-}: ComparisonMatrixProps) {
+export function ComparisonMatrix({ matrix }: ComparisonMatrixProps) {
   const { t } = useTranslation()
 
   if (!matrix?.rows?.length || !matrix.metrics.length) {

@@ -2,20 +2,17 @@ import { useTranslation } from 'react-i18next'
 
 import { Badge } from '@/components/ui/badge'
 import { Card } from '@/components/ui/card'
-import type { LanguageCode } from '@/types'
 
 interface AssumptionsAndUnknownsPanelProps {
   assumptions?: string[]
   unknowns?: string[]
   warnings?: string[]
-  locale?: LanguageCode
 }
 
 export function AssumptionsAndUnknownsPanel({
   assumptions = [],
   unknowns = [],
   warnings = [],
-  locale: _locale = 'en',
 }: AssumptionsAndUnknownsPanelProps) {
   const { t } = useTranslation()
 

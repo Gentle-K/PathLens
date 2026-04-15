@@ -30,7 +30,7 @@ import { useAppStore } from '@/lib/store/app-store'
 import { formatDateTime as formatDateTimeValue, formatMoney } from '@/lib/utils/format'
 import { shortAddress } from '@/lib/web3/hashkey'
 import { useHashKeyWallet } from '@/lib/web3/use-hashkey-wallet'
-import type { ExecutionAdapterKind, ExecutionReceipt, LanguageCode } from '@/types'
+import type { ExecutionAdapterKind, ExecutionPlan, ExecutionReceipt, LanguageCode } from '@/types'
 
 function formatUsd(value: number | undefined, locale: LanguageCode) {
   return formatMoney(value, 'USD', locale, {
@@ -252,13 +252,52 @@ export function ExecutionPage() {
     },
   })
 
-  const currentPlan = prepareQuery.data?.executionPlan ?? storedPlan
+  const readiness = readinessQuery.data
+  const fallbackPlan: ExecutionPlan | undefined =
+    !storedPlan &&
+    !prepareQuery.data?.executionPlan &&
+    readiness &&
+    targetAsset &&
+    ticketSize > 0
+      ? {
+          id: `${sessionId}-derived-plan`,
+          sessionId,
+          generatedAt: session?.updatedAt ?? new Date().toISOString(),
+          walletAddress: trackedWalletAddress,
+          safeAddress: session?.safeAddress || session?.intakeContext.safeAddress || '',
+          sourceChain,
+          sourceAsset,
+          targetAsset,
+          executionAdapterKind: readiness.executionAdapterKind,
+          executionReadiness: readiness.executionReadiness,
+          readinessReason: readiness.routeSummary,
+          externalActionUrl:
+            readiness.asset.actionLinks?.[0]?.url ?? readiness.asset.primarySourceUrl ?? '',
+          externalActionLabel: readiness.asset.actionLinks?.[0]?.label ?? '',
+          ticketSize,
+          status: 'prepared',
+          quote: readiness.quote,
+          warnings: readiness.warnings,
+          simulationWarnings: readiness.warnings,
+          possibleFailureReasons: readiness.possibleFailureReasons,
+          complianceBlockers: readiness.complianceBlockers,
+          requiredApprovals: readiness.requiredApprovals,
+          checklist: readiness.asset.executionNotes?.length
+            ? readiness.asset.executionNotes
+            : [readiness.routeSummary],
+          externalSteps: [],
+          steps: [],
+          txBundle: [],
+          eligibility: [readiness.decision],
+          canExecuteOnchain: readiness.executionAdapterKind !== 'view_only',
+        }
+      : undefined
+  const currentPlan = prepareQuery.data?.executionPlan ?? storedPlan ?? fallbackPlan
   const currentReceipt =
     submitMutation.data?.receipt ??
     prepareQuery.data?.executionReceipt ??
     receiptsQuery.data?.[0]
   const receiptList = receiptsQuery.data ?? []
-  const readiness = readinessQuery.data
   const adapterDescriptor = adapterCopy(t, currentPlan?.executionAdapterKind)
 
   if (sessionQuery.isLoading || reportQuery.isLoading || (prepareQuery.isLoading && !currentPlan)) {

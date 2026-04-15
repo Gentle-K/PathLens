@@ -171,7 +171,7 @@ class AdapterResilienceTests(unittest.TestCase):
 
         self.assertEqual("ANALYZING", step1.status.value)
         self.assertEqual("READY_FOR_REPORT", step2.status.value)
-        self.assertEqual("COMPLETED", step3.status.value)
+        self.assertEqual("READY_FOR_EXECUTION", step3.status.value)
         self.assertEqual("failed", persisted.calculation_tasks[0].status)
         self.assertIsNotNone(persisted.report)
 
@@ -189,7 +189,7 @@ class AdapterResilienceTests(unittest.TestCase):
 
         self.assertEqual("ANALYZING", step1.status.value)
         self.assertEqual("READY_FOR_REPORT", step2.status.value)
-        self.assertEqual("COMPLETED", step3.status.value)
+        self.assertEqual("READY_FOR_EXECUTION", step3.status.value)
         self.assertEqual("failed", persisted.chart_tasks[0].status)
         self.assertTrue(persisted.report.markdown)
 
@@ -239,10 +239,10 @@ class AdapterResilienceTests(unittest.TestCase):
 
         for _ in range(6):
             step = services.orchestrator.advance_session(session.session_id)
-            if step.status.value == "COMPLETED":
+            if step.status.value == "READY_FOR_EXECUTION":
                 break
 
         persisted = services.session_service.get_session(session.session_id)
-        self.assertEqual("COMPLETED", persisted.status.value)
+        self.assertEqual("READY_FOR_EXECUTION", persisted.status.value)
         self.assertIsNotNone(persisted.report)
         self.assertNotEqual("", persisted.report.summary)

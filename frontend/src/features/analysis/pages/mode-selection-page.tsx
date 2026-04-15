@@ -5,7 +5,7 @@ import {
   Sparkles,
   Wallet,
 } from 'lucide-react'
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 
@@ -44,6 +44,34 @@ import type { AnalysisMode, CreateSessionPayload, RwaIntakeContext } from '@/typ
 
 const DRAFT_KEY = 'ga-new-analysis-draft'
 
+type ModeSelectionDraft = {
+  mode: AnalysisMode
+  problem: string
+  safeAddress: string
+  budgetRange: string
+  timeHorizon: string
+  riskPreference: 'conservative' | 'balanced' | 'aggressive'
+  settlementCurrency: string
+  targetChain: 'hashkey' | 'evm' | 'general'
+  accessConstraints: string
+  mustHaveGoals: string
+  mustAvoidOutcomes: string
+}
+
+const DEFAULT_DRAFT: ModeSelectionDraft = {
+  mode: 'single-asset-allocation',
+  problem: '',
+  safeAddress: '',
+  budgetRange: '',
+  timeHorizon: '',
+  riskPreference: 'balanced',
+  settlementCurrency: 'USD',
+  targetChain: 'hashkey',
+  accessConstraints: '',
+  mustHaveGoals: '',
+  mustAvoidOutcomes: '',
+}
+
 function parseBudgetToAmount(value: string) {
   const match = value.match(/(\d+(?:\.\d+)?)/)
   if (!match) {
@@ -62,6 +90,23 @@ function modeCardClass(active: boolean) {
   )
 }
 
+function loadStoredDraft(): ModeSelectionDraft {
+  const raw = getLocalStorageItem(DRAFT_KEY)
+  if (!raw) {
+    return { ...DEFAULT_DRAFT }
+  }
+
+  try {
+    return {
+      ...DEFAULT_DRAFT,
+      ...(JSON.parse(raw) as Partial<ModeSelectionDraft>),
+    }
+  } catch {
+    removeLocalStorageItem(DRAFT_KEY)
+    return { ...DEFAULT_DRAFT }
+  }
+}
+
 export function ModeSelectionPage() {
   const { t } = useTranslation()
   const adapter = useApiAdapter()
@@ -73,84 +118,31 @@ export function ModeSelectionPage() {
   })
   const wallet = useHashKeyWallet(bootstrapQuery.data?.chainConfig)
 
-  const [mode, setMode] = useState<AnalysisMode>('single-asset-allocation')
-  const [problem, setProblem] = useState('')
-  const [safeAddress, setSafeAddress] = useState('')
-  const [budgetRange, setBudgetRange] = useState('')
-  const [timeHorizon, setTimeHorizon] = useState('')
-  const [riskPreference, setRiskPreference] = useState<'conservative' | 'balanced' | 'aggressive'>('balanced')
-  const [settlementCurrency, setSettlementCurrency] = useState('USD')
-  const [targetChain, setTargetChain] = useState<'hashkey' | 'evm' | 'general'>('hashkey')
-  const [accessConstraints, setAccessConstraints] = useState('')
-  const [mustHaveGoals, setMustHaveGoals] = useState('')
-  const [mustAvoidOutcomes, setMustAvoidOutcomes] = useState('')
+  const [draft, setDraft] = useState<ModeSelectionDraft>(() => loadStoredDraft())
   const [lastSavedAt, setLastSavedAt] = useState('')
-
-  useEffect(() => {
-    const raw = getLocalStorageItem(DRAFT_KEY)
-    if (!raw) return
-
-    try {
-      const parsed = JSON.parse(raw) as {
-        mode: AnalysisMode
-        problem: string
-        safeAddress: string
-        budgetRange: string
-        timeHorizon: string
-        riskPreference: 'conservative' | 'balanced' | 'aggressive'
-        settlementCurrency: string
-        targetChain: 'hashkey' | 'evm' | 'general'
-        accessConstraints: string
-        mustHaveGoals: string
-        mustAvoidOutcomes: string
-      }
-      setMode(parsed.mode ?? 'single-asset-allocation')
-      setProblem(parsed.problem ?? '')
-      setSafeAddress(parsed.safeAddress ?? '')
-      setBudgetRange(parsed.budgetRange ?? '')
-      setTimeHorizon(parsed.timeHorizon ?? '')
-      setRiskPreference(parsed.riskPreference ?? 'balanced')
-      setSettlementCurrency(parsed.settlementCurrency ?? 'USD')
-      setTargetChain(parsed.targetChain ?? 'hashkey')
-      setAccessConstraints(parsed.accessConstraints ?? '')
-      setMustHaveGoals(parsed.mustHaveGoals ?? '')
-      setMustAvoidOutcomes(parsed.mustAvoidOutcomes ?? '')
-    } catch {
-      removeLocalStorageItem(DRAFT_KEY)
-    }
-  }, [])
-
-  useEffect(() => {
-    setLocalStorageItem(
-      DRAFT_KEY,
-      JSON.stringify({
-        mode,
-        problem,
-        safeAddress,
-        budgetRange,
-        timeHorizon,
-        riskPreference,
-        settlementCurrency,
-        targetChain,
-        accessConstraints,
-        mustHaveGoals,
-        mustAvoidOutcomes,
-      }),
-    )
-    setLastSavedAt(new Date().toISOString())
-  }, [
-    accessConstraints,
-    budgetRange,
+  const {
     mode,
-    mustAvoidOutcomes,
-    mustHaveGoals,
     problem,
-    riskPreference,
     safeAddress,
+    budgetRange,
+    timeHorizon,
+    riskPreference,
     settlementCurrency,
     targetChain,
-    timeHorizon,
-  ])
+    accessConstraints,
+    mustHaveGoals,
+    mustAvoidOutcomes,
+  } = draft
+
+  const updateDraft = (patch: Partial<ModeSelectionDraft>) => {
+    const savedAt = new Date().toISOString()
+    setDraft((current) => {
+      const next = { ...current, ...patch }
+      setLocalStorageItem(DRAFT_KEY, JSON.stringify(next))
+      return next
+    })
+    setLastSavedAt(savedAt)
+  }
 
   const effectiveAddress = wallet.walletAddress || safeAddress.trim()
   const catalogQuery = useQuery({
@@ -181,6 +173,7 @@ export function ModeSelectionPage() {
   const createMutation = useMutation({
     mutationFn: (payload: CreateSessionPayload) => adapter.analysis.create(payload),
     onSuccess: async (session) => {
+      removeLocalStorageItem(DRAFT_KEY)
       await navigate(`/sessions/${session.id}/clarify`)
     },
   })
@@ -314,7 +307,7 @@ export function ModeSelectionPage() {
                     aria-label={t('analysis.newAnalysis.safeLabel')}
                     value={safeAddress}
                     placeholder={t('analysis.newAnalysis.safePlaceholder')}
-                    onChange={(event) => setSafeAddress(event.target.value)}
+                    onChange={(event) => updateDraft({ safeAddress: event.target.value })}
                   />
                   <Button className="max-sm:w-full" variant="secondary">
                     <Building2 className="size-4" />
@@ -373,7 +366,7 @@ export function ModeSelectionPage() {
                 <button
                   type="button"
                   className={modeCardClass(mode === 'single-asset-allocation')}
-                  onClick={() => setMode('single-asset-allocation')}
+                  onClick={() => updateDraft({ mode: 'single-asset-allocation' })}
                 >
                   <div className="flex items-start justify-between gap-4">
                     <div>
@@ -392,7 +385,7 @@ export function ModeSelectionPage() {
                 <button
                   type="button"
                   className={modeCardClass(mode === 'strategy-compare')}
-                  onClick={() => setMode('strategy-compare')}
+                  onClick={() => updateDraft({ mode: 'strategy-compare' })}
                 >
                   <div className="flex items-start justify-between gap-4">
                     <div>
@@ -424,7 +417,7 @@ export function ModeSelectionPage() {
                     aria-label={t('analysis.newAnalysis.briefLabel')}
                     value={problem}
                     placeholder={t('analysis.newAnalysis.briefPlaceholder')}
-                    onChange={(event) => setProblem(event.target.value)}
+                    onChange={(event) => updateDraft({ problem: event.target.value })}
                   />
                 </div>
 
@@ -436,7 +429,7 @@ export function ModeSelectionPage() {
                     <Input
                       aria-label={t('analysis.newAnalysis.fields.budget')}
                       value={budgetRange}
-                      onChange={(event) => setBudgetRange(event.target.value)}
+                      onChange={(event) => updateDraft({ budgetRange: event.target.value })}
                     />
                   </div>
                   <div className="space-y-2">
@@ -446,7 +439,7 @@ export function ModeSelectionPage() {
                     <Input
                       aria-label={t('analysis.newAnalysis.fields.horizon')}
                       value={timeHorizon}
-                      onChange={(event) => setTimeHorizon(event.target.value)}
+                      onChange={(event) => updateDraft({ timeHorizon: event.target.value })}
                     />
                   </div>
                   <div className="space-y-2">
@@ -456,7 +449,11 @@ export function ModeSelectionPage() {
                     <Select
                       aria-label={t('analysis.newAnalysis.fields.risk')}
                       value={riskPreference}
-                      onChange={(event) => setRiskPreference(event.target.value as typeof riskPreference)}
+                      onChange={(event) =>
+                        updateDraft({
+                          riskPreference: event.target.value as ModeSelectionDraft['riskPreference'],
+                        })
+                      }
                     >
                       <option value="conservative">{t('analysis.newAnalysis.options.risk.conservative')}</option>
                       <option value="balanced">{t('analysis.newAnalysis.options.risk.balanced')}</option>
@@ -470,7 +467,7 @@ export function ModeSelectionPage() {
                     <Select
                       aria-label={t('analysis.newAnalysis.fields.settlement')}
                       value={settlementCurrency}
-                      onChange={(event) => setSettlementCurrency(event.target.value)}
+                      onChange={(event) => updateDraft({ settlementCurrency: event.target.value })}
                     >
                       <option value="USD">USD</option>
                       <option value="USDC">USDC</option>
@@ -484,7 +481,11 @@ export function ModeSelectionPage() {
                     <Select
                       aria-label={t('analysis.newAnalysis.fields.targetChain')}
                       value={targetChain}
-                      onChange={(event) => setTargetChain(event.target.value as typeof targetChain)}
+                      onChange={(event) =>
+                        updateDraft({
+                          targetChain: event.target.value as ModeSelectionDraft['targetChain'],
+                        })
+                      }
                     >
                       <option value="hashkey">{t('analysis.newAnalysis.options.network.hashkey')}</option>
                       <option value="evm">{t('analysis.newAnalysis.options.network.evm')}</option>
@@ -498,7 +499,7 @@ export function ModeSelectionPage() {
                     <Input
                       aria-label={t('analysis.newAnalysis.fields.access')}
                       value={accessConstraints}
-                      onChange={(event) => setAccessConstraints(event.target.value)}
+                      onChange={(event) => updateDraft({ accessConstraints: event.target.value })}
                     />
                   </div>
                   <div className="space-y-2 xl:col-span-2">
@@ -508,7 +509,7 @@ export function ModeSelectionPage() {
                     <Textarea
                       aria-label={t('analysis.newAnalysis.fields.mustHave')}
                       value={mustHaveGoals}
-                      onChange={(event) => setMustHaveGoals(event.target.value)}
+                      onChange={(event) => updateDraft({ mustHaveGoals: event.target.value })}
                     />
                   </div>
                   <div className="space-y-2 xl:col-span-2">
@@ -518,7 +519,7 @@ export function ModeSelectionPage() {
                     <Textarea
                       aria-label={t('analysis.newAnalysis.fields.mustAvoid')}
                       value={mustAvoidOutcomes}
-                      onChange={(event) => setMustAvoidOutcomes(event.target.value)}
+                      onChange={(event) => updateDraft({ mustAvoidOutcomes: event.target.value })}
                     />
                   </div>
                 </div>
@@ -555,7 +556,7 @@ export function ModeSelectionPage() {
                     key={prompt}
                     type="button"
                     className="w-full rounded-[18px] border border-border-subtle bg-app-bg-elevated px-4 py-4 text-left text-sm leading-6 text-text-secondary hover:border-border-strong hover:text-text-primary"
-                    onClick={() => setProblem(prompt)}
+                    onClick={() => updateDraft({ problem: prompt })}
                   >
                     {prompt}
                   </button>

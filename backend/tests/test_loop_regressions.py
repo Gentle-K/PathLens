@@ -5,7 +5,6 @@ import httpx
 from fastapi.testclient import TestClient
 
 from app.adapters.search import BraveSearchAdapter
-from app.bootstrap import AppServices
 from app.domain.models import (
     AnalysisMode,
     AnalysisReport,
@@ -33,6 +32,7 @@ from app.adapters.llm_analysis import OpenAICompatibleAnalysisAdapter
 from app.adapters.llm_analysis import MockAnalysisAdapter
 from app.config import Settings
 from app.prompts.analysis import build_planning_prompts
+from tests.support import build_test_services
 
 
 class RepositoryWithAudit(InMemorySessionRepository):
@@ -86,37 +86,12 @@ class NoopChartAdapter:
 
 
 def build_services():
-    repository = RepositoryWithAudit()
-    audit_log_service = AuditLogService(repository)
-    session_service = SessionService(repository, audit_log_service)
-    wallet_service = WalletService()
-    eligibility_service = EligibilityService()
-    execution_service = ExecutionService(
-        session_service=session_service,
-        eligibility_service=eligibility_service,
-    )
-    monitoring_service = MonitoringService(
-        session_service=session_service,
-        wallet_service=wallet_service,
-    )
-    proof_service = ProofService()
-    orchestrator = AnalysisOrchestrator(
-        repository=repository,
-        audit_log_service=audit_log_service,
+    return build_test_services(
         analysis_adapter=ExplodingAnalysisAdapter(),
         search_adapter=NoopSearchAdapter(),
         calculation_adapter=NoopCalculationAdapter(),
         chart_adapter=NoopChartAdapter(),
-    )
-    return AppServices(
-        session_service=session_service,
-        audit_log_service=audit_log_service,
-        orchestrator=orchestrator,
-        wallet_service=wallet_service,
-        eligibility_service=eligibility_service,
-        execution_service=execution_service,
-        monitoring_service=monitoring_service,
-        proof_service=proof_service,
+        repository=RepositoryWithAudit(),
     )
 
 
@@ -430,7 +405,7 @@ class SessionStepHttpTests(unittest.TestCase):
 
             saved_session = services.session_service.get_session(session_id)
             self.assertIsNotNone(saved_session)
-            saved_session.status = SessionStatus.COMPLETED
+            saved_session.status = SessionStatus.READY_FOR_EXECUTION
             saved_session.report = AnalysisReport(
                 summary="Ready for attestation.",
                 assumptions=[],

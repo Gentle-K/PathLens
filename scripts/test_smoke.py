@@ -307,7 +307,7 @@ def main() -> int:
         for round_index in range(10):
             session = request_json(opener, f"{backend_url}/api/sessions/{session_id}")
             status = session["status"]
-            if status == "COMPLETED":
+            if status == "READY_FOR_EXECUTION":
                 break
             if status == "FAILED":
                 raise RuntimeError(f"Session failed: {session.get('error_message', '')}")
@@ -324,8 +324,10 @@ def main() -> int:
             )
 
         final_session = request_json(opener, f"{backend_url}/api/sessions/{session_id}")
-        if final_session["status"] != "COMPLETED":
-            raise RuntimeError(f"Expected COMPLETED, got {final_session['status']}")
+        if final_session["status"] != "READY_FOR_EXECUTION":
+            raise RuntimeError(
+                f"Expected READY_FOR_EXECUTION, got {final_session['status']}"
+            )
 
         report = final_session["report"]
         if not report:

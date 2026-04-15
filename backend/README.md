@@ -5,9 +5,24 @@ This backend now acts as the proof, readiness, execution-planning, and monitorin
 ## Run
 
 ```bash
-pip install -r requirements.txt
-uvicorn app.main:app --reload
+cd backend
+py -3.13 -m venv .venv
+.venv\Scripts\python -m pip install -r requirements.txt
+.venv\Scripts\python -m uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload
 ```
+
+Cross-platform verification from the repository root:
+
+```bash
+node scripts/run_python.mjs scripts/run_backend_tests.py all
+node scripts/run_python.mjs scripts/test_smoke.py
+```
+
+Current lifecycle contract:
+
+- analysis sessions stop at `READY_FOR_EXECUTION` once a report and execution context are ready
+- they do not auto-transition to `COMPLETED` before an actual execution outcome is recorded
+- when `PlanRegistry` is not configured, `attestation_draft.ready` stays `false` and no explorer URL is emitted
 
 ## Environment
 
@@ -122,6 +137,7 @@ Debug console notes:
 - Default database path: `backend/data/genius_actuary.db`
 - Current implementation stores the full session as JSON and keeps key columns indexed in SQLite.
 - This keeps the orchestrator stable now and leaves room to normalize tables later.
+- The repository ignores local SQLite files; treat the database as runtime state, not as committed source.
 
 ## Key routes
 

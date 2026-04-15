@@ -30,6 +30,14 @@ import {
 import { currentUnderstanding, formatRelativeTime, modeLabel } from '@/features/analysis/lib/view-models'
 import type { UserAnswer } from '@/types'
 
+function createEmptyDraft(): ClarificationDraftValue {
+  return {
+    selectedOptions: [],
+    customInput: '',
+    answerStatus: 'declined',
+  }
+}
+
 function buildInitialDrafts(
   sessionId: string,
   questions: Array<{ id: string }>,
@@ -96,7 +104,9 @@ export function AnalysisSessionPage() {
   const queryClient = useQueryClient()
   const adapter = useApiAdapter()
   const locale = useAppStore((state) => state.locale)
-  const [drafts, setDrafts] = useState<Record<string, ClarificationDraftValue>>({})
+  const [drafts, setDrafts] = useState<Record<string, ClarificationDraftValue>>(() =>
+    buildInitialDrafts(sessionId, []),
+  )
   const [lastSavedAt, setLastSavedAt] = useState<string>('')
 
   const sessionQuery = useQuery({
@@ -113,11 +123,6 @@ export function AnalysisSessionPage() {
       await navigate(`/sessions/${sessionId}/analyzing`)
     },
   })
-
-  useEffect(() => {
-    if (!sessionQuery.data) return
-    setDrafts(buildInitialDrafts(sessionId, sessionQuery.data.questions))
-  }, [sessionId, sessionQuery.data])
 
   useEffect(() => {
     if (
@@ -156,12 +161,18 @@ export function AnalysisSessionPage() {
   }
 
   const pendingQuestions = session.questions.filter((question) => !question.answered)
-  const answers = toAnswers(sessionId, pendingQuestions, drafts)
+  const questionDrafts = Object.fromEntries(
+    session.questions.map((question) => [
+      question.id,
+      drafts[question.id] ?? createEmptyDraft(),
+    ]),
+  )
+  const answers = toAnswers(sessionId, pendingQuestions, questionDrafts)
   const understanding = currentUnderstanding(session)
   const unresolved = pendingQuestions.map((item) => item.question)
 
   const saveDraft = () => {
-    setLocalStorageItem(`ga-clarify-${sessionId}`, JSON.stringify(drafts))
+    setLocalStorageItem(`ga-clarify-${sessionId}`, JSON.stringify(questionDrafts))
     setLastSavedAt(new Date().toISOString())
     toast.success(t('analysis.analysisSessionPage.draftSaved'))
   }
@@ -238,13 +249,7 @@ export function AnalysisSessionPage() {
                   <ClarificationQuestionCard
                     key={question.id}
                     question={question}
-                    value={
-                      drafts[question.id] ?? {
-                        selectedOptions: [],
-                        customInput: '',
-                        answerStatus: 'declined',
-                      }
-                    }
+                    value={questionDrafts[question.id] ?? createEmptyDraft()}
                     onChange={(next) =>
                       setDrafts((current) => ({
                         ...current,
