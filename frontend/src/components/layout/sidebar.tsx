@@ -9,6 +9,7 @@ import {
   PlusSquare,
   ScrollText,
   Settings2,
+  TrendingUp,
 } from 'lucide-react'
 import { NavLink } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
@@ -23,6 +24,7 @@ const navItems = [
   { to: '/new-analysis', labelKey: 'nav.newAnalysis', icon: PlusSquare },
   { to: '/assets', labelKey: 'nav.assets', icon: BadgeCheck },
   { to: '/portfolio', labelKey: 'nav.portfolio', icon: BarChart3 },
+  { to: '/stocks', labelKey: 'nav.stocks', icon: TrendingUp },
   { to: '/sessions', labelKey: 'nav.sessions', icon: Layers3 },
   { to: '/reports', labelKey: 'nav.reports', icon: ScrollText },
   { to: '/evidence', labelKey: 'nav.evidence', icon: FileSearch },

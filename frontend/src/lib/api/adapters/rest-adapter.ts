@@ -64,6 +64,26 @@ import {
   toBackendAnswers,
 } from '@/lib/api/adapters/genius-backend'
 import { mockApiAdapter } from '@/lib/api/adapters/mock-adapter'
+import {
+  type BackendStocksAccountResponse,
+  type BackendStocksAutopilotStateResponse,
+  type BackendStocksBootstrapResponse,
+  type BackendStocksCandidatesResponse,
+  type BackendStocksDecisionCyclesResponse,
+  type BackendStocksKillSwitchResponse,
+  type BackendStocksOrdersResponse,
+  type BackendStocksPositionsResponse,
+  mapDecisionCycleRecord,
+  mapPromotionGateResult,
+  mapStockBrokerAccount,
+  mapStockOrder,
+  mapStockPositionState,
+  mapStocksBootstrap,
+  mapTradeCandidate,
+  mapAiDecision,
+  mapRiskGateResult,
+  toBackendStocksSettingsUpdate,
+} from '@/lib/api/adapters/stocks-backend'
 import { endpoints } from '@/lib/api/endpoints'
 import { useAppStore } from '@/lib/store/app-store'
 import type {
@@ -911,6 +931,107 @@ export const restApiAdapter: ApiAdapter = {
       }
 
       return mockApiAdapter.resources.save(resourceKey, record)
+    },
+  },
+  stocks: {
+    async getBootstrap() {
+      const payload = await apiClient.request<BackendStocksBootstrapResponse>(
+        endpoints.backend.stocksBootstrap,
+      )
+      return mapStocksBootstrap(payload)
+    },
+    async getAccount(mode) {
+      const payload = await apiClient.request<BackendStocksAccountResponse>(
+        endpoints.backend.stocksAccount(mode),
+      )
+      return mapStockBrokerAccount(payload.account)
+    },
+    async getCandidates(mode) {
+      const payload = await apiClient.request<BackendStocksCandidatesResponse>(
+        endpoints.backend.stocksCandidates(mode),
+      )
+      return {
+        mode: payload.mode,
+        candidates: (payload.candidates ?? []).map(mapTradeCandidate),
+        aiDecisions: (payload.ai_decisions ?? []).map(mapAiDecision),
+        riskOutcomes: (payload.risk_outcomes ?? []).map(mapRiskGateResult),
+        latestCycle: payload.latest_cycle
+          ? mapDecisionCycleRecord(payload.latest_cycle)
+          : undefined,
+      }
+    },
+    async getPositions(mode) {
+      const payload = await apiClient.request<BackendStocksPositionsResponse>(
+        endpoints.backend.stocksPositions(mode),
+      )
+      return {
+        mode: payload.mode,
+        positions: (payload.positions ?? []).map(mapStockPositionState),
+        account: mapStockBrokerAccount(payload.account),
+      }
+    },
+    async getOrders(mode) {
+      const payload = await apiClient.request<BackendStocksOrdersResponse>(
+        endpoints.backend.stocksOrders(mode),
+      )
+      return {
+        mode: payload.mode,
+        orders: (payload.orders ?? []).map(mapStockOrder),
+        positions: (payload.positions ?? []).map(mapStockPositionState),
+        account: mapStockBrokerAccount(payload.account),
+      }
+    },
+    async setAutopilotState(mode, state) {
+      const payload = await apiClient.request<BackendStocksAutopilotStateResponse>(
+        endpoints.backend.stocksAutopilotState,
+        {
+          method: 'POST',
+          body: JSON.stringify({ mode, state }),
+        },
+      )
+      return {
+        mode: payload.mode,
+        state: payload.state,
+        account: mapStockBrokerAccount(payload.account),
+        promotionGate: mapPromotionGateResult(payload.promotion_gate),
+      }
+    },
+    async triggerKillSwitch(mode, reason) {
+      const payload = await apiClient.request<BackendStocksKillSwitchResponse>(
+        endpoints.backend.stocksKillSwitch,
+        {
+          method: 'POST',
+          body: JSON.stringify({ mode, reason }),
+        },
+      )
+      return {
+        mode: payload.mode,
+        state: payload.state,
+        account: mapStockBrokerAccount(payload.account),
+        reason: payload.reason,
+      }
+    },
+    async updateSettings(payload) {
+      const response = await apiClient.request<BackendStocksBootstrapResponse>(
+        endpoints.backend.stocksSettings,
+        {
+          method: 'POST',
+          body: JSON.stringify(toBackendStocksSettingsUpdate(payload)),
+        },
+      )
+      return mapStocksBootstrap(response)
+    },
+    async getPromotionGate() {
+      const payload = await apiClient.request<
+        BackendStocksBootstrapResponse['promotion_gate']
+      >(endpoints.backend.stocksPromotionGate)
+      return mapPromotionGateResult(payload)
+    },
+    async getDecisionCycles(mode) {
+      const payload = await apiClient.request<BackendStocksDecisionCyclesResponse>(
+        endpoints.backend.stocksDecisionCycles(mode ?? ''),
+      )
+      return (payload.items ?? []).map(mapDecisionCycleRecord)
     },
   },
 }

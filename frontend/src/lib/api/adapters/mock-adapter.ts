@@ -12,6 +12,18 @@ import {
   buildMockAnalysisBundle,
   buildMockModeDefinitions,
 } from '@/lib/mock/analysis-workflows'
+import {
+  getMockStocksAccount,
+  getMockStocksBootstrap,
+  getMockStocksCandidates,
+  getMockStocksDecisionCycles,
+  getMockStocksOrders,
+  getMockStocksPositions,
+  getMockStocksPromotionGate,
+  setMockStocksAutopilotState,
+  triggerMockStocksKillSwitch,
+  updateMockStocksSettings,
+} from '@/lib/mock/stocks'
 import type { ApiAdapter } from '@/lib/api/adapters/base'
 import type { BackendSession } from '@/lib/api/adapters/genius-backend'
 import { useAppStore } from '@/lib/store/app-store'
@@ -2262,6 +2274,48 @@ export const mockApiAdapter: ApiAdapter = {
       }
 
       return savedRecord
+    },
+  },
+  stocks: {
+    async getBootstrap() {
+      await wait(120)
+      return getMockStocksBootstrap()
+    },
+    async getAccount(mode) {
+      await wait(120)
+      return getMockStocksAccount(mode)
+    },
+    async getCandidates(mode) {
+      await wait(160)
+      return getMockStocksCandidates(mode)
+    },
+    async getPositions(mode) {
+      await wait(120)
+      return getMockStocksPositions(mode)
+    },
+    async getOrders(mode) {
+      await wait(120)
+      return getMockStocksOrders(mode)
+    },
+    async setAutopilotState(mode, state) {
+      await wait(120)
+      return setMockStocksAutopilotState(mode, state)
+    },
+    async triggerKillSwitch(mode, reason) {
+      await wait(120)
+      return triggerMockStocksKillSwitch(mode, reason)
+    },
+    async updateSettings(payload) {
+      await wait(160)
+      return updateMockStocksSettings(payload)
+    },
+    async getPromotionGate() {
+      await wait(120)
+      return getMockStocksPromotionGate()
+    },
+    async getDecisionCycles(mode) {
+      await wait(120)
+      return getMockStocksDecisionCycles(mode)
     },
   },
 }

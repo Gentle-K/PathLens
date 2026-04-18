@@ -6,6 +6,7 @@ from fastapi.responses import JSONResponse
 
 from app.api.routes import router
 from app.api.rwa_routes import rwa_router
+from app.api.stocks_routes import stocks_router
 from app.config import Settings
 
 
@@ -27,6 +28,7 @@ def create_app() -> FastAPI:
 
     app.include_router(router)
     app.include_router(rwa_router)
+    app.include_router(stocks_router)
 
     @app.exception_handler(sqlite3.Error)
     async def sqlite_error_handler(_request, _exc):  # pragma: no cover - exercised via integration tests

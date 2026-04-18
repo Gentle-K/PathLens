@@ -94,6 +94,26 @@ const PortfolioPage = lazy(() =>
     default: module.PortfolioPage,
   })),
 )
+const TradingCockpitPage = lazy(() =>
+  import('@/features/stocks/trading-cockpit-page').then((module) => ({
+    default: module.TradingCockpitPage,
+  })),
+)
+const StocksCandidatesPage = lazy(() =>
+  import('@/features/stocks/candidates-page').then((module) => ({
+    default: module.StocksCandidatesPage,
+  })),
+)
+const StocksOrdersPage = lazy(() =>
+  import('@/features/stocks/orders-page').then((module) => ({
+    default: module.StocksOrdersPage,
+  })),
+)
+const StocksSettingsPage = lazy(() =>
+  import('@/features/stocks/stocks-settings-page').then((module) => ({
+    default: module.StocksSettingsPage,
+  })),
+)
 const AuditLogPage = lazy(() =>
   import('@/features/logs/audit-log-page').then((module) => ({
     default: module.AuditLogPage,
@@ -169,6 +189,16 @@ export const router = createBrowserRouter([
           { path: '/assets', element: withRouteSuspense(<AssetsHubPage />) },
           { path: '/assets/:assetId/proof', element: withRouteSuspense(<AssetProofPage />) },
           { path: '/sessions', element: withRouteSuspense(<SessionsPage />) },
+          { path: '/stocks', element: withRouteSuspense(<TradingCockpitPage />) },
+          {
+            path: '/stocks/candidates',
+            element: withRouteSuspense(<StocksCandidatesPage />),
+          },
+          { path: '/stocks/orders', element: withRouteSuspense(<StocksOrdersPage />) },
+          {
+            path: '/stocks/settings',
+            element: withRouteSuspense(<StocksSettingsPage />),
+          },
           { path: '/sessions/:sessionId', element: withRouteSuspense(<SessionDetailPage />) },
           {
             path: '/sessions/:sessionId/clarify',

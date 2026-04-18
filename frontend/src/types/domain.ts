@@ -1728,3 +1728,221 @@ export interface ExportPayload {
   headers: string[]
   rows: Array<Array<string | number>>
 }
+
+export type TradingMode = 'paper' | 'live'
+export type AutopilotState = 'paused' | 'armed' | 'running' | 'halted'
+export type StrategyTemplate =
+  | 'trend_follow'
+  | 'pullback_reclaim'
+  | 'breakout_confirmation'
+export type AiTradeAction = 'buy' | 'hold' | 'sell_to_close' | 'skip'
+export type RiskGateStatus = 'approved' | 'blocked' | 'watch_only'
+export type ProviderConnectionStatus = 'connected' | 'simulated' | 'unavailable'
+export type StockOrderStatus =
+  | 'draft'
+  | 'ready_not_sent'
+  | 'submitted'
+  | 'filled'
+  | 'canceled'
+  | 'rejected'
+
+export interface StocksProviderStatus {
+  provider: string
+  mode?: TradingMode
+  status: ProviderConnectionStatus
+  detail: string
+  updatedAt: string
+}
+
+export interface StocksRiskLimits {
+  singlePositionCapPct: number
+  grossExposureCapPct: number
+  dailyLossStopPct: number
+  maxOpenPositions: number
+  maxNewEntriesPerSymbolPerDay: number
+  allowExtendedHours: boolean
+  useMarketableLimitOrders: boolean
+  tradingWindowEt: string
+}
+
+export interface StocksSettings {
+  whitelist: string[]
+  notificationsEnabled: boolean
+  defaultMode: TradingMode
+  riskLimits: StocksRiskLimits
+}
+
+export interface StockMarketSnapshot {
+  ticker: string
+  companyName: string
+  asOf: string
+  lastPrice: number
+  openPrice: number
+  highPrice: number
+  lowPrice: number
+  previousClose: number
+  dayChangePct: number
+  volume: number
+  averageVolume: number
+  minuteClose: number
+  minuteOpen: number
+  minuteHigh: number
+  minuteLow: number
+  minuteVolume: number
+  source: string
+  sourceStatus: ProviderConnectionStatus
+}
+
+export interface SignalFeatureSet {
+  priceAboveShortSma: boolean
+  shortSmaAboveLongSma: boolean
+  volumeRatio: number
+  intradayBreakout: boolean
+  pullbackReclaim: boolean
+  momentumPct: number
+  distanceFromOpenPct: number
+  riskBufferPct: number
+  signalScore: number
+}
+
+export interface TradeCandidate {
+  candidateId: string
+  ticker: string
+  companyName: string
+  snapshot: StockMarketSnapshot
+  features: SignalFeatureSet
+  triggeredStrategies: StrategyTemplate[]
+  preferredStrategy?: StrategyTemplate
+  score: number
+  eligible: boolean
+  notes: string[]
+}
+
+export interface AiDecision {
+  decisionId: string
+  ticker: string
+  action: AiTradeAction
+  selectedStrategy?: StrategyTemplate
+  confidence: number
+  rankingScore: number
+  rationale: string
+  modelName: string
+  generatedAt: string
+}
+
+export interface RiskGateResult {
+  gateId: string
+  ticker: string
+  status: RiskGateStatus
+  reasons: string[]
+  warnings: string[]
+  targetWeightPct: number
+  maxNotionalUsd: number
+  suggestedQuantity: number
+  evaluatedAt: string
+}
+
+export interface OrderIntent {
+  intentId: string
+  cycleId: string
+  ticker: string
+  mode: TradingMode
+  action: AiTradeAction
+  quantity: number
+  side: string
+  orderType: string
+  timeInForce: string
+  limitPrice: number
+  status: StockOrderStatus
+  rationale: string
+  riskGate: RiskGateResult
+  submittedOrderId: string
+  createdAt: string
+}
+
+export interface StockOrder {
+  orderId: string
+  clientOrderId: string
+  mode: TradingMode
+  ticker: string
+  side: string
+  quantity: number
+  filledQuantity: number
+  limitPrice: number
+  averageFillPrice: number
+  status: StockOrderStatus
+  sourceIntentId: string
+  broker: string
+  submittedAt: string
+  updatedAt: string
+  metadata: Record<string, unknown>
+}
+
+export interface StockPositionState {
+  ticker: string
+  companyName: string
+  mode: TradingMode
+  direction: 'long'
+  quantity: number
+  averageEntryPrice: number
+  marketPrice: number
+  marketValue: number
+  unrealizedPnl: number
+  realizedPnlToday: number
+  entryStrategy?: StrategyTemplate
+  stopPrice: number
+  takeProfitPrice: number
+  openedAt: string
+  updatedAt: string
+}
+
+export interface StockBrokerAccount {
+  mode: TradingMode
+  equity: number
+  cash: number
+  buyingPower: number
+  dayPnl: number
+  grossExposurePct: number
+  openPositions: number
+  autopilotState: AutopilotState
+  killSwitchActive: boolean
+  providerStatus: ProviderConnectionStatus
+  providerName: string
+  updatedAt: string
+}
+
+export interface PromotionGateResult {
+  eligibleForLiveArm: boolean
+  paperTradingDays: number
+  fillSuccessRate: number
+  unresolvedOrdersCount: number
+  maxDrawdownPct: number
+  riskExceptions: number
+  blockers: string[]
+  evaluatedAt: string
+}
+
+export interface DecisionCycleRecord {
+  cycleId: string
+  mode: TradingMode
+  createdAt: string
+  summary: string
+  marketPhase: string
+  snapshots: StockMarketSnapshot[]
+  candidates: TradeCandidate[]
+  aiDecisions: AiDecision[]
+  orderIntents: OrderIntent[]
+  ordersSubmitted: string[]
+  riskOutcomes: RiskGateResult[]
+  accountEquity: number
+  status: string
+}
+
+export interface StocksBootstrap {
+  settings: StocksSettings
+  modes: TradingMode[]
+  autopilotStates: AutopilotState[]
+  strategies: StrategyTemplate[]
+  providerStatuses: StocksProviderStatus[]
+  promotionGate: PromotionGateResult
+}

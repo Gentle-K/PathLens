@@ -129,6 +129,16 @@ class Settings:
     plan_registry_address: str | None
     kyc_sbt_address: str | None
     asset_proof_registry_address: str | None
+    polygon_api_key: str | None
+    alpaca_paper_key_id: str | None
+    alpaca_paper_secret_key: str | None
+    alpaca_live_key_id: str | None
+    alpaca_live_secret_key: str | None
+    stocks_whitelist: list[str]
+    live_single_position_cap_pct: float
+    live_gross_exposure_cap_pct: float
+    live_daily_loss_stop_pct: float
+    trading_window_et: str
     debug_username: str
     debug_password: str
 
@@ -282,6 +292,25 @@ class Settings:
                 or os.getenv("ASSET_PROOF_REGISTRY_ADDRESS")
                 or None
             ),
+            polygon_api_key=os.getenv("POLYGON_API_KEY") or None,
+            alpaca_paper_key_id=os.getenv("ALPACA_PAPER_KEY_ID") or None,
+            alpaca_paper_secret_key=os.getenv("ALPACA_PAPER_SECRET_KEY") or None,
+            alpaca_live_key_id=os.getenv("ALPACA_LIVE_KEY_ID") or None,
+            alpaca_live_secret_key=os.getenv("ALPACA_LIVE_SECRET_KEY") or None,
+            stocks_whitelist=_split_csv(
+                os.getenv("STOCKS_WHITELIST"),
+                ("AAPL", "MSFT", "NVDA", "AMZN", "META", "GOOGL", "SPY", "QQQ"),
+            ),
+            live_single_position_cap_pct=float(
+                os.getenv("LIVE_SINGLE_POSITION_CAP_PCT", "0.10")
+            ),
+            live_gross_exposure_cap_pct=float(
+                os.getenv("LIVE_GROSS_EXPOSURE_CAP_PCT", "0.35")
+            ),
+            live_daily_loss_stop_pct=float(
+                os.getenv("LIVE_DAILY_LOSS_STOP_PCT", "0.03")
+            ),
+            trading_window_et=os.getenv("TRADING_WINDOW_ET", "09:35-15:45").strip(),
             debug_username=os.getenv("DEBUG_USERNAME", "debug-admin"),
             debug_password=os.getenv("DEBUG_PASSWORD", "change-me-debug-password"),
         )

@@ -11,6 +11,7 @@ from app.adapters.chart import StructuredChartAdapter
 from app.adapters.llm_analysis import MockAnalysisAdapter
 from app.adapters.search import MockSearchAdapter
 from app.bootstrap import AppServices
+from app.config import Settings
 from app.main import create_app
 from app.orchestrator.engine import AnalysisOrchestrator
 from app.persistence.memory import InMemorySessionRepository
@@ -31,6 +32,14 @@ from app.services.proof_repository import ProofRepositoryService
 from app.services.rwa_ops import RwaOpsService
 from app.services.sessions import SessionService
 from app.services.wallets import WalletService
+from app.stocks.broker import StocksBrokerService
+from app.stocks.decision_engine import StocksDecisionEngine
+from app.stocks.execution_router import StocksExecutionRouter
+from app.stocks.market_data import StocksMarketDataService
+from app.stocks.portfolio import StocksPortfolioService
+from app.stocks.repository import InMemoryStocksRepository
+from app.stocks.risk_engine import StocksRiskEngine
+from app.stocks.service import StocksTradingService
 
 
 def build_test_services(
@@ -44,6 +53,7 @@ def build_test_services(
 ) -> AppServices:
     repo = repository or InMemorySessionRepository()
     rwa_repo = InMemoryRwaRepository()
+    stocks_repo = InMemoryStocksRepository()
     audit_log_service = AuditLogService(repo)
     session_service = SessionService(
         repo,
@@ -93,6 +103,16 @@ def build_test_services(
         chain_indexer_service=chain_indexer_service,
         ops_job_service=ops_job_service,
     )
+    stocks_trading_service = StocksTradingService(
+        repository=stocks_repo,
+        market_data_service=StocksMarketDataService(Settings.from_env()),
+        broker_service=StocksBrokerService(Settings.from_env()),
+        decision_engine=StocksDecisionEngine(),
+        risk_engine=StocksRiskEngine(),
+        execution_router=StocksExecutionRouter(),
+        portfolio_service=StocksPortfolioService(),
+        audit_log_service=audit_log_service,
+    )
     orchestrator = AnalysisOrchestrator(
         repository=repo,
         audit_log_service=audit_log_service,
@@ -119,6 +139,7 @@ def build_test_services(
         proof_service=proof_service,
         proof_repository_service=proof_repository_service,
         proof_publisher_service=proof_publisher_service,
+        stocks_trading_service=stocks_trading_service,
     )
 
 
@@ -135,6 +156,9 @@ def patched_test_client(
         )
         stack.enter_context(
             patch("app.api.rwa_routes.get_app_services", return_value=services)
+        )
+        stack.enter_context(
+            patch("app.api.stocks_routes.get_app_services", return_value=services)
         )
         stack.enter_context(
             patch(

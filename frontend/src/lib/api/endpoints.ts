@@ -89,6 +89,17 @@ export const endpoints = {
       `/api/debug/rwa/proofs/${encodeURIComponent(snapshotId)}/publish`,
     debugRwaExecutionStatusSync: '/api/debug/rwa/execution/status-sync',
     debugRwaIndexerRun: '/api/debug/rwa/indexer/run',
+    stocksBootstrap: '/api/stocks/bootstrap',
+    stocksAccount: (mode = 'paper') => `/api/stocks/account?mode=${mode}`,
+    stocksCandidates: (mode = 'paper') => `/api/stocks/candidates?mode=${mode}`,
+    stocksPositions: (mode = 'paper') => `/api/stocks/positions?mode=${mode}`,
+    stocksOrders: (mode = 'paper') => `/api/stocks/orders?mode=${mode}`,
+    stocksAutopilotState: '/api/stocks/autopilot/state',
+    stocksKillSwitch: '/api/stocks/kill-switch',
+    stocksSettings: '/api/stocks/settings',
+    stocksPromotionGate: '/api/stocks/promotion-gate',
+    stocksDecisionCycles: (mode = '') =>
+      `/api/stocks/decision-cycles${mode ? `?mode=${mode}` : ''}`,
   },
   auth: {
     login: '/api/auth/login',

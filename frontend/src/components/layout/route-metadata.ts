@@ -12,6 +12,9 @@ export function routeMetadata(pathname: string): RouteMetadata {
   if (pathname.startsWith('/portfolio')) {
     return { titleKey: 'layout.routes.portfolio' }
   }
+  if (pathname.startsWith('/stocks')) {
+    return { titleKey: 'layout.routes.stocks' }
+  }
   if (pathname.startsWith('/sessions')) {
     return { titleKey: 'layout.routes.sessions' }
   }

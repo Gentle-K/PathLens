@@ -1,0 +1,2 @@
+"""Stocks trading subsystem."""
+

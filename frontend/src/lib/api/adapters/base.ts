@@ -236,4 +236,51 @@ export interface ApiAdapter {
     getById(resourceKey: string, recordId: string): Promise<ResourceRecord>
     save(resourceKey: string, record: Partial<ResourceRecord>): Promise<ResourceRecord>
   }
+  stocks: {
+    getBootstrap(): Promise<import('@/types').StocksBootstrap>
+    getAccount(mode: import('@/types').TradingMode): Promise<import('@/types').StockBrokerAccount>
+    getCandidates(mode: import('@/types').TradingMode): Promise<{
+      mode: import('@/types').TradingMode
+      candidates: import('@/types').TradeCandidate[]
+      aiDecisions: import('@/types').AiDecision[]
+      riskOutcomes: import('@/types').RiskGateResult[]
+      latestCycle?: import('@/types').DecisionCycleRecord
+    }>
+    getPositions(mode: import('@/types').TradingMode): Promise<{
+      mode: import('@/types').TradingMode
+      positions: import('@/types').StockPositionState[]
+      account: import('@/types').StockBrokerAccount
+    }>
+    getOrders(mode: import('@/types').TradingMode): Promise<{
+      mode: import('@/types').TradingMode
+      orders: import('@/types').StockOrder[]
+      positions: import('@/types').StockPositionState[]
+      account: import('@/types').StockBrokerAccount
+    }>
+    setAutopilotState(
+      mode: import('@/types').TradingMode,
+      state: import('@/types').AutopilotState,
+    ): Promise<{
+      mode: import('@/types').TradingMode
+      state: import('@/types').AutopilotState
+      account: import('@/types').StockBrokerAccount
+      promotionGate: import('@/types').PromotionGateResult
+    }>
+    triggerKillSwitch(
+      mode: import('@/types').TradingMode,
+      reason: string,
+    ): Promise<{
+      mode: import('@/types').TradingMode
+      state: import('@/types').AutopilotState
+      account: import('@/types').StockBrokerAccount
+      reason: string
+    }>
+    updateSettings(
+      payload: Partial<import('@/types').StocksSettings>,
+    ): Promise<import('@/types').StocksBootstrap>
+    getPromotionGate(): Promise<import('@/types').PromotionGateResult>
+    getDecisionCycles(
+      mode?: import('@/types').TradingMode,
+    ): Promise<import('@/types').DecisionCycleRecord[]>
+  }
 }

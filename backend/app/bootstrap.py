@@ -25,6 +25,14 @@ from app.services.proof_repository import ProofRepositoryService
 from app.services.rwa_ops import RwaOpsService
 from app.services.sessions import SessionService
 from app.services.wallets import WalletService
+from app.stocks.broker import StocksBrokerService
+from app.stocks.decision_engine import StocksDecisionEngine
+from app.stocks.execution_router import StocksExecutionRouter
+from app.stocks.market_data import StocksMarketDataService
+from app.stocks.portfolio import StocksPortfolioService
+from app.stocks.repository import SQLiteStocksRepository
+from app.stocks.risk_engine import StocksRiskEngine
+from app.stocks.service import StocksTradingService
 
 
 @dataclass
@@ -46,6 +54,7 @@ class AppServices:
     proof_service: ProofService
     proof_repository_service: ProofRepositoryService
     proof_publisher_service: ProofPublisherService
+    stocks_trading_service: StocksTradingService | None = None
 
 
 _services: AppServices | None = None
@@ -136,6 +145,7 @@ def get_app_services() -> AppServices:
         settings = Settings.from_env()
         repository = SQLiteSessionRepository(str(settings.session_db_path))
         rwa_repository = SQLiteRwaRepository(str(settings.session_db_path))
+        stocks_repository = SQLiteStocksRepository(str(settings.session_db_path))
         audit_log_service = AuditLogService(repository)
         session_service = SessionService(
             repository,
@@ -189,6 +199,16 @@ def get_app_services() -> AppServices:
             chain_indexer_service=chain_indexer_service,
             ops_job_service=ops_job_service,
         )
+        stocks_trading_service = StocksTradingService(
+            repository=stocks_repository,
+            market_data_service=StocksMarketDataService(settings),
+            broker_service=StocksBrokerService(settings),
+            decision_engine=StocksDecisionEngine(),
+            risk_engine=StocksRiskEngine(),
+            execution_router=StocksExecutionRouter(),
+            portfolio_service=StocksPortfolioService(),
+            audit_log_service=audit_log_service,
+        )
         orchestrator = AnalysisOrchestrator(
             repository=repository,
             audit_log_service=audit_log_service,
@@ -215,5 +235,6 @@ def get_app_services() -> AppServices:
             proof_service=proof_service,
             proof_repository_service=proof_repository_service,
             proof_publisher_service=proof_publisher_service,
+            stocks_trading_service=stocks_trading_service,
         )
     return _services
